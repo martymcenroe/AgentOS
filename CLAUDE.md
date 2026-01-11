@@ -14,7 +14,7 @@ This workspace uses **AgentOS** - a parameterized agent configuration system. Ea
 
 To generate configs for a new project:
 ```bash
-python /c/Users/mcwiz/Projects/tools/agentos-generate.py --project YOUR_PROJECT
+poetry run --directory /c/Users/mcwiz/Projects/AgentOS python /c/Users/mcwiz/Projects/AgentOS/tools/agentos-generate.py --project YOUR_PROJECT
 ```
 
 ---
