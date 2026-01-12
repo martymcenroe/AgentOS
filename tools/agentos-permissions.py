@@ -2,18 +2,21 @@
 """
 AgentOS Permission Propagation Tool
 
-Syncs friction-free permissions across projects under Projects/.
+IMPORTANT: Claude Code permissions DO NOT INHERIT - they REPLACE.
+When a project has its own permissions block, it completely overrides the parent.
+
+This tool ONLY removes true session vends (one-time specific commands).
+It does NOT remove permissions just because they exist in the parent.
 
 Modes:
-  --audit        Read-only analysis of redundant/stale permissions
-  --clean        Remove redundancies and stale session vends
-  --sync         Full sync with auto-promote (patterns in 3+ projects)
+  --audit        Read-only analysis of session vends
+  --clean        Remove ONLY session vends (keeps all reusable patterns)
   --quick-check  Fast check for cleanup integration (exit code 0/1)
+  --restore      Restore from backup
 
 Usage:
   poetry run python tools/agentos-permissions.py --audit --project Aletheia
   poetry run python tools/agentos-permissions.py --clean --project AgentOS --dry-run
-  poetry run python tools/agentos-permissions.py --sync --all-projects
   poetry run python tools/agentos-permissions.py --quick-check --project Aletheia
 """
 import argparse
@@ -22,102 +25,12 @@ import re
 import shutil
 import sys
 from pathlib import Path
-from collections import Counter
 from typing import Optional
-
-
-# Parent-level broad patterns that cover specific project permissions
-# These are extracted from C:\Users\mcwiz\Projects\.claude\settings.local.json
-PARENT_BROAD_PATTERNS = [
-    # Bash command wildcards
-    (r"^Bash\(git:\*\)$", r"^Bash\(git[ -]"),        # git:* covers git commands
-    (r"^Bash\(poetry:\*\)$", r"^Bash\(poetry "),     # poetry:* covers poetry commands
-    (r"^Bash\(npm:\*\)$", r"^Bash\(npm "),           # npm:* covers npm commands
-    (r"^Bash\(npx:\*\)$", r"^Bash\(npx "),           # npx:* covers npx commands
-    (r"^Bash\(node:\*\)$", r"^Bash\(node "),         # node:* covers node commands
-    (r"^Bash\(docker:\*\)$", r"^Bash\(docker "),     # docker:* covers docker commands
-    (r"^Bash\(aws:\*\)$", r"^Bash\(aws "),           # aws:* covers aws commands
-    (r"^Bash\(gh:\*\)$", r"^Bash\(gh "),             # gh:* covers gh commands
-    (r"^Bash\(cat:\*\)$", r"^Bash\(cat "),           # etc.
-    (r"^Bash\(ls:\*\)$", r"^Bash\(ls "),
-    (r"^Bash\(grep:\*\)$", r"^Bash\(grep "),
-    (r"^Bash\(rg:\*\)$", r"^Bash\(rg "),
-    (r"^Bash\(find:\*\)$", r"^Bash\(find "),
-    (r"^Bash\(head:\*\)$", r"^Bash\(head "),
-    (r"^Bash\(tail:\*\)$", r"^Bash\(tail "),
-    (r"^Bash\(chmod:\*\)$", r"^Bash\(chmod "),
-    (r"^Bash\(mkdir:\*\)$", r"^Bash\(mkdir "),
-    (r"^Bash\(rm:\*\)$", r"^Bash\(rm "),
-    (r"^Bash\(cp:\*\)$", r"^Bash\(cp "),
-    (r"^Bash\(mv:\*\)$", r"^Bash\(mv "),
-    (r"^Bash\(powershell\.exe:\*\)$", r"^Bash\(powershell\.exe "),
-    (r"^Bash\(powershell:\*\)$", r"^Bash\(powershell "),
-    (r"^Bash\(code:\*\)$", r"^Bash\(code "),
-    (r"^Bash\(gemini:\*\)$", r"^Bash\(gemini "),
-    (r"^Bash\(tasklist:\*\)$", r"^Bash\(tasklist"),
-    (r"^Bash\(shellcheck:\*\)$", r"^Bash\(shellcheck "),
-    (r"^Bash\(pytest:\*\)$", r"^Bash\(pytest "),
-    (r"^Bash\(ruff:\*\)$", r"^Bash\(ruff "),
-    (r"^Bash\(mypy:\*\)$", r"^Bash\(mypy "),
-    (r"^Bash\(make:\*\)$", r"^Bash\(make "),
-    (r"^Bash\(curl:\*\)$", r"^Bash\(curl "),
-    (r"^Bash\(wget:\*\)$", r"^Bash\(wget "),
-    (r"^Bash\(tar:\*\)$", r"^Bash\(tar "),
-    (r"^Bash\(zip:\*\)$", r"^Bash\(zip "),
-    (r"^Bash\(unzip:\*\)$", r"^Bash\(unzip "),
-    (r"^Bash\(jq:\*\)$", r"^Bash\(jq "),
-    (r"^Bash\(diff:\*\)$", r"^Bash\(diff "),
-    (r"^Bash\(date:\*\)$", r"^Bash\(date "),
-    (r"^Bash\(sleep:\*\)$", r"^Bash\(sleep "),
-    (r"^Bash\(wc:\*\)$", r"^Bash\(wc "),
-    (r"^Bash\(sort:\*\)$", r"^Bash\(sort "),
-    (r"^Bash\(cut:\*\)$", r"^Bash\(cut "),
-    (r"^Bash\(tr:\*\)$", r"^Bash\(tr "),
-    (r"^Bash\(awk:\*\)$", r"^Bash\(awk "),
-    (r"^Bash\(sed:\*\)$", r"^Bash\(sed "),
-    (r"^Bash\(echo:\*\)$", r"^Bash\(echo "),
-    (r"^Bash\(touch:\*\)$", r"^Bash\(touch "),
-    (r"^Bash\(which:\*\)$", r"^Bash\(which "),
-    (r"^Bash\(file:\*\)$", r"^Bash\(file "),
-    (r"^Bash\(tree:\*\)$", r"^Bash\(tree "),
-    (r"^Bash\(dig:\*\)$", r"^Bash\(dig "),
-    (r"^Bash\(nslookup:\*\)$", r"^Bash\(nslookup "),
-    (r"^Bash\(docker-compose:\*\)$", r"^Bash\(docker-compose "),
-    (r"^Bash\(claude:\*\)$", r"^Bash\(claude "),
-    # Path wildcards
-    (r"^Bash\(/c/Users/mcwiz/Projects/\*\*:\*\)$", r"^Bash\(/c/Users/mcwiz/Projects/"),
-    (r"^Bash\(\./tools/\*\*:\*\)$", r"^Bash\(\./tools/"),
-    # Read/Write/Edit wildcards
-    (r"^Read\(//c/Users/mcwiz/Projects/\*\*\)$", r"^Read\(//c/Users/mcwiz/Projects/"),
-    (r"^Write\(//c/Users/mcwiz/Projects/\*\*\)$", r"^Write\(//c/Users/mcwiz/Projects/"),
-    (r"^Edit\(//c/Users/mcwiz/Projects/\*\*\)$", r"^Edit\(//c/Users/mcwiz/Projects/"),
-    (r"^Read\(//c/Users/mcwiz/\.claude/\*\*\)$", r"^Read\(//c/Users/mcwiz/\.claude/"),
-    # Skills and WebFetch
-    (r"^WebFetch$", r"^WebFetch\(domain:"),
-    (r"^WebSearch$", None),  # Only exact match
-]
-
-# Patterns that indicate session-specific one-time permissions (vends)
-SESSION_VEND_PATTERNS = [
-    r'Bash\(git -C .* commit -m "\$',      # Git commits with embedded messages
-    r"Bash\(git -C .* commit -m '\$",      # Git commits (single quotes)
-    r'Bash\(gh pr create .* --body "\$',   # PR creations with body
-    r"Bash\(gh pr create .* --body '\$",   # PR creations (single quotes)
-    r'Bash\(gh pr create .* --body "',     # PR creations with inline body
-    r"Bash\(git -C .* push -u origin HEAD\)", # One-time push with tracking
-    r"Bash\(gh pr merge:",                  # PR merge commands
-    r"EOF",                                 # Heredoc-style commits
-]
 
 
 def get_projects_dir() -> Path:
     """Get the Projects directory path."""
     return Path.home() / "Projects"
-
-
-def get_parent_settings_path() -> Path:
-    """Get path to parent settings.local.json."""
-    return get_projects_dir() / ".claude" / "settings.local.json"
 
 
 def get_project_settings_path(project_name: str) -> Path:
@@ -141,41 +54,108 @@ def save_settings(path: Path, settings: dict):
     path.write_text(json.dumps(settings, indent=2) + "\n", encoding='utf-8')
 
 
-def load_parent_patterns() -> set:
-    """Load the set of permission patterns from parent settings."""
-    parent_settings = load_settings(get_parent_settings_path())
-    if not parent_settings:
-        return set()
-    return set(parent_settings.get("permissions", {}).get("allow", []))
+def is_session_vend(permission: str) -> tuple[bool, str]:
+    """
+    Check if permission is a one-time session vend that should be removed.
+
+    Returns (is_vend, reason) tuple.
+
+    Session vends are SPECIFIC one-time permissions, not reusable patterns.
+    We identify them by looking for:
+    - Embedded commit messages (heredocs, specific text)
+    - Specific file paths in commands (not wildcards)
+    - One-time git operations (specific commits, pushes, merges)
+    """
+
+    # Git commits with embedded messages (heredocs)
+    if re.search(r'Bash\(git.* commit -m "\$\(cat <<', permission):
+        return True, "git commit with heredoc"
+    if re.search(r"Bash\(git.* commit -m '\$\(cat <<", permission):
+        return True, "git commit with heredoc"
+    if "EOF" in permission and "commit" in permission:
+        return True, "git commit with EOF marker"
+
+    # Git commits with inline messages (specific, not wildcard)
+    if re.search(r'Bash\(git -C [^ ]+ commit -m "[^"]+"\)', permission):
+        return True, "specific git commit"
+
+    # PR creations with specific bodies
+    if re.search(r'Bash\(gh pr create.* --body "\$', permission):
+        return True, "PR creation with heredoc body"
+    if re.search(r"Bash\(gh pr create.* --body '\$", permission):
+        return True, "PR creation with heredoc body"
+    if re.search(r'Bash\(gh pr create.* --body "[^"]{50,}', permission):
+        return True, "PR creation with long body"
+
+    # Specific git -C commands (not wildcards) - look for complete commands
+    # e.g., Bash(git -C /path status) is a vend, but Bash(git -C /path commit -m "$(cat...") already caught above
+    if re.search(r'Bash\(git -C /[^ ]+ (status|add|push|pull|fetch|diff|branch|stash|log)\)', permission):
+        # These are specific one-off commands, likely vends
+        # But we need to be careful - some might be intentional
+        # Only flag if it has a very specific path
+        if re.search(r'Bash\(git -C /c/Users/mcwiz/Projects/[^/]+-\d+ ', permission):
+            return True, "git command on worktree (has issue ID)"
+        # Don't flag commands on main project dirs - those might be intentional
+
+    # Specific push commands with tracking
+    if re.search(r'Bash\(git -C .+ push -u origin (HEAD|[a-zA-Z0-9-]+)\)', permission):
+        return True, "one-time push with tracking"
+
+    # PR merge commands (one-time)
+    if re.search(r'Bash\(gh pr merge', permission):
+        return True, "PR merge command"
+
+    # Specific file opens with start command (Windows)
+    if re.search(r'Bash\(start "" "[^"]+\\\\[^"]+\.(html|pdf|txt)"\)', permission):
+        return True, "specific file open command"
+
+    # Specific CLAUDE_TOOL_INPUT patterns (test commands)
+    if "CLAUDE_TOOL_INPUT" in permission:
+        return True, "test/debug command"
+
+    # Powershell one-liners with specific date formatting
+    if re.search(r'Bash\(powershell\.exe -Command "Get-Date', permission):
+        return True, "powershell date command"
+
+    return False, ""
 
 
-def is_covered_by_parent(permission: str, parent_patterns: set) -> bool:
-    """Check if a specific permission is covered by a broad parent pattern."""
-    # Exact match
-    if permission in parent_patterns:
-        return True
+def is_reusable_pattern(permission: str) -> tuple[bool, str]:
+    """
+    Check if permission is a reusable pattern that should be kept.
 
-    # Check if covered by a wildcard pattern
-    for broad_pattern, specific_pattern in PARENT_BROAD_PATTERNS:
-        # Check if the broad pattern exists in parent
-        for parent_perm in parent_patterns:
-            if re.match(broad_pattern, parent_perm):
-                # If specific pattern is None, only exact match counts
-                if specific_pattern is None:
-                    continue
-                # Check if this permission matches the specific pattern
-                if re.match(specific_pattern, permission):
-                    return True
+    Returns (is_reusable, category) tuple.
+    """
 
-    return False
+    # Skills - always keep
+    if permission.startswith("Skill("):
+        return True, "Skill"
 
+    # WebFetch/WebSearch - always keep
+    if permission.startswith("WebFetch") or permission.startswith("WebSearch"):
+        return True, "Web"
 
-def is_session_vend(permission: str) -> bool:
-    """Check if permission looks like a one-time session vend."""
-    for pattern in SESSION_VEND_PATTERNS:
-        if re.search(pattern, permission):
-            return True
-    return False
+    # Read/Write/Edit wildcards - always keep
+    if re.match(r"^(Read|Write|Edit)\(.*\*\*\)", permission):
+        return True, "File wildcard"
+
+    # Bash wildcards (end with :*) - always keep
+    if re.match(r"^Bash\([^)]+:\*\)$", permission):
+        return True, "Bash wildcard"
+
+    # Bash path wildcards (./tools/**, /c/Users/...**) - always keep
+    if re.search(r"Bash\(\./[^)]+\*\*", permission) or re.search(r"Bash\(/c/Users/[^)]+\*\*", permission):
+        return True, "Path wildcard"
+
+    # Environment variable prefixed commands with wildcards - keep
+    if re.match(r"^Bash\([A-Z_]+=.+:\*\)$", permission):
+        return True, "Env var wildcard"
+
+    # gh commands with wildcards - keep
+    if re.match(r"^Bash\(gh (pr|issue) (list|create|view):\*\)$", permission):
+        return True, "gh wildcard"
+
+    return False, ""
 
 
 def find_all_projects() -> list:
@@ -192,7 +172,7 @@ def find_all_projects() -> list:
     return sorted(projects)
 
 
-def audit_project(project_name: str, parent_patterns: set) -> dict:
+def audit_project(project_name: str) -> dict:
     """Audit a project's permissions and classify them."""
     settings_path = get_project_settings_path(project_name)
     settings = load_settings(settings_path)
@@ -201,25 +181,33 @@ def audit_project(project_name: str, parent_patterns: set) -> dict:
         return {"error": f"Could not load settings for {project_name}"}
 
     allow_list = settings.get("permissions", {}).get("allow", [])
+    deny_list = settings.get("permissions", {}).get("deny", [])
 
-    redundant = []      # Covered by parent
-    session_vends = []  # One-time permissions
-    project_specific = []  # Truly project-specific
+    session_vends = []  # One-time permissions to remove
+    reusable = []       # Reusable patterns to keep
+    unclear = []        # Neither clearly vend nor clearly reusable
 
     for perm in allow_list:
-        if is_session_vend(perm):
-            session_vends.append(perm)
-        elif is_covered_by_parent(perm, parent_patterns):
-            redundant.append(perm)
-        else:
-            project_specific.append(perm)
+        is_vend, vend_reason = is_session_vend(perm)
+        if is_vend:
+            session_vends.append((perm, vend_reason))
+            continue
+
+        is_reuse, reuse_category = is_reusable_pattern(perm)
+        if is_reuse:
+            reusable.append((perm, reuse_category))
+            continue
+
+        # If not clearly a vend or reusable, keep it (err on side of keeping)
+        unclear.append(perm)
 
     return {
         "project": project_name,
-        "total": len(allow_list),
-        "redundant": redundant,
+        "total_allow": len(allow_list),
+        "total_deny": len(deny_list),
         "session_vends": session_vends,
-        "project_specific": project_specific,
+        "reusable": reusable,
+        "unclear": unclear,
     }
 
 
@@ -229,53 +217,81 @@ def print_audit_report(audit: dict):
         print(f"ERROR: {audit['error']}")
         return
 
-    print(f"\n## Audit: {audit['project']}")
-    print(f"Total permissions: {audit['total']}")
+    print(f"\n{'='*60}")
+    print(f"Audit: {audit['project']}")
+    print(f"{'='*60}")
+    print(f"Total: {audit['total_allow']} allow, {audit['total_deny']} deny")
     print()
 
-    print(f"### Redundant (covered by parent): {len(audit['redundant'])}")
-    for perm in audit['redundant'][:10]:  # Show first 10
-        print(f"  - {perm[:80]}...")
-    if len(audit['redundant']) > 10:
-        print(f"  ... and {len(audit['redundant']) - 10} more")
+    print(f"### Session Vends (REMOVE): {len(audit['session_vends'])}")
+    if audit['session_vends']:
+        for perm, reason in audit['session_vends'][:10]:
+            print(f"  [{reason}]")
+            print(f"    {perm[:100]}{'...' if len(perm) > 100 else ''}")
+        if len(audit['session_vends']) > 10:
+            print(f"  ... and {len(audit['session_vends']) - 10} more")
+    else:
+        print("  (none)")
     print()
 
-    print(f"### Session Vends (stale): {len(audit['session_vends'])}")
-    for perm in audit['session_vends'][:5]:  # Show first 5
-        print(f"  - {perm[:80]}...")
-    if len(audit['session_vends']) > 5:
-        print(f"  ... and {len(audit['session_vends']) - 5} more")
+    print(f"### Reusable Patterns (KEEP): {len(audit['reusable'])}")
+    if audit['reusable']:
+        # Group by category
+        by_category = {}
+        for perm, cat in audit['reusable']:
+            by_category.setdefault(cat, []).append(perm)
+        for cat, perms in sorted(by_category.items()):
+            print(f"  {cat}: {len(perms)}")
+            for perm in perms[:3]:
+                print(f"    - {perm[:70]}{'...' if len(perm) > 70 else ''}")
+            if len(perms) > 3:
+                print(f"    ... and {len(perms) - 3} more")
     print()
 
-    print(f"### Project-Specific (keep): {len(audit['project_specific'])}")
-    for perm in audit['project_specific'][:10]:  # Show first 10
-        print(f"  - {perm[:80]}...")
-    if len(audit['project_specific']) > 10:
-        print(f"  ... and {len(audit['project_specific']) - 10} more")
+    print(f"### Unclear (KEEP - err on side of caution): {len(audit['unclear'])}")
+    if audit['unclear']:
+        for perm in audit['unclear'][:10]:
+            print(f"  - {perm[:80]}{'...' if len(perm) > 80 else ''}")
+        if len(audit['unclear']) > 10:
+            print(f"  ... and {len(audit['unclear']) - 10} more")
+    else:
+        print("  (none)")
 
 
-def clean_project(project_name: str, parent_patterns: set, dry_run: bool = True) -> dict:
-    """Clean a project's settings by removing redundancies and session vends."""
+def clean_project(project_name: str, dry_run: bool = True) -> dict:
+    """Clean a project's settings by removing ONLY session vends."""
     settings_path = get_project_settings_path(project_name)
     settings = load_settings(settings_path)
 
     if not settings:
         return {"error": f"Could not load settings for {project_name}"}
 
-    audit = audit_project(project_name, parent_patterns)
+    audit = audit_project(project_name)
+    if "error" in audit:
+        return audit
 
-    # Keep only project-specific permissions
-    new_allow = audit['project_specific']
+    # Build new allow list: everything EXCEPT session vends
+    vend_perms = {perm for perm, _ in audit['session_vends']}
+    original_allow = settings.get("permissions", {}).get("allow", [])
+    new_allow = [p for p in original_allow if p not in vend_perms]
 
-    removed_count = len(audit['redundant']) + len(audit['session_vends'])
+    removed_count = len(audit['session_vends'])
 
     if dry_run:
         print(f"\n## Dry Run: {project_name}")
-        print(f"Would remove {removed_count} permissions:")
-        print(f"  - {len(audit['redundant'])} redundant")
-        print(f"  - {len(audit['session_vends'])} session vends")
-        print(f"Would keep {len(new_allow)} project-specific permissions")
+        print(f"Would remove {removed_count} session vends")
+        print(f"Would keep {len(new_allow)} permissions")
+        if audit['session_vends']:
+            print("Vends to remove:")
+            for perm, reason in audit['session_vends'][:5]:
+                print(f"  [{reason}] {perm[:60]}...")
+            if len(audit['session_vends']) > 5:
+                print(f"  ... and {len(audit['session_vends']) - 5} more")
         return {"removed": removed_count, "kept": len(new_allow), "dry_run": True}
+
+    if removed_count == 0:
+        print(f"\n## {project_name}: No session vends to remove")
+        return {"removed": 0, "kept": len(new_allow), "dry_run": False}
 
     # Create backup
     backup_path = settings_path.with_suffix('.local.json.bak')
@@ -287,86 +303,29 @@ def clean_project(project_name: str, parent_patterns: set, dry_run: bool = True)
     save_settings(settings_path, settings)
 
     print(f"\n## Cleaned: {project_name}")
-    print(f"Removed {removed_count} permissions")
-    print(f"Kept {len(new_allow)} project-specific permissions")
+    print(f"Removed {removed_count} session vends")
+    print(f"Kept {len(new_allow)} permissions")
 
     return {"removed": removed_count, "kept": len(new_allow), "dry_run": False}
 
 
-def find_common_patterns(projects: list, parent_patterns: set) -> list:
-    """Find patterns that appear in 3+ projects (promotion candidates)."""
-    pattern_counts = Counter()
-
-    for project_name in projects:
-        audit = audit_project(project_name, parent_patterns)
-        if "error" in audit:
-            continue
-
-        # Count project-specific patterns (not already in parent)
-        for perm in audit['project_specific']:
-            # Normalize pattern for comparison (remove project-specific paths)
-            normalized = re.sub(r'/c/Users/mcwiz/Projects/[^/]+', '/c/Users/mcwiz/Projects/{PROJECT}', perm)
-            pattern_counts[normalized] += 1
-
-    # Return patterns in 3+ projects
-    return [pattern for pattern, count in pattern_counts.items() if count >= 3]
-
-
-def quick_check(project_name: str, parent_patterns: set) -> int:
+def quick_check(project_name: str) -> int:
     """Quick check for cleanup integration. Returns exit code."""
-    audit = audit_project(project_name, parent_patterns)
+    audit = audit_project(project_name)
 
     if "error" in audit:
         print(f"ERROR: {audit['error']}")
         return 2
 
-    stale_count = len(audit['session_vends'])
-    redundant_count = len(audit['redundant'])
+    vend_count = len(audit['session_vends'])
 
-    if stale_count > 0 or redundant_count > 5:
-        print(f"Stale permissions detected: {stale_count} vends, {redundant_count} redundant")
+    if vend_count > 5:
+        print(f"Session vends detected: {vend_count}")
         print(f"Consider: poetry run python tools/agentos-permissions.py --clean --project {project_name}")
         return 1
 
-    print(f"Permissions clean: {audit['total']} total, {len(audit['project_specific'])} project-specific")
+    print(f"Permissions OK: {audit['total_allow']} total, {vend_count} vends (threshold: 5)")
     return 0
-
-
-def sync_all(dry_run: bool = True):
-    """Full sync: promote common patterns and clean all projects."""
-    parent_patterns = load_parent_patterns()
-    projects = find_all_projects()
-
-    print(f"Found {len(projects)} projects with settings.local.json")
-
-    # Find common patterns for promotion
-    common = find_common_patterns(projects, parent_patterns)
-
-    if common:
-        print(f"\n## Patterns to promote (found in 3+ projects): {len(common)}")
-        for pattern in common[:10]:
-            print(f"  - {pattern[:80]}")
-        if len(common) > 10:
-            print(f"  ... and {len(common) - 10} more")
-
-        if not dry_run:
-            # Add common patterns to parent
-            parent_path = get_parent_settings_path()
-            parent_settings = load_settings(parent_path)
-            if parent_settings:
-                # Create backup
-                backup_path = parent_path.with_suffix('.local.json.bak')
-                shutil.copy(parent_path, backup_path)
-                print(f"Parent backup: {backup_path}")
-
-                # Add patterns (de-normalized - would need project name)
-                # For now, just log - full implementation would need more work
-                print("NOTE: Auto-promotion of patterns not yet implemented")
-
-    # Clean each project
-    print("\n## Cleaning projects...")
-    for project_name in projects:
-        clean_project(project_name, parent_patterns, dry_run=dry_run)
 
 
 def main():
@@ -380,9 +339,7 @@ def main():
     mode_group.add_argument("--audit", action="store_true",
                            help="Read-only analysis of permissions")
     mode_group.add_argument("--clean", action="store_true",
-                           help="Remove redundancies and session vends")
-    mode_group.add_argument("--sync", action="store_true",
-                           help="Full sync with auto-promote")
+                           help="Remove ONLY session vends (keeps reusable patterns)")
     mode_group.add_argument("--quick-check", action="store_true",
                            help="Fast check for cleanup integration")
     mode_group.add_argument("--restore", action="store_true",
@@ -397,43 +354,31 @@ def main():
 
     args = parser.parse_args()
 
-    # Load parent patterns
-    parent_patterns = load_parent_patterns()
-    if not parent_patterns:
-        print("ERROR: Could not load parent settings.local.json")
-        print(f"Expected at: {get_parent_settings_path()}")
-        sys.exit(1)
-
-    print(f"Loaded {len(parent_patterns)} parent patterns")
-
     # Execute mode
     if args.audit:
         if args.all_projects:
             for project in find_all_projects():
-                audit = audit_project(project, parent_patterns)
+                audit = audit_project(project)
                 print_audit_report(audit)
         elif args.project:
-            audit = audit_project(args.project, parent_patterns)
+            audit = audit_project(args.project)
             print_audit_report(audit)
         else:
             parser.error("--audit requires --project or --all-projects")
 
     elif args.clean:
         if args.project:
-            clean_project(args.project, parent_patterns, dry_run=args.dry_run)
+            clean_project(args.project, dry_run=args.dry_run)
         elif args.all_projects:
             for project in find_all_projects():
-                clean_project(project, parent_patterns, dry_run=args.dry_run)
+                clean_project(project, dry_run=args.dry_run)
         else:
             parser.error("--clean requires --project or --all-projects")
-
-    elif args.sync:
-        sync_all(dry_run=args.dry_run)
 
     elif args.quick_check:
         if not args.project:
             parser.error("--quick-check requires --project")
-        exit_code = quick_check(args.project, parent_patterns)
+        exit_code = quick_check(args.project)
         sys.exit(exit_code)
 
     elif args.restore:

@@ -1,0 +1,11 @@
+# AgentOS-specific gitignore
+# Note: Parent Projects/.gitignore covers common patterns
+
+# Claude Code local settings (machine-specific, prevent merge overwrites)
+.claude/settings.local.json
+
+# Claude Code temporary files
+tmpclaude-*
+
+# Generated files
+*.generated.json
