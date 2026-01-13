@@ -41,7 +41,26 @@ AgentOS/
 
 ## Numbering Convention
 
-AgentOS follows a 4-digit document numbering system:
+### Parent-Child Scheme (AgentOS ↔ Projects)
+
+AgentOS uses **4-digit numbers** for generic/shared frameworks.
+Projects use **5-digit numbers** (prefix `1` + AgentOS number) for implementations.
+
+| Scope | Digits | Range | Example |
+|-------|--------|-------|---------|
+| **AgentOS (Generic)** | 4 | 0000-9999 | `0809-agentic-ai-governance.md` |
+| **Projects (Specific)** | 5 | 10000-19999 | `10809-agentic-ai-governance.md` |
+
+**The `1` prefix means "project-specific implementation of":**
+- AgentOS `0809` = Generic audit framework for agentic AI governance
+- Aletheia `10809` = Aletheia's implementation of that audit
+- Talos `10809` = Talos's implementation of that audit
+
+**Future commands enabled:**
+- `compare 0809 10809` - Compare generic to project-specific
+- `promote 10809` - Extract common patterns from all projects' 10809, move to AgentOS 0809
+
+### AgentOS Categories (4-digit)
 
 | Range | Category | Directory | Description |
 |-------|----------|-----------|-------------|
@@ -52,10 +71,21 @@ AgentOS follows a 4-digit document numbering system:
 | 08xx | Audits | audits/ | Audit frameworks |
 | 09xx | Runbooks | runbooks/ | Operational procedures |
 
+### Project Categories (5-digit)
+
+| Range | Category | Directory | Description |
+|-------|----------|-----------|-------------|
+| 100xx | Standards | standards/ | Project-specific standards |
+| 101xx | Templates | templates/ | Project-specific templates |
+| 102xx | ADRs | adrs/ | Project-specific ADRs |
+| 106xx | Skills | skills/ | Project-specific skills |
+| 108xx | Audits | audits/ | Project-specific audit reports |
+| 109xx | Runbooks | runbooks/ | Project-specific runbooks |
+| 10001 | Architecture | architecture/ | C4 diagrams (project-specific) |
+
 **Sub-numbering:** Within a range, letters denote related sub-documents:
-- 0001-architecture.md (main)
-- 0001a-context-view.md (sub-topic)
-- 0001b-container-view.md (sub-topic)
+- 0001-architecture.md (main) → 10001-architecture.md (project)
+- 0001a-context-view.md (sub-topic) → 10001a-context-view.md (project)
 
 ---
 
@@ -189,3 +219,4 @@ Project/.claude/            -> Generated from AgentOS templates
 |---------|------|---------|
 | 1.0 | 2026-01-13 | Initial structure with skills, runbooks, templates |
 | 2.0 | 2026-01-13 | Full document catalog after numbering audit (47 docs) |
+| 2.1 | 2026-01-13 | Added parent-child numbering scheme (4-digit AgentOS, 5-digit projects) |
