@@ -1,6 +1,6 @@
 # AgentOS Documentation Index
 
-**Version:** 1.0
+**Version:** 2.0
 **Last Updated:** 2026-01-13
 
 ---
@@ -61,23 +61,83 @@ AgentOS follows a 4-digit document numbering system:
 
 ## Document Catalog
 
-### Skills (06xx)
+### Standards (00xx)
 
 | Number | Title | Description |
 |--------|-------|-------------|
-| [0600](skills/0600-command-reference.md) | Command Reference | All 8 AgentOS commands documented |
-
-### Runbooks (09xx)
-
-| Number | Title | Description |
-|--------|-------|-------------|
-| [0901](runbooks/0901-new-project-setup.md) | New Project Setup | Initialize a project with AgentOS |
+| [0001](standards/0001-orchestration-protocol.md) | Orchestration Protocol | Multi-agent coordination |
+| [0002](standards/0002-coding-standards.md) | Coding Standards | Code style and practices |
+| [0003](standards/0003-agent-prohibited-actions.md) | Agent Prohibited Actions | What agents must NOT do |
+| [0004](standards/0004-mermaid-diagrams.md) | Mermaid Diagrams | Diagram standards |
+| [0005](standards/0005-session-closeout-protocol.md) | Session Closeout | End-of-session procedures |
+| [0006](standards/0006-standard-labels.md) | Standard Labels | GitHub labels convention |
+| [0007](standards/0007-testing-strategy.md) | Testing Strategy | Test-first philosophy |
 
 ### Templates (01xx)
 
 | Number | Title | Description |
 |--------|-------|-------------|
-| [0109](templates/0109-runbook-template.md) | Runbook Template | Template for operational procedures |
+| [0100](templates/0100-template-guide.md) | Template Guide | How to use templates |
+| [0101](templates/0101-issue-template.md) | Issue Template | GitHub issue format |
+| [0102](templates/0102-feature-lld-template.md) | Feature LLD | Low-level design template |
+| [0103](templates/0103-implementation-report-template.md) | Implementation Report | Post-impl documentation |
+| [0104](templates/0104-adr-template.md) | ADR Template | Architecture decisions |
+| [0105](templates/0105-implementation-plan-template.md) | Implementation Plan | Pre-impl planning |
+| [0106](templates/0106-lld-pre-impl-review.md) | LLD Pre-Impl Review | Review checklist |
+| [0107](templates/0107-test-script-template.md) | Test Script | Test case format |
+| [0108](templates/0108-test-report-template.md) | Test Report | Test results format |
+| [0109](templates/0109-runbook-template.md) | Runbook Template | Operational procedures |
+
+### ADRs (02xx)
+
+| Number | Title | Description |
+|--------|-------|-------------|
+| [0201](adrs/0201-adversarial-audit-philosophy.md) | Adversarial Audit Philosophy | Security mindset |
+| [0202](adrs/0202-claude-staging-pattern.md) | Claude Staging Pattern | Safe deployment |
+| [0203](adrs/0203-git-worktree-isolation.md) | Git Worktree Isolation | Multi-agent safety |
+| [0204](adrs/0204-single-identity-orchestration.md) | Single Identity Orchestration | Agent identity |
+| [0205](adrs/0205-test-first-philosophy.md) | Test-First Philosophy | Quality approach |
+
+### Skills (06xx)
+
+| Number | Title | Description |
+|--------|-------|-------------|
+| [0600](skills/0600-command-reference.md) | Command Reference | All 8 AgentOS commands |
+| [0601](skills/0601-gemini-dual-review.md) | Gemini Dual Review | AI-to-AI review |
+| [0602](skills/0602-gemini-lld-review.md) | Gemini LLD Review | Design review |
+| [0699](skills/0699-skill-instructions-index.md) | Skill Index | All skills listed |
+
+### Audits (08xx)
+
+| Number | Title | Description |
+|--------|-------|-------------|
+| [0800](audits/0800-audit-index.md) | Audit Index | Master audit list |
+| [0801](audits/0801-security-audit.md) | Security Audit | OWASP-based security |
+| [0802](audits/0802-privacy-audit.md) | Privacy Audit | IAPP privacy framework |
+| [0803](audits/0803-code-quality-audit.md) | Code Quality | Maintainability check |
+| [0804](audits/0804-accessibility-audit.md) | Accessibility | WCAG compliance |
+| [0805](audits/0805-license-compliance.md) | License Compliance | OSS license check |
+| [0806](audits/0806-bias-fairness.md) | Bias & Fairness | AI fairness audit |
+| [0807](audits/0807-explainability.md) | Explainability | AI transparency |
+| [0808](audits/0808-ai-safety-audit.md) | AI Safety | Safety measures |
+| [0809](audits/0809-agentic-ai-governance.md) | Agentic AI Governance | Agent oversight |
+| [0810](audits/0810-ai-management-system.md) | AI Management System | ISO 42001 alignment |
+| [0811](audits/0811-ai-incident-post-mortem.md) | AI Incident Post-Mortem | Failure analysis |
+| [0812](audits/0812-ai-supply-chain.md) | AI Supply Chain | Dependency audit |
+| [0813](audits/0813-claude-capabilities.md) | Claude Capabilities | Model features |
+| [0814](audits/0814-horizon-scanning-protocol.md) | Horizon Scanning | Threat monitoring |
+| [0815](audits/0815-permission-friction.md) | Permission Friction | Approval overhead |
+| [0816](audits/0816-permission-permissiveness.md) | Permission Permissiveness | Access control |
+| [0817](audits/0817-agentos-audit.md) | AgentOS Audit | Self-audit framework |
+| [0899](audits/0899-meta-audit.md) | Meta Audit | Audit the audits |
+
+### Runbooks (09xx)
+
+| Number | Title | Description |
+|--------|-------|-------------|
+| [0900](runbooks/0900-runbook-index.md) | Runbook Index | All runbooks listed |
+| [0901](runbooks/0901-new-project-setup.md) | New Project Setup | Initialize with AgentOS |
+| [0902](runbooks/0902-nightly-agentos-audit.md) | Nightly AgentOS Audit | Scheduled audit run |
 
 ---
 
@@ -123,22 +183,9 @@ Project/.claude/            -> Generated from AgentOS templates
 
 ---
 
-## Future Documents (Planned)
-
-| Number | Title | Category |
-|--------|-------|----------|
-| 0000 | System Guide | Standards |
-| 0001 | Architecture | Standards |
-| 0002 | Coding Standards | Standards |
-| 0201 | Privacy-First Permissions | ADR |
-| 0207 | Worktree Isolation | ADR |
-| 0800 | Audit Index | Audits |
-| 0900 | Runbook Index | Runbooks |
-
----
-
 ## Revision History
 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-01-13 | Initial structure with skills, runbooks, templates |
+| 2.0 | 2026-01-13 | Full document catalog after numbering audit (47 docs) |
