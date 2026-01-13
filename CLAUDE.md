@@ -19,6 +19,46 @@ poetry run --directory /c/Users/mcwiz/Projects/AgentOS python /c/Users/mcwiz/Pro
 
 ---
 
+## Source of Truth (WHERE TO FIX THINGS)
+
+**AgentOS is the canonical source for all core rules and tools.**
+
+When you're working in ANY project and discover something needs fixing in AgentOS, you MUST:
+1. **Fix it in AgentOS** (`C:\Users\mcwiz\Projects\AgentOS`)
+2. **Execute from AgentOS** (tools live there, not copied locally)
+3. **Never fix it in the local project copy**
+
+### What Lives Where
+
+| Type | Location | Examples |
+|------|----------|----------|
+| **Core rules** | `AgentOS/CLAUDE.md` | Bash rules, worktree isolation, gates |
+| **Core tools** | `AgentOS/tools/` | `agentos-generate.py`, `agentos-permissions.py` |
+| **Templates** | `AgentOS/.claude/templates/` | Parameterized configs with `{{VAR}}` |
+| **User-level skills** | `~/.claude/commands/` | `/sync-permissions`, cross-project utilities |
+| **Project-specific** | `<project>/CLAUDE.md` | Gemini integration, project workflows |
+| **Project commands** | `<project>/.claude/commands/` | `/cleanup` (with `{{GITHUB_REPO}}`) |
+
+### When You See a Problem
+
+```
+Is the problem in...
+├── Bash rules, gates, worktree isolation?
+│   └── Fix in: AgentOS/CLAUDE.md
+├── A tool that runs from AgentOS/tools/?
+│   └── Fix in: AgentOS/tools/
+├── A template with {{VARIABLES}}?
+│   └── Fix in: AgentOS/.claude/templates/
+├── A skill that should work everywhere?
+│   └── Fix in: ~/.claude/commands/
+└── Project-specific workflow?
+    └── Fix in: <project>/CLAUDE.md or <project>/.claude/commands/
+```
+
+**The cardinal sin:** Copying an AgentOS tool locally and "fixing" it there. Now you have two versions, one will drift, and future updates won't reach you.
+
+---
+
 ## Critical Workflow Rules (NON-NEGOTIABLE)
 
 ### AgentOS Authority Hierarchy
