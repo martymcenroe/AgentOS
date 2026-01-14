@@ -297,9 +297,10 @@ class CountdownOverlay:
 class Unleashed:
     """Main PTY wrapper for auto-approval."""
 
-    def __init__(self, delay: int = DEFAULT_DELAY, dry_run: bool = False):
+    def __init__(self, delay: int = DEFAULT_DELAY, dry_run: bool = False, cwd: str = None):
         self.delay = delay
         self.dry_run = dry_run
+        self.cwd = cwd or os.getcwd()
         self.pty_process = None
         self.pty_reader = None
         self.input_reader = None
@@ -379,12 +380,7 @@ class Unleashed:
 
     def _show_banner(self):
         """Display startup banner."""
-        banner = f"""
-{BOLD}{YELLOW}╔══════════════════════════════════════════════════════════════╗
-║  UNLEASHED - Auto-approval wrapper for Claude Code            ║
-║  Countdown: {self.delay}s | Press any key during countdown to cancel   ║
-║  Dry-run: {'ON' if self.dry_run else 'OFF'}                                                   ║
-╚══════════════════════════════════════════════════════════════╝{RESET}
+        banner = f"""{BOLD}{YELLOW}[UNLEASHED] Auto-approval active | {self.delay}s countdown | Dir: {self.cwd}{RESET}
 """
         self._write_stdout(banner)
 
@@ -411,7 +407,7 @@ class Unleashed:
             self.pty_process = winpty.PtyProcess.spawn(
                 ['claude'],
                 dimensions=(rows, cols),
-                cwd=os.getcwd()
+                cwd=self.cwd
             )
 
             self.pty_reader = PtyReader(self.pty_process)
@@ -543,6 +539,12 @@ Security Note:
         default=None,
         help="Countdown delay in seconds (overrides UNLEASHED_DELAY env var)"
     )
+    parser.add_argument(
+        "--cwd",
+        type=str,
+        default=None,
+        help="Working directory for Claude (use when poetry changes cwd)"
+    )
 
     args = parser.parse_args()
 
@@ -552,7 +554,7 @@ Security Note:
         delay = int(os.environ.get("UNLEASHED_DELAY", DEFAULT_DELAY))
 
     # Create and run unleashed
-    unleashed = Unleashed(delay=delay, dry_run=args.dry_run)
+    unleashed = Unleashed(delay=delay, dry_run=args.dry_run, cwd=args.cwd)
     setup_signal_handlers(unleashed)
 
     try:
