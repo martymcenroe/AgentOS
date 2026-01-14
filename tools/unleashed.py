@@ -321,6 +321,17 @@ class Unleashed:
         clean_text = strip_ansi(text)
         return bool(FOOTER_PATTERN.search(clean_text))
 
+    def _detect_three_options(self) -> bool:
+        """Check if the current prompt has 3 options (includes 'remember' option).
+
+        When there are 3 options, option 2 is typically "Yes, and don't ask again..."
+        which we prefer to select to reduce future prompts.
+        """
+        clean_text = strip_ansi(self.screen_buffer)
+        # Look for "3. No" or "3." followed by "No" near end of buffer
+        recent = clean_text[-500:]
+        return bool(re.search(r'3\.\s*No', recent))
+
     def _capture_screen_context(self) -> str:
         """Capture current screen context for logging."""
         return strip_ansi(self.screen_buffer)[-2000:]  # Last 2KB stripped
@@ -368,13 +379,19 @@ class Unleashed:
         self.overlay.hide()
         self.in_countdown = False
 
+        # Check if 3-option prompt (has "remember" option)
+        has_three = self._detect_three_options()
+
         if not self.dry_run:
-            # Inject Enter to approve
             if self.pty_process and self.pty_process.isalive():
-                self.pty_process.write('\r')
-            self.logger.log_event("AUTO_APPROVED", context=screen_context[:500])
+                if has_three:
+                    # Send Shift+Tab to select option 2 ("Yes, and don't ask again...")
+                    self.pty_process.write('\x1b[Z')  # Shift+Tab
+                    time.sleep(0.05)  # Small delay for UI to update
+                self.pty_process.write('\r')  # Enter to confirm
+            self.logger.log_event("AUTO_APPROVED", option=2 if has_three else 1, context=screen_context[:500])
         else:
-            self.logger.log_event("AUTO_APPROVED_DRY_RUN", context=screen_context[:500])
+            self.logger.log_event("AUTO_APPROVED_DRY_RUN", option=2 if has_three else 1, context=screen_context[:500])
 
         return True
 
