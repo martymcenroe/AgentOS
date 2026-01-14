@@ -1,6 +1,6 @@
 ---
 description: Agent onboarding (quick/full mode)
-argument-hint: "[--help] [--quick | --full]"
+argument-hint: "[--help] [--refresh | --quick | --full]"
 ---
 
 # Agent Onboarding
@@ -14,17 +14,19 @@ Onboard yourself to the current project by reading and understanding the documen
 ```
 /onboard - Agent onboarding for current project
 
-Usage: `/onboard [--help] [--quick | --full]`
+Usage: `/onboard [--help] [--refresh | --quick | --full]`
 
 Options:
 | Flag | Effect |
 |------|--------|
 | `--help` | Show this help message and exit |
+| `--refresh` | Reload rules only (~$0.01, 15s) - for post-compact/resumed sessions |
 | `--quick` | Read digest only, report age (~$0.02, 30s) - for simple tasks |
 | `--full` | Full onboarding (~$0.35, 2min) - for complex work (default) |
 
 Examples:
 - `/onboard --help` - show this help
+- `/onboard --refresh` - reload rules after context compaction
 - `/onboard --quick` - quick onboard for status check
 - `/onboard --full` - full onboard for feature work
 - `/onboard` - same as --full
@@ -54,8 +56,43 @@ Detect the current project from working directory:
 
 | Mode | Cost | Time | Use Case |
 |------|------|------|----------|
+| `--refresh` | ~$0.01 | ~15s | Post-compact, resumed sessions, rule reload |
 | `--quick` | ~$0.02 | ~30s | Simple tasks, status checks |
 | `--full` (default) | ~$0.35 | ~2min | Complex features, audits |
+
+## Refresh Mode (`--refresh`)
+
+**Purpose:** Reload core rules after context compaction or when resuming a session. Does NOT re-read project state or session logs.
+
+**Model hint:** Refresh mode can use **Haiku** since it only reads rule files.
+
+**Use when:**
+- Session was compacted and you need to reload rules
+- Resuming a session with `/resume` and need rules refreshed
+- You've been working for a while and want to re-anchor on constraints
+- Quick sanity check that bash rules, worktree rules, etc. are loaded
+
+**Steps (parallel reads):**
+
+1. Read AgentOS core rules:
+   `C:\Users\mcwiz\Projects\AgentOS\CLAUDE.md`
+
+2. Read Projects root rules (if exists):
+   `C:\Users\mcwiz\Projects\CLAUDE.md`
+
+3. Read current project CLAUDE.md (detected from working directory)
+
+4. Optionally scan current permissions:
+   `C:\Users\mcwiz\Projects\.claude\settings.local.json` (just the `allow` array)
+
+**Report format:**
+```
+✓ Rules refreshed for {PROJECT}
+• AgentOS core: Bash constraints, worktree isolation, visible self-check
+• Project rules: {one-line summary}
+• Session permissions: {count} active allows
+Ready to continue.
+```
 
 ## Quick Mode (`--quick`)
 
