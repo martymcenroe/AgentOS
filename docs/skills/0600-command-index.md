@@ -35,6 +35,7 @@ Each skill has two documentation files:
 | Phase | Command | Typical Usage |
 |-------|---------|---------------|
 | Start | `/onboard` | Load project context |
+| Resume | `/onboard --refresh` | Reload rules after compact/resume |
 | Work | `/zugzwang` | Log permission friction |
 | End | `/cleanup` | Commit and close session |
 

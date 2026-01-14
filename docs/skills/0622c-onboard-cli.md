@@ -12,6 +12,26 @@ The `/onboard` skill is Claude-orchestrated. For manual onboarding, read these f
 
 ---
 
+## Refresh Mode (Manual)
+
+For post-compact or resumed sessions - just reload rules:
+
+```bash
+# 1. AgentOS core rules
+cat /c/Users/mcwiz/Projects/AgentOS/CLAUDE.md
+
+# 2. Projects root rules
+cat /c/Users/mcwiz/Projects/CLAUDE.md
+
+# 3. Current project rules
+cat PROJECT/CLAUDE.md
+
+# 4. Current permissions (optional)
+cat /c/Users/mcwiz/Projects/.claude/settings.local.json | jq '.allow'
+```
+
+---
+
 ## Quick Mode (Manual)
 
 Read these files:
@@ -66,6 +86,7 @@ cat PROJECT/docs/0000b-ONBOARD-DIGEST.md
 
 | Scenario | Recommendation |
 |----------|----------------|
+| Post-compact / resumed session | Use `/onboard --refresh` |
 | Quick status check | Manual - read CLAUDE.md |
 | Full context loading | Use `/onboard` - Claude synthesizes |
 | New to project | Use `/onboard --full` |

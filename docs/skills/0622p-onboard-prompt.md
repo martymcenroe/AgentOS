@@ -12,6 +12,7 @@
 /onboard              # Full onboarding (default)
 /onboard --full       # Same as above
 /onboard --quick      # Minimal - rules + recent context
+/onboard --refresh    # Reload rules only (post-compact/resumed)
 /onboard --help       # Show help
 ```
 
@@ -21,6 +22,7 @@
 
 | Scenario | Use Skill? |
 |----------|------------|
+| Post-compact / resumed session | **Skill --refresh** |
 | Starting complex work | **Skill** - full context |
 | Quick task | **Skill --quick** or **CLI** |
 | Need project synthesis | **Skill** - Claude summarizes |
@@ -29,6 +31,18 @@
 ---
 
 ## Modes
+
+### --refresh (~15s, ~$0.01)
+
+Reload rules only - for post-compact or resumed sessions.
+
+**What it reads:**
+- `AgentOS/CLAUDE.md` - core rules (bash constraints, worktree isolation)
+- `Projects/CLAUDE.md` - root rules
+- Project `CLAUDE.md` - project-specific rules
+- `settings.local.json` - current permissions (optional scan)
+
+**Use when:** Context was compacted, resuming with `/resume`, or need to re-anchor on rules.
 
 ### --quick (~30s, ~$0.02)
 
@@ -58,15 +72,18 @@ Comprehensive onboarding for complex work.
 
 ## Mode Comparison
 
-| Check | Quick | Full |
-|-------|:-----:|:----:|
-| CLAUDE.md | YES | YES |
-| docs/0000-GUIDE.md | YES | YES |
-| Recent session log | YES | YES |
-| Architecture docs | | YES |
-| Sprint focus | | YES |
-| Open issues | | YES |
-| Onboard digest | | YES |
+| Check | Refresh | Quick | Full |
+|-------|:-------:|:-----:|:----:|
+| AgentOS CLAUDE.md | YES | | |
+| Projects CLAUDE.md | YES | | |
+| Project CLAUDE.md | YES | YES | YES |
+| settings.local.json | optional | | |
+| docs/0000-GUIDE.md | | YES | YES |
+| Recent session log | | YES | YES |
+| Architecture docs | | | YES |
+| Sprint focus | | | YES |
+| Open issues | | | YES |
+| Onboard digest | | | YES |
 
 ---
 

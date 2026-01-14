@@ -79,3 +79,4 @@ This document indexes all skill documentation in the `06xx` namespace.
 | 2026-01-09 | Added 0602-skill-gemini-dual-review.md. |
 | 2026-01-14 | Restructured: Added c/p convention for CLI vs Prompt docs. |
 | 2026-01-14 | Added 0620-0627 skill documentation (c/p pairs for all commands). |
+| 2026-01-14 | Added --refresh option to /onboard (post-compact/resume rule reload). |
