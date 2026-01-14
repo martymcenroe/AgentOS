@@ -6,7 +6,13 @@ argument-hint: "[PR#] [--files path1 path2...] [--focus security|quality|all]"
 # Multi-Agent Code Review
 
 **Based on:** `anthropics/claude-code` code-review plugin
-**Architecture:** 5 parallel Sonnet agents with confidence-based filtering
+**Architecture:** 5 parallel agents with confidence-based filtering
+
+**Model hints:**
+- Security Reviewer: **Opus** (complex security reasoning)
+- All other agents: **Sonnet** (pattern matching, sufficient capability)
+
+**Cost optimization:** Context is gathered ONCE in Step 1, then PASSED to agents. Agents should NOT read files independently - this wastes tokens on duplicate reads.
 
 ---
 
@@ -62,12 +68,27 @@ Launch 5 agents in parallel using the Task tool. Each agent operates independent
 
 **CRITICAL:** Use a single message with 5 Task tool calls to run in parallel.
 
+**COST OPTIMIZATION (SHARED CONTEXT):**
+- You (the parent agent) already gathered the PR diff in Step 1
+- PASS the diff content directly in each agent's spawn prompt
+- Agents should NOT use Read/Grep tools to re-fetch the same content
+- This avoids 5x duplicate file reads
+
+**Template:** In each agent prompt below, replace `[PR diff or file contents]` with the ACTUAL diff content you gathered in Step 1. Do not use placeholders.
+
+**Agent Prompt Header (include in ALL agent prompts):**
+```
+IMPORTANT: All context is provided below. Do NOT use Read/Grep tools to fetch files - this wastes tokens. Analyze only the provided content.
+```
+
 #### Agent 1: Security Reviewer (Opus)
 
 ```
 Review code for security vulnerabilities.
 
-Context: [PR diff or file contents]
+IMPORTANT: All context is provided below. Do NOT use Read/Grep tools.
+
+Context: [PR diff or file contents - REPLACE WITH ACTUAL DIFF]
 
 Execute security checklist:
 1. Input validation and sanitization
@@ -91,8 +112,10 @@ Return findings in format:
 ```
 Review code changes for AgentOS compliance.
 
-Context: [PR diff]
-Reference: Read CLAUDE.md
+IMPORTANT: All context is provided below. Do NOT use Read/Grep tools except for CLAUDE.md reference.
+
+Context: [PR diff - REPLACE WITH ACTUAL DIFF]
+Reference: Read CLAUDE.md (this is the ONE exception - read it for rules)
 
 Check for violations:
 1. Bash commands using && or pipes
@@ -115,7 +138,9 @@ Return findings in format:
 ```
 Analyze code for potential bugs and logic errors.
 
-Context: [PR diff or file contents]
+IMPORTANT: All context is provided below. Do NOT use Read/Grep tools.
+
+Context: [PR diff or file contents - REPLACE WITH ACTUAL DIFF]
 
 Check for:
 1. Null/undefined handling
@@ -139,7 +164,9 @@ Return findings in format:
 ```
 Review code for quality, maintainability, and best practices.
 
-Context: [PR diff or file contents]
+IMPORTANT: All context is provided below. Do NOT use Read/Grep tools.
+
+Context: [PR diff or file contents - REPLACE WITH ACTUAL DIFF]
 
 Check for:
 1. SOLID principles adherence
@@ -163,7 +190,9 @@ Return findings in format:
 ```
 Analyze test coverage for the changed code.
 
-Context: [PR diff or file contents]
+IMPORTANT: All context is provided below. Do NOT use Read/Grep tools.
+
+Context: [PR diff or file contents - REPLACE WITH ACTUAL DIFF]
 
 Check for:
 1. New code has corresponding tests

@@ -5,6 +5,8 @@ argument-hint: "[--full] [--file path/to/report.md]"
 
 # Test Gap Mining Skill
 
+**Model hint:** Use **Sonnet** - requires pattern recognition across reports and code correlation.
+
 **Purpose:** Analyze implementation reports, test reports, and code to identify testing gaps and automation opportunities.
 
 **Per AgentOS:adrs/test-first-philosophy:** Continuous test improvement requires systematic mining of existing documentation for test debt.
@@ -25,27 +27,48 @@ Usage: `/test-gaps [--full] [--file path/to/report.md]`
 
 ## Execution
 
-### Step 1: Gather Reports
+### Step 1: Pre-Filter Reports (COST OPTIMIZATION)
+
+**Before reading full reports, use Grep to identify which reports have test gaps.**
+
+Run these Grep patterns across report directories:
+```
+Grep pattern: "manual testing|tested manually"
+Grep pattern: "not tested|untested|skipped"
+Grep pattern: "deferred|future work"
+Grep pattern: "edge case.*not covered"
+Grep pattern: "happy path only"
+Grep pattern: "hard to test|difficult to mock"
+Grep pattern: "TODO|FIXME"
+```
+
+This produces a list of files that contain gap indicators. Only proceed with files that have matches.
+
+**Why:** Report files can be large. Pre-filtering with Grep (fast, no token cost) eliminates reports with no gaps before expensive file reads.
+
+**If no reports have gap indicators:** Report "No test gaps found in reports" and exit early.
+
+### Step 2: Gather Matched Reports
 
 **Quick scan (default):**
 ```
-Read docs/reports/*/test-report.md (last 5 issues)
-Read docs/reports/*/implementation-report.md (last 5 issues)
+Read matched docs/reports/*/test-report.md (last 5 issues with matches)
+Read matched docs/reports/*/implementation-report.md (last 5 issues with matches)
 ```
 
 **Full scan (--full):**
 ```
-Read ALL docs/reports/*/test-report.md
-Read ALL docs/reports/*/implementation-report.md
+Read ALL matched docs/reports/*/test-report.md
+Read ALL matched docs/reports/*/implementation-report.md
 Read docs/9000-lessons-learned.md (if exists)
 ```
 
 **Single file (--file):**
 ```
-Read the specified file only
+Read the specified file only (no pre-filter)
 ```
 
-### Step 2: Pattern Matching
+### Step 3: Pattern Matching
 
 Scan each report for these gap indicators:
 
@@ -60,7 +83,7 @@ Scan each report for these gap indicators:
 | "hard to test" / "difficult to mock" | Architecture issue | LOW |
 | "TODO" / "FIXME" in test code | Incomplete test | HIGH |
 
-### Step 3: Cross-Reference Code
+### Step 4: Cross-Reference Code
 
 For each gap found:
 1. Identify the affected code file
@@ -68,7 +91,7 @@ For each gap found:
 3. Check current test coverage (if available)
 4. Estimate complexity to add tests
 
-### Step 4: Generate Report
+### Step 5: Generate Report
 
 Output a prioritized list:
 
