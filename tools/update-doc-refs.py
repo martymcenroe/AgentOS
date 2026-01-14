@@ -107,12 +107,12 @@ REFERENCE_MAP: Dict[str, str] = {
 
 
 def find_references(content: str) -> List[Tuple[str, str, int]]:
-    """Find all references to old 0xxx patterns in content.
+    r"""Find all references to old 0xxx patterns in content.
 
     Returns list of (old_pattern, suggested_new, line_number)
 
     IMPORTANT: Uses word boundaries to avoid matching 0xxx inside 10xxx
-    (Aletheia uses 10xxx for project-specific docs)
+    (Aletheia uses 10xxx for project-specific docs via (?<!\d) lookbehind)
     """
     matches = []
     lines = content.split('\n')
@@ -166,7 +166,7 @@ def apply_fixes(file_path: Path, project_path: Path, verbose: bool = False) -> i
 
     Returns the number of replacements made.
 
-    IMPORTANT: Uses (?<!\d) lookbehind to avoid matching 0xxx inside 10xxx
+    IMPORTANT: Uses (?<!\\d) lookbehind to avoid matching 0xxx inside 10xxx
     (Aletheia uses 10xxx for project-specific docs)
     """
     try:
