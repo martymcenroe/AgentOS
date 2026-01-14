@@ -42,10 +42,10 @@ Detect the current project from working directory:
 
 | Project | GitHub Repo | Main Guide | Immediate Plan |
 |---------|-------------|------------|----------------|
-| AgentOS | martymcenroe/AgentOS | `docs/index.md` | None |
+| AgentOS | martymcenroe/AgentOS | `docs/index.md` | `docs/10000a-IMMEDIATE-PLAN.md` |
 | Aletheia | martymcenroe/Aletheia | `docs/10000-GUIDE.md` | `docs/10000a-IMMEDIATE-PLAN.md` |
 | Talos | martymcenroe/Talos | `docs/10000-GUIDE.md` | `docs/10000a-IMMEDIATE-PLAN.md` |
-| maintenance | martymcenroe/maintenance | `docs/10000-GUIDE.md` | None |
+| maintenance | martymcenroe/maintenance | `docs/10000-GUIDE.md` | `docs/10000a-IMMEDIATE-PLAN.md` |
 | claude-code | anthropics/claude-code | `README.md` | None |
 
 **CRITICAL:** Use the correct file paths for the detected project. Do NOT use Aletheia paths when in AgentOS.
@@ -80,7 +80,7 @@ Read these files simultaneously based on project:
 **For AgentOS:**
 - `CLAUDE.md` - Core rules
 - `docs/index.md` - Documentation index
-- Recent session log from `docs/session-logs/`
+- `docs/10000a-IMMEDIATE-PLAN.md` - Current focus (AgentOS-specific work only)
 
 **For Aletheia:**
 - `CLAUDE.md` - Project rules
@@ -95,7 +95,7 @@ Read these files simultaneously based on project:
 **For maintenance:**
 - `CLAUDE.md` - Project rules
 - `docs/10000-GUIDE.md` - Project guide
-- Recent session log from `docs/session-logs/`
+- `docs/10000a-IMMEDIATE-PLAN.md` - Current focus (may be empty for ad-hoc project)
 
 **For claude-code:**
 - `README.md` - Project overview
@@ -128,7 +128,8 @@ Report:
 - Use absolute paths and `git -C` patterns (no cd && chaining)
 - Use `--repo {owner}/{repo}` for all gh commands (see table above)
 - Never use forbidden commands (git reset, git push --force, pip install, etc.)
-- All code changes require worktrees - NEVER commit directly to main
+- **Code changes** require worktrees - never commit code directly to main
+- **Documentation changes** can be committed directly to main (no worktree needed)
 
 ## Efficiency Notes
 
