@@ -11,7 +11,10 @@ AgentOS core infrastructure and skill maintenance.
 ### Active Work
 
 - [ ] Verify /onboard skill works correctly across all projects
-- [ ] Clean up tmpclaude-* temp directories in docs/
+
+### Just Completed (This Session)
+
+- [x] Clean up tmpclaude-* temp files in docs/ (7 files removed)
 
 ### Recently Completed
 

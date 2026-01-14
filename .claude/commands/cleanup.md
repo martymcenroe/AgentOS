@@ -8,6 +8,11 @@ aliases: ["/closeout", "/goodbye"]
 
 **Aliases:** `/closeout` (same as `/cleanup`), `/goodbye` (same as `/cleanup --quick`)
 
+**Model hints:**
+- `--quick`: Can use **Haiku** (simple git commands, session log append)
+- `--normal`: Use **Sonnet** (branch analysis, conditional fixes)
+- `--full`: Use **Sonnet** (comprehensive verification)
+
 **If `$ARGUMENTS` contains `--help`:** Display the Help section below and STOP.
 
 ---

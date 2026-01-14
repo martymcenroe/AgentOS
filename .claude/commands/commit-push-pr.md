@@ -5,6 +5,8 @@ argument-hint: "[--title \"...\"] [--draft]"
 
 # Commit, Push, and PR
 
+**Model hint:** Can use **Haiku** - simple git workflow with straightforward commit message generation.
+
 Quick workflow to commit current changes, push to remote, and create a pull request.
 
 ---

@@ -5,6 +5,8 @@ argument-hint: "[--help] [--sessions N] [--since YYYY-MM-DD]"
 
 # Permission Friction Analysis
 
+**Model hint:** Use **Sonnet** - requires pattern recognition and analysis across multiple session files.
+
 **If `$ARGUMENTS` contains `--help`:** Display the Help section below and STOP.
 
 ---
@@ -80,16 +82,33 @@ Path: C:\Users\mcwiz\.claude\projects\C--Users-mcwiz-Projects-{PROJECT}
 
 This returns all session transcript files. Sort by modification time (most recent first).
 
-### Step 2: Identify Sessions to Analyze
+### Step 2: Pre-Filter Sessions (COST OPTIMIZATION)
 
-Based on arguments:
-- Default: Last 3 `.jsonl` files by modification time (exclude `agent-*.jsonl`)
-- `--sessions N`: Last N files
-- `--since YYYY-MM-DD`: Files modified after that date
+**Before reading full files, use Grep to identify which sessions have friction.**
+
+Run these Grep patterns across all candidate session files:
+```
+Grep pattern: "Exit code [1-9]"
+Grep pattern: "Permission denied"
+Grep pattern: "not allowed"
+```
+
+This produces a list of files that contain friction. Only proceed with files that have matches.
+
+**Why:** Session transcripts can be 100KB+. Pre-filtering with Grep (fast, no token cost) eliminates sessions with no friction before expensive file reads.
+
+### Step 3: Identify Sessions to Analyze
+
+Based on arguments AND pre-filter results:
+- Default: Last 3 `.jsonl` files **with friction matches** by modification time (exclude `agent-*.jsonl`)
+- `--sessions N`: Last N files **with friction matches**
+- `--since YYYY-MM-DD`: Files modified after that date **with friction matches**
 
 **Filter out subagent files:** Skip files matching `agent-*.jsonl` (these are subagent transcripts, not main sessions).
 
-### Step 3: Search for Friction Patterns
+**If no sessions have friction matches:** Report "No friction found in recent sessions" and exit early.
+
+### Step 4: Search for Friction Patterns
 
 For each session file, use **Grep** to search for friction indicators:
 
@@ -120,14 +139,14 @@ Grep pattern: "deny"
 Grep pattern: "blocked"
 ```
 
-### Step 4: Read Current Permissions
+### Step 5: Read Current Permissions
 
 Use Read tool on settings.local.json:
 ```
 Read: C:\Users\mcwiz\Projects\{PROJECT}\.claude\settings.local.json
 ```
 
-### Step 5: Analyze and Categorize
+### Step 6: Analyze and Categorize
 
 For each friction instance found, classify:
 
@@ -139,7 +158,7 @@ For each friction instance found, classify:
 | **ENV_PREFIX** | Env var prefix not allowed | Add `Bash(VAR=val cmd:*)` |
 | **DENIED** | Intentionally blocked | Document why, no action needed |
 
-### Step 6: Generate Report
+### Step 7: Generate Report
 
 Output format:
 
