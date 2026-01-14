@@ -9,3 +9,14 @@ tmpclaude-*
 
 # Generated files
 *.generated.json
+
+# Gemini retry logs (generated at runtime)
+logs/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Harvest artifacts (generated reports)
+harvest-*.json
+harvest-*.xlsx
