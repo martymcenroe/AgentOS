@@ -404,6 +404,69 @@ See: `AgentOS/docs/standards/0008-documentation-convention.md`
 
 ---
 
+## Gemini Review Protocol (MANDATORY)
+
+**When a task requires Gemini review (LLD, code, implementation), these rules are NON-NEGOTIABLE:**
+
+### Required Model
+
+**ONLY these models are acceptable for reviews:**
+- `gemini-3-pro-preview` (primary)
+- `gemini-3-pro` (acceptable alternative)
+
+**FORBIDDEN - DO NOT USE for reviews:**
+- `gemini-2.0-flash`, `gemini-2.5-flash`, `gemini-flash-*` (lower tier)
+- `gemini-2.5-lite`, `gemini-*-lite` (lowest tier)
+- Any model not explicitly `gemini-3-pro*`
+
+**If you use any other model, the review is INVALID and must be redone.**
+
+### Quota Exhaustion Protocol
+
+**When you see ANY of these errors:**
+- `"You have exhausted your capacity on this model"`
+- `"TerminalQuotaError"`
+- `"QUOTA_EXHAUSTED"`
+- `gemini-retry.py` exceeds 5 attempts
+
+**You MUST:**
+1. **STOP** - Do not substitute a different model
+2. **Report to user** - State: "Gemini 3 Pro quota exhausted. Cannot proceed with review."
+3. **Wait** - The review cannot proceed until quota resets (~24h) or user intervenes
+4. **DO NOT rationalize** - "Flash review is better than nothing" is WRONG
+
+**Why this matters:**
+- Gemini 3 Pro has reasoning capabilities that Flash lacks
+- Reviews with lesser models miss critical issues
+- Claiming a Flash review is a "Gemini review" is dishonest
+
+### Running Gemini Reviews
+
+**Use the retry tool with explicit model:**
+```bash
+poetry run --directory /c/Users/mcwiz/Projects/AgentOS python /c/Users/mcwiz/Projects/AgentOS/tools/gemini-retry.py --model gemini-3-pro-preview --prompt "..."
+```
+
+**For long prompts, use stdin (NOT -p flag):**
+```bash
+gemini --model gemini-3-pro-preview --output-format json < /path/to/prompt.txt
+```
+
+**Verify the model in response:**
+- Check `stats.models` in JSON output
+- If model is not `gemini-3-pro*`, the review is INVALID
+
+### What Counts as "Gemini Reviewed"
+
+A document is "Gemini reviewed" ONLY if:
+1. Review was performed by `gemini-3-pro-preview` or `gemini-3-pro`
+2. Model was verified in JSON response
+3. All three review types completed (LLD, Security, Implementation)
+
+**Partial reviews or reviews by other models DO NOT count.**
+
+---
+
 ## You Are Not Alone
 
 Other agents may work on this project. Check session logs for recent context. Coordinate via the project's issue tracker.

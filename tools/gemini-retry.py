@@ -113,11 +113,28 @@ def classify_error(output: str) -> ErrorClassification:
         )
 
     # True quota exhaustion (daily limit - NOT retryable)
+    # Check multiple patterns - Gemini CLI error formats vary
     if "QUOTA_EXHAUSTED" in output:
         return ErrorClassification(
             error_type="quota",
             retryable=False,
             message="Daily quota exhausted - wait for reset"
+        )
+
+    # TerminalQuotaError - Gemini CLI specific format (NOT retryable)
+    if "TerminalQuotaError" in output:
+        return ErrorClassification(
+            error_type="quota",
+            retryable=False,
+            message="Terminal quota error - quota exhausted, wait for reset"
+        )
+
+    # "exhausted your capacity" - another Gemini CLI format (NOT retryable)
+    if "exhausted your capacity" in output.lower():
+        return ErrorClassification(
+            error_type="quota",
+            retryable=False,
+            message="Capacity exhausted - quota depleted, wait for reset"
         )
 
     # Per-minute rate limit (retryable with fixed wait)

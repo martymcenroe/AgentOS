@@ -7,6 +7,28 @@
 
 ---
 
+## ⚠️ CRITICAL: Model Requirements (READ FIRST)
+
+**ONLY these models are valid for Gemini reviews:**
+- `gemini-3-pro-preview` (preferred)
+- `gemini-3-pro` (acceptable)
+
+**INVALID - DO NOT USE:**
+- `gemini-2.0-flash` - WRONG MODEL, review invalid
+- `gemini-2.5-flash` - WRONG MODEL, review invalid
+- `gemini-*-lite` - WRONG MODEL, review invalid
+- Any model not `gemini-3-pro*` - WRONG MODEL, review invalid
+
+**If quota is exhausted:**
+1. **STOP** - Do not substitute another model
+2. **Report** - Tell user "Gemini 3 Pro quota exhausted"
+3. **Wait** - Reviews cannot proceed until quota resets
+4. **DO NOT** claim a Flash review is a valid "Gemini review"
+
+**Why this matters:** Gemini 3 Pro has reasoning capabilities that lesser models lack. Reviews with Flash/Lite models miss critical issues. A review by the wrong model is worse than no review because it creates false confidence.
+
+---
+
 ## Overview
 
 This skill implements a fully automated dual-AI review system where Claude Code (Sonnet 4.5) and Gemini CLI (3 Pro) collaborate on the Aletheia project. Gemini acts as a senior architect providing review gates at three critical workflow stages: LLD design, implementation review, and issue filing.
