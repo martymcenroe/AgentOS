@@ -407,10 +407,11 @@ class Unleashed:
             except Exception:
                 cols, rows = 120, 40
 
-            # Spawn Claude Code
+            # Spawn Claude Code in user's current working directory
             self.pty_process = winpty.PtyProcess.spawn(
                 ['claude'],
-                dimensions=(rows, cols)
+                dimensions=(rows, cols),
+                cwd=os.getcwd()
             )
 
             self.pty_reader = PtyReader(self.pty_process)
