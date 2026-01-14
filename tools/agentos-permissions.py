@@ -7,11 +7,15 @@ When a project has its own permissions block, it completely overrides the parent
 
 This tool manages permissions across the master (user-level) and project-level files.
 
+PROTECTED PERMISSIONS:
+  - Bash(python:*) and Bash(python3:*) are NEVER allowed in deny lists
+  - These are automatically removed during any clean operation
+
 Modes:
   --audit        Read-only analysis of session vends
-  --clean        Remove ONLY session vends (keeps all reusable patterns)
+  --clean        Remove session vends AND protected deny entries
   --quick-check  Fast check for cleanup integration (exit code 0/1)
-  --merge-up     Collect unique reusable patterns from projects into master
+  --merge-up     LOCKED STEPS: clean all projects, then merge to master, then sync to Projects level
   --restore      Restore from backup
 
 Usage:
@@ -29,6 +33,14 @@ from pathlib import Path
 from typing import Optional
 
 
+# Permissions that should NEVER be in deny - too important to accidentally block
+# This is a hard-coded protection that cannot be overridden
+PROTECTED_FROM_DENY = [
+    "Bash(python:*)",
+    "Bash(python3:*)",
+]
+
+
 def get_projects_dir() -> Path:
     """Get the Projects directory path."""
     return Path.home() / "Projects"
@@ -42,6 +54,11 @@ def get_master_settings_path() -> Path:
 def get_project_settings_path(project_name: str) -> Path:
     """Get path to project's settings.local.json."""
     return get_projects_dir() / project_name / ".claude" / "settings.local.json"
+
+
+def get_projects_level_settings_path() -> Path:
+    """Get path to Projects-level settings.local.json (~/Projects/.claude/)."""
+    return get_projects_dir() / ".claude" / "settings.local.json"
 
 
 def load_settings(path: Path) -> Optional[dict]:
@@ -124,6 +141,22 @@ def is_session_vend(permission: str) -> tuple[bool, str]:
         return True, "powershell date command"
 
     return False, ""
+
+
+def clean_deny_list(deny_list: list) -> tuple[list, list]:
+    """
+    Remove protected permissions from deny list.
+
+    Returns (cleaned_list, removed_list) tuple.
+    """
+    cleaned = []
+    removed = []
+    for perm in deny_list:
+        if perm in PROTECTED_FROM_DENY:
+            removed.append(perm)
+        else:
+            cleaned.append(perm)
+    return cleaned, removed
 
 
 def is_reusable_pattern(permission: str) -> tuple[bool, str]:
@@ -265,7 +298,7 @@ def print_audit_report(audit: dict):
 
 
 def clean_project(project_name: str, dry_run: bool = True) -> dict:
-    """Clean a project's settings by removing ONLY session vends."""
+    """Clean a project's settings by removing session vends and protected deny entries."""
     settings_path = get_project_settings_path(project_name)
     settings = load_settings(settings_path)
 
@@ -281,11 +314,19 @@ def clean_project(project_name: str, dry_run: bool = True) -> dict:
     original_allow = settings.get("permissions", {}).get("allow", [])
     new_allow = [p for p in original_allow if p not in vend_perms]
 
-    removed_count = len(audit['session_vends'])
+    # Clean deny list: remove protected permissions
+    original_deny = settings.get("permissions", {}).get("deny", [])
+    new_deny, removed_from_deny = clean_deny_list(original_deny)
+
+    removed_vends = len(audit['session_vends'])
+    removed_protected = len(removed_from_deny)
+    total_removed = removed_vends + removed_protected
 
     if dry_run:
         print(f"\n## Dry Run: {project_name}")
-        print(f"Would remove {removed_count} session vends")
+        print(f"Would remove {removed_vends} session vends")
+        if removed_protected:
+            print(f"Would remove {removed_protected} protected from deny: {removed_from_deny}")
         print(f"Would keep {len(new_allow)} permissions")
         if audit['session_vends']:
             print("Vends to remove:")
@@ -293,11 +334,12 @@ def clean_project(project_name: str, dry_run: bool = True) -> dict:
                 print(f"  [{reason}] {perm[:60]}...")
             if len(audit['session_vends']) > 5:
                 print(f"  ... and {len(audit['session_vends']) - 5} more")
-        return {"removed": removed_count, "kept": len(new_allow), "dry_run": True}
+        return {"removed": removed_vends, "removed_from_deny": removed_protected,
+                "kept": len(new_allow), "dry_run": True}
 
-    if removed_count == 0:
-        print(f"\n## {project_name}: No session vends to remove")
-        return {"removed": 0, "kept": len(new_allow), "dry_run": False}
+    if total_removed == 0:
+        print(f"\n## {project_name}: Nothing to clean")
+        return {"removed": 0, "removed_from_deny": 0, "kept": len(new_allow), "dry_run": False}
 
     # Create backup
     backup_path = settings_path.with_suffix('.local.json.bak')
@@ -306,13 +348,17 @@ def clean_project(project_name: str, dry_run: bool = True) -> dict:
 
     # Update settings
     settings["permissions"]["allow"] = new_allow
+    settings["permissions"]["deny"] = new_deny
     save_settings(settings_path, settings)
 
     print(f"\n## Cleaned: {project_name}")
-    print(f"Removed {removed_count} session vends")
+    print(f"Removed {removed_vends} session vends")
+    if removed_protected:
+        print(f"Removed {removed_protected} protected from deny: {removed_from_deny}")
     print(f"Kept {len(new_allow)} permissions")
 
-    return {"removed": removed_count, "kept": len(new_allow), "dry_run": False}
+    return {"removed": removed_vends, "removed_from_deny": removed_protected,
+            "kept": len(new_allow), "dry_run": False}
 
 
 def quick_check(project_name: str) -> int:
@@ -487,6 +533,9 @@ def merge_up(projects: list[str], dry_run: bool = True) -> dict:
         else:
             cleaned_allow.append(perm)
 
+    # Clean: remove protected permissions from deny
+    cleaned_deny, removed_from_deny = clean_deny_list(new_deny)
+
     # Dedupe: remove duplicates while preserving order
     seen = set()
     deduped_allow = []
@@ -497,7 +546,7 @@ def merge_up(projects: list[str], dry_run: bool = True) -> dict:
 
     seen_deny = set()
     deduped_deny = []
-    for perm in new_deny:
+    for perm in cleaned_deny:
         if perm not in seen_deny:
             seen_deny.add(perm)
             deduped_deny.append(perm)
@@ -513,15 +562,24 @@ def merge_up(projects: list[str], dry_run: bool = True) -> dict:
     print(f"  +{len(to_merge_deny)} deny patterns merged")
     if removed_vends:
         print(f"  -{len(removed_vends)} vends cleaned from master")
+    if removed_from_deny:
+        print(f"  -{len(removed_from_deny)} protected removed from deny: {removed_from_deny}")
     if duplicates_removed:
         print(f"  -{duplicates_removed} duplicates removed")
     print(f"  Master now has {len(deduped_allow)} allow, {len(deduped_deny)} deny")
+
+    # Sync to Projects-level (so both are identical)
+    projects_level_path = get_projects_level_settings_path()
+    if projects_level_path.exists():
+        shutil.copy(master_path, projects_level_path)
+        print(f"\n## Synced to Projects level: {projects_level_path}")
 
     return {
         "merged_allow": len(to_merge_allow),
         "merged_deny": len(to_merge_deny),
         "skipped_vends": len(skipped_vends),
         "cleaned_vends": len(removed_vends),
+        "cleaned_from_deny": len(removed_from_deny),
         "duplicates_removed": duplicates_removed,
         "dry_run": False
     }
@@ -589,6 +647,17 @@ def main():
             projects = find_all_projects()
         else:
             parser.error("--merge-up requires --project or --all-projects")
+
+        # LOCKED STEP: Always clean projects first before merge-up
+        print("=" * 60)
+        print("Step 1: Clean all projects (locked step)")
+        print("=" * 60)
+        for project in projects:
+            clean_project(project, dry_run=args.dry_run)
+
+        print("\n" + "=" * 60)
+        print("Step 2: Merge up to master")
+        print("=" * 60)
         result = merge_up(projects, dry_run=args.dry_run)
         if "error" in result:
             print(f"ERROR: {result['error']}")
