@@ -50,6 +50,7 @@ except ImportError:
 # Constants
 # =============================================================================
 
+VERSION = "1.1.0"  # Smart option selection feature
 DEFAULT_DELAY = 10  # seconds
 FOOTER_PATTERN = re.compile(
     r'Esc to cancel[-·–—\s]+Tab to add additional instructions',
@@ -181,6 +182,7 @@ class InputReader:
                                 'Q': '\x1b[6~', # Page Down
                                 'R': '\x1b[2~', # Insert
                                 'S': '\x1b[3~', # Delete
+                                '\x0f': '\x1b[Z',  # Shift+Tab (scan code 15)
                             }
                             if scan in key_map:
                                 self.queue.put(key_map[scan])
@@ -397,7 +399,7 @@ class Unleashed:
 
     def _show_banner(self):
         """Display startup banner."""
-        banner = f"""{BOLD}{YELLOW}[UNLEASHED] Auto-approval active | {self.delay}s countdown | Dir: {self.cwd}{RESET}
+        banner = f"""{BOLD}{YELLOW}[UNLEASHED v{VERSION}] Auto-approval | {self.delay}s | Dir: {self.cwd}{RESET}
 """
         self._write_stdout(banner)
 
@@ -407,7 +409,7 @@ class Unleashed:
         log_dir = Path(__file__).parent.parent / "logs"
 
         self.logger = EventLogger(log_dir, session_id)
-        self.logger.log_event("START", delay=self.delay, dry_run=self.dry_run)
+        self.logger.log_event("START", version=VERSION, delay=self.delay, dry_run=self.dry_run)
 
         self.overlay = CountdownOverlay(self._write_stdout)
         self._show_banner()
