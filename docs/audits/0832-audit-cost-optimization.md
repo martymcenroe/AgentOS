@@ -186,41 +186,41 @@ Read file with limit=10
 
 | Aspect | Current | Optimal | Gap |
 |--------|---------|---------|-----|
-| Model hint | Not specified | Haiku for quick/normal, Sonnet for full | Add hints |
+| Model hint | ✅ Haiku for quick/normal, Sonnet for full | Correct | None |
 | Git operations | Sequential | Could batch some | Minor |
 | Session log | Single write | Correct | None |
 
-**Findings:** Add model hints to documentation.
+**Findings:** ✅ FIXED 2026-01-14 - Model hints added.
 
 ### 5.3 /code-review
 
 | Aspect | Current | Optimal | Gap |
 |--------|---------|---------|-----|
-| Model hint | Sonnet x3 | Could use Haiku for simple checks | Investigate |
+| Model hint | ✅ Opus for security, Sonnet for others | Correct | None |
 | Parallel agents | Yes | Correct | None |
-| File reading | Per-agent | Could share context | Major opportunity |
+| File reading | ✅ Shared context from parent | Correct | None |
 
-**Findings:** Review agents read same files independently. Consider shared context.
+**Findings:** ✅ FIXED 2026-01-14 - Model hints added. Agents now receive context in spawn prompt and are instructed NOT to re-read files.
 
 ### 5.4 /sync-permissions
 
 | Aspect | Current | Optimal | Gap |
 |--------|---------|---------|-----|
-| Model hint | Not specified | Haiku | Add hint |
+| Model hint | ✅ "Zero LLM cost" noted | Correct | None |
 | JSON parsing | Python tool | Correct | None |
 | Validation | Added | Correct | None |
 
-**Findings:** Runs as Python tool (no LLM cost). Documentation could note this.
+**Findings:** ✅ FIXED 2026-01-14 - Documentation now notes this is a Python tool with zero LLM cost.
 
 ### 5.5 /friction
 
 | Aspect | Current | Optimal | Gap |
 |--------|---------|---------|-----|
-| Model hint | Not specified | Sonnet | Add hint |
-| Transcript parsing | Full read | Could use grep first | Opportunity |
+| Model hint | ✅ Sonnet specified | Correct | None |
+| Transcript parsing | ✅ Pre-filter with Grep | Correct | None |
 | Analysis depth | Comprehensive | Correct for purpose | None |
 
-**Findings:** Could pre-filter transcripts with grep before full analysis.
+**Findings:** ✅ FIXED 2026-01-14 - Model hint added. Pre-filtering step added to use Grep before reading full transcripts.
 
 ### 5.6 /zugzwang
 
@@ -235,20 +235,20 @@ Read file with limit=10
 
 | Aspect | Current | Optimal | Gap |
 |--------|---------|---------|-----|
-| Model hint | Not specified | Haiku | Add hint |
+| Model hint | ✅ Haiku specified | Correct | None |
 | Git operations | Sequential (necessary) | Correct | None |
 | PR body generation | Inline | Correct | None |
 
-**Findings:** Simple workflow, could use Haiku.
+**Findings:** ✅ FIXED 2026-01-14 - Model hint added.
 
 ### 5.8 /test-gaps
 
 | Aspect | Current | Optimal | Gap |
 |--------|---------|---------|-----|
-| Model hint | Not specified | Sonnet | Add hint |
-| Report mining | Full read | Could use grep first | Opportunity |
+| Model hint | ✅ Sonnet specified | Correct | None |
+| Report mining | ✅ Pre-filter with Grep | Correct | None |
 
-**Findings:** Similar to /friction - could pre-filter.
+**Findings:** ✅ FIXED 2026-01-14 - Model hint added. Pre-filtering step added to use Grep before reading full reports.
 
 ---
 
@@ -337,6 +337,7 @@ This audit requires human decision:
 | Date | Auditor | Skills Audited | Findings | Issues |
 |------|---------|----------------|----------|--------|
 | 2026-01-14 | Claude Opus 4.5 | All 8 skills | 5 missing model hints, 2 pre-filter opportunities | - |
+| 2026-01-14 | Claude Opus 4.5 | All 8 skills | ✅ ALL FIXED: model hints added, pre-filtering added, shared context for /code-review | - |
 
 ---
 
