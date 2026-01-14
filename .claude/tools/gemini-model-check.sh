@@ -4,15 +4,19 @@
 #
 # Usage: ./tools/gemini-model-check.sh "prompt text" [required-model]
 #
-# This script invokes Gemini CLI with JSON output and validates that the
-# correct model tier is used. If Gemini downgrades to a lower model due to
-# quota exhaustion, the script aborts and reports the issue.
+# This script uses gemini-retry.py for automatic retry with exponential backoff.
+# If Gemini downgrades to a lower model, the script aborts.
 #
 # Exit codes:
 #   0 - Success (correct model used)
-#   1 - Gemini CLI failed to execute
-#   2 - Quota exhausted (429 error)
+#   1 - Gemini CLI failed to execute / max retries exceeded
+#   2 - Quota exhausted (429 error - not retryable)
 #   3 - Model downgrade detected
+#
+# Environment variables (passed to gemini-retry.py):
+#   GEMINI_RETRY_MAX         Max retry attempts (default: 20)
+#   GEMINI_RETRY_BASE_DELAY  Initial delay in seconds (default: 30)
+#   GEMINI_RETRY_MAX_DELAY   Max delay cap in seconds (default: 600)
 
 set -euo pipefail
 
@@ -20,7 +24,26 @@ set -euo pipefail
 PROMPT="$1"
 REQUIRED_MODEL="${2:-gemini-3-pro-preview}"
 
-# Invoke Gemini CLI with JSON output
+# Get the directory of this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TOOLS_DIR="$(dirname "$SCRIPT_DIR")/../tools"
+
+# Check if gemini-retry.py exists
+if [[ -f "$TOOLS_DIR/gemini-retry.py" ]]; then
+  # Use retry wrapper for automatic backoff on capacity errors
+  result=$(python "$TOOLS_DIR/gemini-retry.py" --prompt "$PROMPT" --model "$REQUIRED_MODEL" 2>&1) || {
+    exit_code=$?
+    echo "ERROR: Gemini retry failed after max attempts" >&2
+    echo "$result" >&2
+    exit $exit_code
+  }
+  # gemini-retry.py returns the response directly on stdout
+  echo "$result"
+  exit 0
+fi
+
+# Fallback: direct invocation (no retry)
+echo "WARNING: gemini-retry.py not found, using direct invocation" >&2
 result=$(gemini -p "$PROMPT" \
   --model "$REQUIRED_MODEL" \
   --output-format json 2>&1) || {
