@@ -1,0 +1,44 @@
+{
+  "$schema": "project-registry-schema.json",
+  "$comment": "Registry of child projects that inherit from AgentOS. Used by bidirectional sync (ADR 0206).",
+
+  "children": [
+    {
+      "name": "Aletheia",
+      "path": "C:\\Users\\mcwiz\\Projects\\Aletheia",
+      "pathUnix": "/c/Users/mcwiz/Projects/Aletheia",
+      "github": "martymcenroe/Aletheia",
+      "description": "Browser extension for vocabulary learning",
+      "lastSync": "2026-01-13T00:00:00Z",
+      "lastHarvest": null,
+      "status": "active"
+    },
+    {
+      "name": "Talos",
+      "path": "C:\\Users\\mcwiz\\Projects\\Talos",
+      "pathUnix": "/c/Users/mcwiz/Projects/Talos",
+      "github": "martymcenroe/Talos",
+      "description": "Job application automation (Talent-OS)",
+      "lastSync": "2026-01-13T00:00:00Z",
+      "lastHarvest": null,
+      "status": "active",
+      "notes": "Has Gemini review protocol that should be promoted to AgentOS"
+    },
+    {
+      "name": "maintenance",
+      "path": "C:\\Users\\mcwiz\\Projects\\maintenance",
+      "pathUnix": "/c/Users/mcwiz/Projects/maintenance",
+      "github": "martymcenroe/maintenance",
+      "description": "Infrastructure maintenance scripts",
+      "lastSync": "2026-01-13T00:00:00Z",
+      "lastHarvest": null,
+      "status": "active"
+    }
+  ],
+
+  "syncConfig": {
+    "autoPropagate": false,
+    "postCommitHook": false,
+    "harvestOnCleanupFull": true
+  }
+}

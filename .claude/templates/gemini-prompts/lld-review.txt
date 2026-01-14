@@ -1,0 +1,56 @@
+You are reviewing a Low-Level Design document for the {{PROJECT_NAME}} project.
+
+**Context:** This is a ONE-SHOT REVIEW request via gemini-model-check.sh wrapper. You are running as gemini-3-pro-preview model. This is NOT an interactive session - no handshake required. Provide your review feedback immediately.
+
+CRITICAL INSTRUCTIONS:
+1. Use the three-tier priority system:
+   - [BLOCKING] - Must fix before implementation (security, correctness, fail-safe gates)
+   - [HIGH] - Should fix before implementation (testing, mocking, data pipeline)
+   - [SUGGESTION] - Nice to have (performance, maintainability)
+2. Do NOT offer to implement code or provide code snippets
+3. Focus on design review only
+
+REVIEW CHECKLIST:
+
+## Tier 1: BLOCKING (Must Pass)
+| Category | Key Questions |
+| --- | --- |
+| **Security** | Input validation? Injection risks? Auth/AuthZ? Secrets management? OWASP Top 10? |
+| **Privacy** | PII handling? Logging sensitive content? Data minimization? |
+| **Correctness** | Does implementation match requirements? Are interfaces correct? Edge cases handled? |
+| **Control** | Does the test strategy rely on manual verification? Tests must be automated assertions. |
+| **Fail-Safe** | Are timeout/failure paths explicitly defined? Is "Silent Failure" prevented? |
+
+## Tier 2: HIGH PRIORITY (Should Pass)
+| Category | Key Questions |
+| --- | --- |
+| **Testing** | All scenarios covered? Tests fail on revert? Data hygiene (no real sensitive data in tests)? |
+| **Mocking** | Can this be developed offline? Is a "Mock Mode" defined for external dependencies? |
+| **Data Pipeline** | Where does data come from? How does it get there? Test fixtures defined? |
+
+## Tier 3: SUGGESTIONS (Nice to Have)
+| Category | Key Questions |
+| --- | --- |
+| **Performance** | Latency budget? Memory budget? Bottlenecks identified? |
+| **Maintainability** | Code structure clear? Future developers can understand? |
+
+LLD TO REVIEW:
+File: {{LLD_PATH}}
+
+{{LLD_CONTENT}}
+
+OUTPUT FORMAT:
+Provide feedback using the priority markers:
+
+## [BLOCKING] Issues
+- Issue 1...
+- Issue 2...
+
+## [HIGH] Priority Issues
+- Issue 1...
+
+## [SUGGESTION] Improvements
+- Suggestion 1...
+
+## Summary
+Overall assessment and next steps recommendation.

@@ -127,6 +127,7 @@ Projects use **5-digit numbers** (prefix `1` + AgentOS number) for implementatio
 | [0203](adrs/0203-git-worktree-isolation.md) | Git Worktree Isolation | Multi-agent safety |
 | [0204](adrs/0204-single-identity-orchestration.md) | Single Identity Orchestration | Agent identity |
 | [0205](adrs/0205-test-first-philosophy.md) | Test-First Philosophy | Quality approach |
+| [0206](adrs/0206-bidirectional-sync-architecture.md) | Bidirectional Sync Architecture | Cross-project propagation |
 
 ### Skills (06xx)
 
@@ -213,6 +214,45 @@ Project/.claude/            -> Generated from AgentOS templates
 
 ---
 
+## Bidirectional Sync Model
+
+See [ADR 0206](adrs/0206-bidirectional-sync-architecture.md) for full details.
+
+```
+                    ┌─────────────┐
+                    │   AgentOS   │
+                    │  (Generic)  │
+                    └──────┬──────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         │                 │                 │
+    ┌────▼────┐      ┌─────▼─────┐     ┌─────▼─────┐
+    │ Aletheia│      │   Talos   │     │maintenance│
+    │(10xxx)  │      │  (10xxx)  │     │  (10xxx)  │
+    └────┬────┘      └─────┬─────┘     └─────┬─────┘
+         │                 │                 │
+         └─────────────────┼─────────────────┘
+                           │
+                     ┌─────▼─────┐
+                     │  Harvest  │
+                     │  Promote  │
+                     └───────────┘
+```
+
+### Sync Directions
+
+| Direction | Trigger | Tool |
+|-----------|---------|------|
+| **AgentOS → Projects** | Manual, post-commit | `agentos-generate.py` |
+| **Project → AgentOS** | Agent explicit call | `/promote` command |
+| **All Projects → AgentOS** | `/cleanup --full` | `agentos-harvest.py` |
+
+### Registered Projects
+
+See `.claude/project-registry.json` for current list.
+
+---
+
 ## Revision History
 
 | Version | Date | Changes |
@@ -220,3 +260,4 @@ Project/.claude/            -> Generated from AgentOS templates
 | 1.0 | 2026-01-13 | Initial structure with skills, runbooks, templates |
 | 2.0 | 2026-01-13 | Full document catalog after numbering audit (47 docs) |
 | 2.1 | 2026-01-13 | Added parent-child numbering scheme (4-digit AgentOS, 5-digit projects) |
+| 2.2 | 2026-01-13 | ADR 0206: Bidirectional sync architecture, project registry created |
