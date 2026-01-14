@@ -50,7 +50,7 @@ except ImportError:
 # Constants
 # =============================================================================
 
-VERSION = "1.1.0"  # Smart option selection feature
+VERSION = "1.1.1"  # Banner to stderr, skill --version/--help
 DEFAULT_DELAY = 10  # seconds
 FOOTER_PATTERN = re.compile(
     r'Esc to cancel[-·–—\s]+Tab to add additional instructions',
@@ -398,10 +398,10 @@ class Unleashed:
         return True
 
     def _show_banner(self):
-        """Display startup banner."""
-        banner = f"""{BOLD}{YELLOW}[UNLEASHED v{VERSION}] Auto-approval | {self.delay}s | Dir: {self.cwd}{RESET}
-"""
-        self._write_stdout(banner)
+        """Display startup banner to stderr (avoids Claude's stdout cursor positioning)."""
+        banner = f"{BOLD}{YELLOW}[UNLEASHED v{VERSION}] Auto-approval | {self.delay}s | Dir: {self.cwd}{RESET}\n"
+        sys.stderr.write(banner)
+        sys.stderr.flush()
 
     def run(self):
         """Main run loop."""
