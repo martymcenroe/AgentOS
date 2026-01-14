@@ -68,6 +68,7 @@ class Credential:
     key: Optional[str] = None  # Only for api_key type
     enabled: bool = True
     notes: str = ""
+    account_name: str = ""  # Human-readable account identifier (e.g., email)
 
 
 @dataclass
@@ -104,6 +105,7 @@ def load_credentials() -> list[Credential]:
             key=cred_data.get("key"),
             enabled=cred_data.get("enabled", True),
             notes=cred_data.get("notes", ""),
+            account_name=cred_data.get("account-name", ""),  # User-friendly identifier
         ))
 
     return credentials
@@ -181,22 +183,22 @@ def parse_reset_time(error_output: str) -> Optional[float]:
 # =============================================================================
 # OAuth Management
 # =============================================================================
+#
+# IMPORTANT: We DO NOT move oauth_creds.json files anymore!
+#
+# Why: Moving files causes race conditions when multiple agents run simultaneously.
+# One agent moves the file, another agent can't find it -> browser popup.
+#
+# How auth works:
+# - If GEMINI_API_KEY env var is set -> Uses API key (no popup)
+# - If no API key -> Uses ~/.gemini/oauth_creds.json
+# - API key takes PRECEDENCE over OAuth automatically
+#
+# So we just set/unset the env var. No file manipulation needed.
 
-def enable_oauth():
-    """Enable OAuth by restoring oauth_creds.json."""
-    if OAUTH_CREDS_DISABLED.exists() and not OAUTH_CREDS_FILE.exists():
-        shutil.move(OAUTH_CREDS_DISABLED, OAUTH_CREDS_FILE)
-    elif OAUTH_CREDS_BACKUP.exists() and not OAUTH_CREDS_FILE.exists():
-        shutil.copy(OAUTH_CREDS_BACKUP, OAUTH_CREDS_FILE)
-
-
-def disable_oauth():
-    """Disable OAuth by moving oauth_creds.json aside."""
-    if OAUTH_CREDS_FILE.exists():
-        # Backup if no backup exists
-        if not OAUTH_CREDS_BACKUP.exists():
-            shutil.copy(OAUTH_CREDS_FILE, OAUTH_CREDS_BACKUP)
-        shutil.move(OAUTH_CREDS_FILE, OAUTH_CREDS_DISABLED)
+def check_oauth_available() -> bool:
+    """Check if OAuth credentials file exists."""
+    return OAUTH_CREDS_FILE.exists()
 
 
 # =============================================================================
@@ -215,14 +217,17 @@ def invoke_gemini(
     Returns: (success, response, raw_output)
     """
     # Set up environment based on credential type
+    # NOTE: We use env vars only - no file manipulation (causes race conditions)
     env = os.environ.copy()
 
     if cred.cred_type == "oauth":
-        enable_oauth()
-        # Remove API key so OAuth is used
+        # Remove API key so Gemini CLI falls through to OAuth
         env.pop("GEMINI_API_KEY", None)
+        # Verify OAuth is available
+        if not check_oauth_available():
+            return False, "", f"OAuth credential '{cred.name}' requires ~/.gemini/oauth_creds.json (run 'gemini' once to authenticate)"
     else:  # api_key
-        disable_oauth()
+        # Set API key - this takes precedence over OAuth automatically
         if cred.key:
             env["GEMINI_API_KEY"] = cred.key
         else:
@@ -384,9 +389,13 @@ def print_status():
             status = f"EXHAUSTED (reset: {reset_time})"
 
         cred_type = cred.cred_type.upper()
-        if cred.cred_type == "api_key":
-            key_preview = cred.key[:10] + "..." if cred.key else "NOT SET"
-            print(f"  [{status:20}] {cred.name:20} ({cred_type}) key={key_preview}")
+        # Show account-name if available, otherwise show key preview for API keys
+        account_info = cred.account_name if cred.account_name else ""
+        if not account_info and cred.cred_type == "api_key" and cred.key:
+            account_info = f"key={cred.key[:8]}..."
+
+        if account_info:
+            print(f"  [{status:20}] {cred.name:20} ({cred_type}) {account_info}")
         else:
             print(f"  [{status:20}] {cred.name:20} ({cred_type})")
 
