@@ -168,6 +168,29 @@ Read file with limit=10
 | Static data cached | Config files, templates read once |
 | Results reused | Expensive computations stored |
 
+### 4.6 User Interaction Efficiency
+
+| Check | Pass Criteria |
+|-------|---------------|
+| Questions batched | Multiple questions in single message |
+| Context not repeated | Don't re-explain what agent already knows |
+| Partial reads used | `limit` parameter for large files |
+
+**Why batching matters:**
+Each message carries context overhead. One message with 5 questions costs less than 5 separate messages because the full conversation history is re-sent each time.
+
+### 4.7 Protocol Overhead (User Trade-offs)
+
+Some AgentOS protocols add token cost for safety/auditability:
+
+| Protocol | Cost | When to Skip |
+|----------|------|--------------|
+| Visible self-check | ~20 tokens/Bash call | Token-critical sessions, trusted operations |
+| Full spawn instructions | ~100 tokens/spawn | Simple spawns to Haiku |
+| Detailed commit messages | ~50 tokens | Quick doc updates |
+
+**These are USER decisions.** The protocols exist for good reasons, but when you're at 58% budget with 3 days left, pragmatism wins.
+
 ---
 
 ## 5. Skill-by-Skill Audit
@@ -338,6 +361,7 @@ This audit requires human decision:
 |------|---------|----------------|----------|--------|
 | 2026-01-14 | Claude Opus 4.5 | All 8 skills | 5 missing model hints, 2 pre-filter opportunities | - |
 | 2026-01-14 | Claude Opus 4.5 | All 8 skills | ✅ ALL FIXED: model hints added, pre-filtering added, shared context for /code-review | - |
+| 2026-01-14 | Claude Opus 4.5 | Checklist | Added 4.6 User Interaction Efficiency, 4.7 Protocol Overhead trade-offs | - |
 
 ---
 
