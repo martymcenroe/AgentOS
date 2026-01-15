@@ -419,7 +419,41 @@ Audit Updates → Relevant 08xx audit
 
 | ID | Date | Title | Severity | Root Cause | Post-Mortem |
 |----|------|-------|----------|------------|-------------|
-| | | | | | |
+| INC-001 | 2026-01-15 | OneDrive Mass Download via Unleashed | SEV-2 | Explore agents auto-approved `find` on user home, triggering 30GB OneDrive download | See below |
+
+#### INC-001: OneDrive Mass Download via Unleashed
+
+**Date:** 2026-01-15 08:50 AM CT
+**Severity:** SEV-2 (High - significant system impact)
+**Duration:** ~2 hours (system unresponsive)
+**Status:** Resolved
+
+**Summary:** Three Explore agents running with `unleashed` auto-approved `find` commands that traversed the entire user home directory (`C:\Users\mcwiz`), which includes a 30GB OneDrive folder with Files On-Demand enabled. This triggered massive file downloads, saturating disk I/O and making the system unresponsive.
+
+**Root Cause:**
+1. Explore agents issued broad `find "C:\Users\mcwiz" ...` commands
+2. Unleashed v1.2.0 auto-approved these after 10-second countdown (no path validation)
+3. OneDrive Files On-Demand triggered downloads for every file accessed
+4. Multiple agents + OneDrive downloads = system freeze
+
+**Contributing Factors:**
+- [x] Configuration error (no OneDrive exclusion rules)
+- [x] Process gap (no dangerous path detection for searches)
+- [x] Edge case not handled (cloud-synced directories)
+
+**Action Items Completed:**
+1. Added DANGEROUS PATH CONSTRAINTS to CLAUDE.md
+2. Added OneDrive exclusion to spawn agent prompts
+3. Created `~/.agentos/excluded_paths.txt` config
+4. Implemented dangerous path detection in unleashed v1.2.0
+5. Implemented HARD BLOCK for destructive commands in unleashed v1.3.0
+6. Created `~/.agentos/hard_block_commands.txt` and `safe_paths.txt`
+
+**Lessons Learned:**
+- Cloud-synced directories (OneDrive, Dropbox, iCloud) are hazardous for automated traversal
+- Auto-approval tools need path-based safety gates, not just countdown timers
+- Destructive commands need hard blocks, not just confirmation prompts
+- User home directory should never be searched wholesale
 
 ---
 
