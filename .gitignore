@@ -20,3 +20,6 @@ __pycache__/
 # Harvest artifacts (generated reports)
 harvest-*.json
 harvest-*.xlsx
+
+# Blog drafts (not ready for public)
+docs/blog/
