@@ -30,7 +30,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-VERSION = "1.0.0"
+VERSION = "1.0.0-test"
 BUFFER_SIZE = 2000
 PROMPT_REGEX = re.compile(r"Allow this command to run\?")
 DEFAULT_FORBIDDEN = [
