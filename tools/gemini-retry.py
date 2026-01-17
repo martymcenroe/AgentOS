@@ -13,18 +13,21 @@ Features:
     - Exponential backoff for temporary capacity issues
     - Logs all attempts to logs/gemini-retry-TIMESTAMP.jsonl
     - Validates model used (rejects silent downgrades)
+    - Auto-switches to stdin for large prompts (>10KB) to avoid CLI issues
     - Returns response on success, exits 1 on permanent failure
 
 Key Insight:
     - QUOTA_EXHAUSTED (account limit) → Try other credentials via rotation
     - CAPACITY_EXHAUSTED (Google servers) → Exponential backoff makes sense
     - Exponential backoff is USELESS for account quota - rotation is the answer
+    - Large prompts fail with -p flag → Use stdin instead (Issue #34)
 
 Environment Variables:
-    GEMINI_RETRY_MAX         Max retry attempts (default: 20)
-    GEMINI_RETRY_BASE_DELAY  Initial delay in seconds (default: 30)
-    GEMINI_RETRY_MAX_DELAY   Max delay cap in seconds (default: 600)
-    GEMINI_RETRY_LOG_DIR     Log directory (default: logs/)
+    GEMINI_RETRY_MAX              Max retry attempts (default: 20)
+    GEMINI_RETRY_BASE_DELAY       Initial delay in seconds (default: 30)
+    GEMINI_RETRY_MAX_DELAY        Max delay cap in seconds (default: 600)
+    GEMINI_RETRY_LOG_DIR          Log directory (default: logs/)
+    GEMINI_RETRY_PROMPT_THRESHOLD Prompt size threshold for stdin (default: 10240)
 
 Exit Codes:
     0 - Success (response printed to stdout)
@@ -58,6 +61,10 @@ MAX_RETRIES = int(os.environ.get("GEMINI_RETRY_MAX", "20"))
 BASE_DELAY = float(os.environ.get("GEMINI_RETRY_BASE_DELAY", "30"))
 MAX_DELAY = float(os.environ.get("GEMINI_RETRY_MAX_DELAY", "600"))
 JITTER_FACTOR = 0.2  # ±20%
+
+# Prompt size threshold for stdin vs -p flag (Issue #34)
+# Large prompts (>10KB) use stdin to avoid command line issues
+PROMPT_SIZE_THRESHOLD = int(os.environ.get("GEMINI_RETRY_PROMPT_THRESHOLD", str(10 * 1024)))
 
 # Logging
 LOG_DIR = Path(os.environ.get("GEMINI_RETRY_LOG_DIR", "logs"))
@@ -247,6 +254,10 @@ def invoke_gemini(prompt: str, model: str, no_tools: bool = False) -> GeminiResu
 
     Returns:
         GeminiResult with success/failure info
+
+    Note:
+        For large prompts (>PROMPT_SIZE_THRESHOLD), uses stdin instead of -p flag
+        to avoid command line length limits and shell escaping issues. (Issue #34)
     """
     import shutil
 
@@ -260,12 +271,26 @@ def invoke_gemini(prompt: str, model: str, no_tools: bool = False) -> GeminiResu
             exit_code=-1
         )
 
-    cmd = [
-        gemini_path,
-        "-p", prompt,
-        "--model", model,
-        "--output-format", "json"
-    ]
+    # Determine whether to use stdin or -p flag based on prompt size (Issue #34)
+    use_stdin = len(prompt) > PROMPT_SIZE_THRESHOLD
+
+    if use_stdin:
+        # Large prompt: use stdin (avoids command line length limits)
+        cmd = [
+            gemini_path,
+            "--model", model,
+            "--output-format", "json"
+        ]
+        if os.environ.get("GEMINI_RETRY_DEBUG"):
+            print(f"[DEBUG] Using stdin for large prompt ({len(prompt)} bytes > {PROMPT_SIZE_THRESHOLD})", file=sys.stderr)
+    else:
+        # Small prompt: use -p flag (simpler)
+        cmd = [
+            gemini_path,
+            "-p", prompt,
+            "--model", model,
+            "--output-format", "json"
+        ]
 
     # Disable agentic tools if requested (for reviews)
     if no_tools:
@@ -274,6 +299,7 @@ def invoke_gemini(prompt: str, model: str, no_tools: bool = False) -> GeminiResu
     try:
         result = subprocess.run(
             cmd,
+            input=prompt if use_stdin else None,
             capture_output=True,
             text=True,
             timeout=300  # 5 minute timeout per attempt
@@ -637,16 +663,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Environment Variables:
-  GEMINI_RETRY_MAX         Max retry attempts (default: 20)
-  GEMINI_RETRY_BASE_DELAY  Initial delay in seconds (default: 30)
-  GEMINI_RETRY_MAX_DELAY   Max delay cap in seconds (default: 600)
-  GEMINI_RETRY_LOG_DIR     Log directory (default: logs/)
+  GEMINI_RETRY_MAX              Max retry attempts (default: 20)
+  GEMINI_RETRY_BASE_DELAY       Initial delay in seconds (default: 30)
+  GEMINI_RETRY_MAX_DELAY        Max delay cap in seconds (default: 600)
+  GEMINI_RETRY_LOG_DIR          Log directory (default: logs/)
+  GEMINI_RETRY_PROMPT_THRESHOLD Prompt size for stdin switch (default: 10240)
 
 Examples:
   # Simple prompt
   python gemini-retry.py --prompt "Review this code"
 
-  # From file
+  # From file (large prompts auto-use stdin)
   python gemini-retry.py --prompt-file review-prompt.txt
 
   # For reviews: disable agentic tools (prevents file searching)
