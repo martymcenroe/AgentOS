@@ -152,6 +152,58 @@ These audits apply to ALL projects using AgentOS:
 **Purpose:** Ensure documentation reflects reality.
 **Check:** README, Wiki, and docs align with current state.
 
+### 0818 - AI Management System (ISO/IEC 42001)
+**Purpose:** AI governance per ISO/IEC 42001:2023.
+**Check:**
+1. AI system inventory (models, agents, classifiers)
+2. Risk classification per system
+3. Development lifecycle documentation
+4. Data management practices
+**Deep mode:** WebSearch for ISO 42001 updates.
+
+### 0819 - AI Supply Chain
+**Purpose:** Model provenance, dependency security, AIBOM.
+**Check:**
+1. Model source verification (provider, version)
+2. Model version pinning
+3. Dependency vulnerability scan
+4. Training data source integrity (if applicable)
+**Deep mode:** WebSearch for model security advisories, AIBOM standards.
+
+### 0820 - Explainability (XAI)
+**Purpose:** Ensure AI outputs are understandable and traceable.
+**Check:**
+1. AI disclosure to users
+2. Reasoning/rationale included in outputs
+3. Decision traceability
+4. Uncertainty markers present
+**Deep mode:** WebSearch for EU AI Act transparency requirements, XAI frameworks.
+
+### 0821 - Agentic AI Governance
+**Purpose:** OWASP Agentic Top 10 compliance for AI agents.
+**Check:**
+1. AA01 Agent Goal Hijacking - Boundary enforcement
+2. AA05 Tool Misuse - Permission deny lists
+3. AA06 Excessive Autonomy - Human approval gates
+4. AA07 Trust Boundary Violations - Isolation mechanisms
+**Deep mode:** WebSearch for OWASP Agentic Top 10 updates.
+
+### 0822 - Bias & Fairness
+**Purpose:** Ensure fair, unbiased AI outputs.
+**Check:**
+1. Cultural/linguistic bias in outputs
+2. Source data bias
+3. Output consistency testing
+4. Demographic fairness (if applicable)
+
+### 0823 - AI Incident Post-Mortem
+**Purpose:** Structured process for AI failure analysis.
+**Check:**
+1. Review any open/recent AI-related issues
+2. Verify incident classification process exists
+3. Check lessons learned captured
+4. Review response time SLAs
+
 ### 0832 - Cross-Project Harvest
 **Purpose:** Discover patterns in child projects worth promoting to AgentOS.
 **Tool:** `poetry run python tools/agentos-harvest.py`
