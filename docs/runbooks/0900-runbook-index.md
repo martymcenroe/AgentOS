@@ -19,7 +19,9 @@ Quick reference for the orchestrator (Marty) on how to run tools, commands, agen
 
 | ID | Runbook | Trigger | Frequency | Model |
 |----|---------|---------|-----------|-------|
-| 0901 | [Nightly AgentOS Audit](0901-runbook-nightly-agentos-audit.md) | PowerShell | Nightly | Opus + ultrathink |
+| 0901 | [New Project Setup](0901-new-project-setup.md) | Manual | On new project | - |
+| 0902 | [Nightly AgentOS Audit](0902-nightly-agentos-audit.md) | PowerShell | Nightly | Opus + ultrathink |
+| 0903 | [Windows Scheduled Tasks](0903-windows-scheduled-tasks.md) | Reference | - | Sonnet |
 
 ## Model Selection Guide
 
