@@ -1,25 +1,19 @@
 #!/usr/bin/env python3
 """
-Unleashed Danger Test - PTY Wrapper for Claude Code Auto-Approval (Test Version)
+Unleashed - PTY Wrapper for Claude Code Auto-Approval
 
-Test version of unleashed-danger with --debug flag for verbose logging.
-Deploy changes here first, test, then promote to production.
-
-DANGER MODE: This version has NO safety checks - it auto-approves EVERYTHING.
-- No hard block checks
-- No dangerous path checks
-- No git destructive checks
-- Single Escape key passes through (user can interrupt Claude)
+A convenience wrapper that auto-approves Claude Code permission prompts
+after a 10-second countdown, giving users a window to cancel.
 
 Usage:
-  python tools/unleashed-danger-test.py [--debug] [--dry-run] [--help]
+  python tools/unleashed.py [--dry-run] [--help]
 
 Environment Variables:
   UNLEASHED_DELAY=N  Override default 10-second countdown (default: 10)
 
 Security Note:
-  This tool auto-approves ALL permission prompts with ZERO safety checks.
-  Use at your own risk.
+  This is a convenience tool, not a security tool. It auto-approves ALL
+  permission prompts after the countdown. Use at your own risk.
 
 References:
   - Issue #10: https://github.com/martymcenroe/AgentOS/issues/10
@@ -38,21 +32,10 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Version constant (defined early for --version flag)
-VERSION = "1.4.1-danger-t"  # Danger test version - deploy changes here first
-
-# Global debug flag
-DEBUG = False
-
-# Handle --version before heavy imports
-if "--version" in sys.argv or "-v" in sys.argv:
-    print(f"unleashed-danger-test.py {VERSION}")
-    sys.exit(0)
-
 try:
     import winpty
 except ImportError:
-    print("[UNLEASHED-DANGER-TEST] Error: pywinpty not installed. Run: poetry add pywinpty", file=sys.stderr)
+    print("[UNLEASHED] Error: pywinpty not installed. Run: poetry add pywinpty", file=sys.stderr)
     sys.exit(1)
 
 # Try to import msvcrt for Windows keyboard input
@@ -61,13 +44,6 @@ try:
     HAS_MSVCRT = True
 except ImportError:
     HAS_MSVCRT = False
-
-
-def debug_log(msg: str):
-    """Log debug message to stderr if DEBUG is enabled."""
-    if DEBUG:
-        sys.stderr.write(f"[DEBUG] {msg}\n")
-        sys.stderr.flush()
 
 
 # =============================================================================
@@ -88,8 +64,6 @@ CURSOR_HOME = '\x1b[H'
 CLEAR_LINE = '\x1b[2K'
 BOLD = '\x1b[1m'
 YELLOW = '\x1b[33m'
-RED = '\x1b[31m'
-CYAN = '\x1b[36m'
 RESET = '\x1b[0m'
 
 
@@ -170,15 +144,11 @@ class PtyReader:
 
 
 # =============================================================================
-# Input Reader (for user keyboard input) - DANGER MODE
+# Input Reader (for user keyboard input)
 # =============================================================================
 
 class InputReader:
-    """Non-blocking input reader - DANGER MODE with selective filtering.
-
-    This reader filters out terminal response escape sequences (multi-char)
-    while allowing single Escape keypresses through for user cancellation.
-    """
+    """Non-blocking stdin reader."""
 
     def __init__(self):
         self.queue = queue.Queue()
@@ -186,54 +156,20 @@ class InputReader:
         self.thread = threading.Thread(target=self._reader_thread, daemon=True)
         self.thread.start()
 
-    def _is_safe_char(self, char: str) -> bool:
-        """Check if character is safe user input (not terminal garbage).
-
-        AGGRESSIVE filtering - only pass through:
-        - Printable ASCII (32-126)
-        - Tab (9), Enter (13), Backspace (8)
-        - Escape (27) - but only standalone, not in sequences
-
-        FILTERED (terminal response garbage):
-        - Semicolons (;) - CSI parameter separator
-        - Brackets ([ ]) - CSI sequences
-        (Only filtering chars users never type standalone)
-        """
-        if not char:
-            return False
-        code = ord(char)
-        # Safe: printable ASCII (32-126), Tab(9), Enter(13), Backspace(8)
-        # Note: We filter Escape(27) separately via sequence detection
-        safe_controls = {8, 9, 10, 13}
-        return (32 <= code <= 126) or code in safe_controls
-
     def _reader_thread(self):
-        """Background thread for reading stdin via msvcrt - with aggressive filtering."""
+        """Background thread for reading stdin."""
         while self.running:
             try:
                 if HAS_MSVCRT:
+                    # Windows: use msvcrt for non-blocking input
                     if msvcrt.kbhit():
                         char = msvcrt.getwch()
-                        debug_log(f"input: char={repr(char)} ord={ord(char) if len(char)==1 else 'N/A'}")
-
-                        # FILTER: Drop terminal response garbage (brackets, semicolons)
-                        # These only appear standalone from terminal responses, not user input
-                        # NOTE: digits, 'c', '?' removed - users need to type them!
-                        if char in ';[]':
-                            # Likely terminal response garbage - drop it
-                            debug_log(f"input: FILTERED (terminal response char)")
-                            # Drain any remaining garbage
-                            while msvcrt.kbhit():
-                                garbage = msvcrt.getwch()
-                                debug_log(f"input: draining garbage: {repr(garbage)}")
-                                if garbage in '\r\n':  # Stop at newline
-                                    break
-                            continue
-
-                        # Handle Windows special keys
+                        # Handle Windows special keys (arrows, function keys, etc.)
+                        # They come as two-char sequences: \xe0 or \x00 followed by scan code
                         if char in ('\xe0', '\x00'):
+                            # Read scan code immediately - it's already buffered
                             scan = msvcrt.getwch()
-                            debug_log(f"input: scan={repr(scan)} ord={ord(scan) if len(scan)==1 else 'N/A'}")
+                            # Convert to ANSI escape sequences
                             key_map = {
                                 'H': '\x1b[A',  # Up
                                 'P': '\x1b[B',  # Down
@@ -248,39 +184,16 @@ class InputReader:
                             }
                             if scan in key_map:
                                 self.queue.put(key_map[scan])
-                                debug_log(f"input: mapped to {repr(key_map[scan])}")
-                            else:
-                                debug_log(f"input: unknown scan code")
-                        elif char == '\x1b':
-                            # Escape character - might be terminal response or user keypress
-                            # Wait briefly to see if more characters follow (escape sequence)
-                            time.sleep(0.02)  # 20ms - enough for terminal sequences
-                            seq = char
-                            while msvcrt.kbhit():
-                                seq += msvcrt.getwch()
-                            debug_log(f"input: escape_seq={repr(seq)}")
-
-                            # Filter multi-char escape sequences (terminal garbage)
-                            # but allow single Escape key through for user cancellation
-                            if len(seq) > 1:
-                                # Multi-char escape sequence - definitely terminal response
-                                debug_log(f"input: FILTERED (multi-char escape)")
-                                continue
-                            # Single escape - pass it through so user can cancel Claude
-                            debug_log(f"input: queued single escape")
-                            self.queue.put('\x1b')
-                        elif self._is_safe_char(char):
-                            self.queue.put(char)
-                            debug_log(f"input: queued safe char")
+                            # else: unknown scan code, drop it
                         else:
-                            debug_log(f"input: FILTERED (unsafe)")
-                        # else: drop unsafe character
+                            self.queue.put(char)
                     else:
                         time.sleep(0.01)
                 else:
+                    # Unix: use select for non-blocking input
                     if select.select([sys.stdin], [], [], 0.01)[0]:
                         char = sys.stdin.read(1)
-                        if char and self._is_safe_char(char):
+                        if char:
                             self.queue.put(char)
             except Exception:
                 time.sleep(0.01)
@@ -313,11 +226,11 @@ class EventLogger:
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         # Raw output log
-        self.raw_log_path = log_dir / f"unleashed-danger-test_{session_id}.log"
+        self.raw_log_path = log_dir / f"unleashed_{session_id}.log"
         self.raw_log = open(self.raw_log_path, 'wb')
 
         # Structured event log
-        self.event_log_path = log_dir / f"unleashed-danger-test_events_{session_id}.jsonl"
+        self.event_log_path = log_dir / f"unleashed_events_{session_id}.jsonl"
         self.event_log = open(self.event_log_path, 'a', encoding='utf-8')
 
     def log_raw(self, data: bytes):
@@ -355,7 +268,7 @@ class CountdownOverlay:
     def show(self, seconds_remaining: int):
         """Show countdown overlay."""
         self.active = True
-        message = f"{CURSOR_SAVE}{CURSOR_HOME}{BOLD}{RED}[UNLEASHED-DANGER-TEST]{YELLOW} Auto-approving in {seconds_remaining}s... (Press any key to cancel){RESET}{CLEAR_LINE}{CURSOR_RESTORE}"
+        message = f"{CURSOR_SAVE}{CURSOR_HOME}{BOLD}{YELLOW}[UNLEASHED] Auto-approving in {seconds_remaining}s... (Press any key to cancel){RESET}{CLEAR_LINE}{CURSOR_RESTORE}"
         self.writer(message)
 
     def hide(self):
@@ -368,12 +281,12 @@ class CountdownOverlay:
 
     def show_approved(self):
         """Show approval message briefly."""
-        message = f"{CURSOR_SAVE}{CURSOR_HOME}{BOLD}{RED}[UNLEASHED-DANGER-TEST]{YELLOW} Auto-approved!{RESET}{CLEAR_LINE}{CURSOR_RESTORE}"
+        message = f"{CURSOR_SAVE}{CURSOR_HOME}{BOLD}{YELLOW}[UNLEASHED] Auto-approved!{RESET}{CLEAR_LINE}{CURSOR_RESTORE}"
         self.writer(message)
 
     def show_cancelled(self):
         """Show cancellation message briefly."""
-        message = f"{CURSOR_SAVE}{CURSOR_HOME}{BOLD}{RED}[UNLEASHED-DANGER-TEST]{YELLOW} Cancelled by user{RESET}{CLEAR_LINE}{CURSOR_RESTORE}"
+        message = f"{CURSOR_SAVE}{CURSOR_HOME}{BOLD}{YELLOW}[UNLEASHED] Cancelled by user{RESET}{CLEAR_LINE}{CURSOR_RESTORE}"
         self.writer(message)
 
 
@@ -382,17 +295,7 @@ class CountdownOverlay:
 # =============================================================================
 
 class Unleashed:
-    """Main PTY wrapper for auto-approval - DANGER MODE TEST.
-
-    DANGER MODE means:
-    - NO safety checks (hard block, dangerous path, git destructive)
-    - Single Escape passes through (user can interrupt Claude)
-    - Filters multi-char escape sequences (terminal garbage)
-    - Just countdown and auto-approve
-
-    TEST MODE adds:
-    - --debug flag for verbose logging
-    """
+    """Main PTY wrapper for auto-approval."""
 
     def __init__(self, delay: int = DEFAULT_DELAY, dry_run: bool = False, cwd: str = None):
         self.delay = delay
@@ -416,10 +319,7 @@ class Unleashed:
     def _detect_footer(self, text: str) -> bool:
         """Check if the permission footer is present in text."""
         clean_text = strip_ansi(text)
-        result = bool(FOOTER_PATTERN.search(clean_text))
-        if result:
-            debug_log("footer detected in text")
-        return result
+        return bool(FOOTER_PATTERN.search(clean_text))
 
     def _detect_three_options(self) -> bool:
         """Check if the current prompt has 3 options (includes 'remember' option).
@@ -440,16 +340,13 @@ class Unleashed:
         """
         Handle the countdown sequence.
         Returns True if auto-approved, False if cancelled.
-
-        DANGER MODE: No safety checks - just countdown and auto-approve.
-        NEVER sends Escape to Claude.
         """
         self.in_countdown = True
         screen_context = self._capture_screen_context()
 
         self.logger.log_event("FOOTER_DETECTED")
-        self.logger.log_event("COUNTDOWN_START", delay=self.delay, mode="DANGER-TEST")
-        debug_log(f"starting countdown: {self.delay}s (DANGER MODE)")
+        self.logger.log_event("SCREEN_CAPTURED", context_length=len(screen_context))
+        self.logger.log_event("COUNTDOWN_START", delay=self.delay)
 
         for remaining in range(self.delay, 0, -1):
             self.overlay.show(remaining)
@@ -467,14 +364,10 @@ class Unleashed:
                             self.overlay.hide()
                             self.in_countdown = False
                             self.logger.log_event("CANCELLED_BY_USER", key=repr(char))
-                            debug_log(f"cancelled by user: {repr(char)}")
 
                             # Pass the keypress through to Claude
-                            # DANGER MODE: Never send Escape, but can send other chars
                             if self.pty_process and self.pty_process.isalive():
-                                # Only pass through safe characters (no escape)
-                                if char != '\x1b':
-                                    self.pty_process.write(char)
+                                self.pty_process.write(char)
 
                             return False
 
@@ -488,13 +381,12 @@ class Unleashed:
 
         # Check if 3-option prompt (has "remember" option)
         has_three = self._detect_three_options()
-        debug_log(f"auto-approving, has_three={has_three}")
 
         if not self.dry_run:
             if self.pty_process and self.pty_process.isalive():
                 if has_three:
                     # Send Shift+Tab to select option 2 ("Yes, and don't ask again...")
-                    self.pty_process.write('\x1b[Z')  # Shift+Tab (this is OK - it's not bare Escape)
+                    self.pty_process.write('\x1b[Z')  # Shift+Tab
                     time.sleep(0.05)  # Small delay for UI to update
                 self.pty_process.write('\r')  # Enter to confirm
             self.logger.log_event("AUTO_APPROVED", option=2 if has_three else 1, context=screen_context[:500])
@@ -504,11 +396,10 @@ class Unleashed:
         return True
 
     def _show_banner(self):
-        """Display startup banner to stderr (avoids Claude's stdout cursor positioning)."""
-        debug_mode = " [DEBUG]" if DEBUG else ""
-        banner = f"{BOLD}{RED}[UNLEASHED-DANGER-TEST v{VERSION}]{debug_mode}{YELLOW} Auto-approval | {self.delay}s | NO SAFETY CHECKS | Dir: {self.cwd}{RESET}\n"
-        sys.stderr.write(banner)
-        sys.stderr.flush()
+        """Display startup banner."""
+        banner = f"""{BOLD}{YELLOW}[UNLEASHED] Auto-approval active | {self.delay}s countdown | Dir: {self.cwd}{RESET}
+"""
+        self._write_stdout(banner)
 
     def run(self):
         """Main run loop."""
@@ -516,10 +407,7 @@ class Unleashed:
         log_dir = Path(__file__).parent.parent / "logs"
 
         self.logger = EventLogger(log_dir, session_id)
-        self.logger.log_event("START", version=VERSION, delay=self.delay, dry_run=self.dry_run, mode="DANGER-TEST", debug=DEBUG)
-
-        # Set environment variable so Claude can check version via /unleashed-version
-        os.environ['UNLEASHED_VERSION'] = VERSION
+        self.logger.log_event("START", delay=self.delay, dry_run=self.dry_run)
 
         self.overlay = CountdownOverlay(self._write_stdout)
         self._show_banner()
@@ -560,15 +448,14 @@ class Unleashed:
                     self._write_stdout(pty_output)
 
                     # Check for footer (permission prompt)
-                    # Check both latest output AND full buffer (footer might be split across chunks)
-                    if not self.in_countdown:
-                        if self._detect_footer(pty_output) or self._detect_footer(self.screen_buffer[-500:]):
-                            self._handle_countdown()
+                    if not self.in_countdown and self._detect_footer(pty_output):
+                        self._handle_countdown()
 
                 # Read user input (when not in countdown)
                 if not self.in_countdown:
                     user_input = self.input_reader.read_nowait()
                     if user_input:
+                        # Pass through to PTY
                         if self.pty_process.isalive():
                             self.pty_process.write(user_input)
 
@@ -613,7 +500,7 @@ class Unleashed:
         if self.logger:
             self.logger.log_event("END")
             self.logger.close()
-            print(f"\n[UNLEASHED-DANGER-TEST] Logs saved to: {self.logger.log_dir}", file=sys.stderr)
+            print(f"\n[UNLEASHED] Logs saved to: {self.logger.log_dir}", file=sys.stderr)
 
         # Reset terminal state
         sys.stdout.write('\x1b[0m')  # Reset attributes
@@ -642,36 +529,21 @@ def setup_signal_handlers(unleashed_instance):
 # =============================================================================
 
 def main():
-    global DEBUG
-
     parser = argparse.ArgumentParser(
-        description="Unleashed Danger Test - Auto-approval wrapper for Claude Code (NO SAFETY CHECKS - Test Version)",
+        description="Unleashed - Auto-approval wrapper for Claude Code",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Environment Variables:
   UNLEASHED_DELAY=N  Override countdown delay (default: 10 seconds)
 
 Examples:
-  python tools/unleashed-danger-test.py              # Danger test mode
-  python tools/unleashed-danger-test.py --debug      # With debug output
-  python tools/unleashed-danger-test.py --dry-run    # Test detection without injection
-  UNLEASHED_DELAY=5 python tools/unleashed-danger-test.py  # 5-second countdown
+  python tools/unleashed.py              # Normal mode
+  python tools/unleashed.py --dry-run    # Test detection without injection
+  UNLEASHED_DELAY=5 python tools/unleashed.py  # 5-second countdown
 
-WARNING:
-  DANGER MODE has NO safety checks:
-  - No hard block for destructive commands
-  - No dangerous path detection
-  - No git destructive warnings
-  - Single Escape passes through (can interrupt Claude)
-
-  Use at your own risk.
+Security Note:
+  This tool auto-approves ALL permission prompts. Use at your own risk.
         """
-    )
-    # Note: --version is handled early (before imports) for faster response
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable verbose debug output to stderr"
     )
     parser.add_argument(
         "--dry-run",
@@ -693,9 +565,6 @@ WARNING:
 
     args = parser.parse_args()
 
-    # Set global debug flag
-    DEBUG = args.debug
-
     # Determine delay
     delay = args.delay
     if delay is None:
@@ -708,7 +577,7 @@ WARNING:
     try:
         unleashed.run()
     except Exception as e:
-        print(f"[UNLEASHED-DANGER-TEST] Fatal error: {e}", file=sys.stderr)
+        print(f"[UNLEASHED] Fatal error: {e}", file=sys.stderr)
         sys.exit(1)
 
 

@@ -1,0 +1,105 @@
+## **Post-Mortem Report: Unleashed Development & Debugging**
+
+This report documents the systematic failure of "blind" hypothesis-driven debugging and the eventual transition to an investigative, data-driven methodology that stabilized the **Unleashed** tool.
+
+### **1. Chronology of Failed Hypotheses**
+
+The initial hours were spent "thrashing" with code changes that addressed symptoms rather than the root cause.
+
+* 
+**Hypothesis A: Shell Script Resolution.** I assumed WinPTY could not find the `claude` command because it is a Windows batch script (`.cmd`) rather than an executable. I attempted to fix this with `cmd /c` wrappers and absolute pathing.
+
+
+* **Result:** Failure. The process would spawn but return no output.
+
+
+
+
+* 
+**Hypothesis B: Environment Inheritance.** I hypothesized that the child process lacked the `PATH` to find Node.js. I added environment copying and `TERM` variable enforcement.
+
+
+* **Result:** Failure. Continued "silence" from the PTY.
+
+
+
+
+* 
+**Hypothesis C: Direct Node Invocation.** I attempted to bypass the Windows shell entirely by calling `node.exe` on the Claude entry-point script.
+
+
+* **Result:** Failure. WinPTY still could not capture the output stream.
+
+
+
+
+
+---
+
+### **2. Transition to Investigative Exploration**
+
+The breakthrough occurred only after abandoning code generation in favor of raw terminal exploration to "audit" the system state.
+
+* 
+**Executable Verification:** Using `type claude` and `where claude` proved the binaries were correctly located in `~\AppData\Roaming\npm\claude.cmd`.
+
+
+* 
+**Version Audit:** Direct commands revealed a highly modern environment: **Python 3.14.0** and **Node v25.2.1**.
+
+
+* 
+**Library Validation:** Using `poetry run pip show pywinpty` and direct Python one-liners proved that **pywinpty 3.0.2** was functional but sensitive to the parent terminal's state.
+
+
+* 
+**The Root Cause Discovery:** The audit of the `unleashed-test` alias revealed that `stty raw` was being called *before* Python started. This "pre-rawed" the terminal, preventing WinPTY from establishing its own I/O pipes, which caused the silent hanging.
+
+
+
+---
+
+### **3. Forensic Debugging Implementations**
+
+To prove the failure points, several debug sequences were implemented in `unleashed-test.py`:
+
+* 
+**v3003-v3004 (IO Audit):** Added thread-level logging (`Thread-Stdin: ONLINE`) to see which side of the pipe was blocking.
+
+
+* **v3005-v3006 (Type Probing):** Discovered a `TypeError` where Python 3.14/WinPTY returned `bytes` while the code expected `str`. This was only visible after adding `sys.stderr` catch-blocks.
+
+
+* 
+**v3008 (Input Sync):** Used `msvcrt.kbhit()` and `msvcrt.getch()` to bypass the Bash echo and capture raw keys directly from the Windows console.
+
+
+
+---
+
+### **4. Corrective Instruction for Future Sessions**
+
+To prevent a recurrence of "thrashing," use the following directive in your system instructions or at the start of a session:
+
+> "You are strictly prohibited from generating new code for `unleashed-test.py` based on hypotheses alone. If a failure occurs, you must first provide terminal commands to investigate the environment (paths, versions, handles, and terminal state). Only after you provide proof of the root cause are you permitted to suggest code modifications. Never assume; investigate."
+
+---
+
+### **5. Remaining Work & Technical Debt**
+
+While the PTY bridge is now stable, the following tasks are outstanding:
+
+* 
+**Handling ANSI Leakage:** Claude sends Device Status Reports (DSR) that occasionally appear as raw text (e.g., `61;4;...`). A state machine is needed to filter these out of `stdout`.
+
+
+* 
+**Signal Propagation:** Ensure that resizing the terminal window correctly updates the PTY dimensions via `pty.set_size()` to prevent layout breaking.
+
+
+* 
+**Performance Optimization:** The 5ms polling rate in `msvcrt` is functional but should be reviewed for CPU impact during long idle sessions.
+
+
+
+**Would you like me to begin the investigation into the ANSI leakage sequences?**

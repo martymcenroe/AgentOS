@@ -9,7 +9,7 @@ DANGER MODE: This version has NO safety checks - it auto-approves EVERYTHING.
 - No hard block checks
 - No dangerous path checks
 - No git destructive checks
-- Single Escape key passes through (user can interrupt Claude)
+- NEVER sends Escape to Claude (cannot interrupt)
 
 Usage:
   python tools/unleashed-danger-test.py [--debug] [--dry-run] [--help]
@@ -39,7 +39,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # Version constant (defined early for --version flag)
-VERSION = "1.4.1-danger-t"  # Danger test version - deploy changes here first
+VERSION = "1.4.0-danger-t"  # Danger test version - deploy changes here first
 
 # Global debug flag
 DEBUG = False
@@ -174,10 +174,10 @@ class PtyReader:
 # =============================================================================
 
 class InputReader:
-    """Non-blocking input reader - DANGER MODE with selective filtering.
+    """Non-blocking input reader - DANGER MODE with aggressive filtering.
 
-    This reader filters out terminal response escape sequences (multi-char)
-    while allowing single Escape keypresses through for user cancellation.
+    This reader aggressively filters out terminal response characters
+    to prevent them from being passed to Claude and interrupting it.
     """
 
     def __init__(self):
@@ -195,9 +195,11 @@ class InputReader:
         - Escape (27) - but only standalone, not in sequences
 
         FILTERED (terminal response garbage):
+        - Digits (0-9) - often part of terminal responses
         - Semicolons (;) - CSI parameter separator
         - Brackets ([ ]) - CSI sequences
-        (Only filtering chars users never type standalone)
+        - Question mark (?) - terminal mode queries
+        - Letter 'c' - device attributes response terminator
         """
         if not char:
             return False
@@ -216,10 +218,10 @@ class InputReader:
                         char = msvcrt.getwch()
                         debug_log(f"input: char={repr(char)} ord={ord(char) if len(char)==1 else 'N/A'}")
 
-                        # FILTER: Drop terminal response garbage (brackets, semicolons)
-                        # These only appear standalone from terminal responses, not user input
-                        # NOTE: digits, 'c', '?' removed - users need to type them!
-                        if char in ';[]':
+                        # FILTER: Drop anything that looks like terminal response
+                        # Terminal responses often contain digits, semicolons, brackets
+                        # after escape sequences - drop ALL of these
+                        if char in '0123456789;[]?c':
                             # Likely terminal response garbage - drop it
                             debug_log(f"input: FILTERED (terminal response char)")
                             # Drain any remaining garbage
@@ -252,23 +254,24 @@ class InputReader:
                             else:
                                 debug_log(f"input: unknown scan code")
                         elif char == '\x1b':
-                            # Escape character - might be terminal response or user keypress
-                            # Wait briefly to see if more characters follow (escape sequence)
-                            time.sleep(0.02)  # 20ms - enough for terminal sequences
+                            # Escape character - might be terminal response
+                            # Try to read the full sequence
                             seq = char
                             while msvcrt.kbhit():
                                 seq += msvcrt.getwch()
                             debug_log(f"input: escape_seq={repr(seq)}")
 
-                            # Filter multi-char escape sequences (terminal garbage)
-                            # but allow single Escape key through for user cancellation
+                            # AGGRESSIVE FILTER: Drop ALL escape sequences
+                            # In danger mode, we don't want ANY escape sequences
+                            # going to Claude - they could interrupt it
                             if len(seq) > 1:
                                 # Multi-char escape sequence - definitely terminal response
                                 debug_log(f"input: FILTERED (multi-char escape)")
                                 continue
-                            # Single escape - pass it through so user can cancel Claude
-                            debug_log(f"input: queued single escape")
-                            self.queue.put('\x1b')
+                            # Single escape - also drop it to be safe
+                            # User can still cancel via the countdown overlay
+                            debug_log(f"input: FILTERED (single escape)")
+                            continue
                         elif self._is_safe_char(char):
                             self.queue.put(char)
                             debug_log(f"input: queued safe char")
@@ -386,8 +389,8 @@ class Unleashed:
 
     DANGER MODE means:
     - NO safety checks (hard block, dangerous path, git destructive)
-    - Single Escape passes through (user can interrupt Claude)
-    - Filters multi-char escape sequences (terminal garbage)
+    - NEVER sends Escape to Claude
+    - Aggressive input filtering
     - Just countdown and auto-approve
 
     TEST MODE adds:
@@ -662,7 +665,7 @@ WARNING:
   - No hard block for destructive commands
   - No dangerous path detection
   - No git destructive warnings
-  - Single Escape passes through (can interrupt Claude)
+  - NEVER sends Escape to Claude (cannot interrupt)
 
   Use at your own risk.
         """

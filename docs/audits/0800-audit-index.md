@@ -89,11 +89,11 @@ Audits exist because:
 | Category | Count | Auto-Fix | Focus |
 |----------|-------|----------|-------|
 | Documentation Health | 7 | 6 | Docs-code alignment, inventory, terminology |
-| Core Development | 18 | 4 | Code quality, security, privacy, accessibility, cost |
+| Core Development | 19 | 4 | Code quality, security, privacy, accessibility, cost, worktree hygiene |
 | AI Governance | 7 | 0 | AI-specific controls and compliance |
 | Meta | 2 | 0 | Audit system governance |
 | Ultimate | 1 | 0 | Expensive/rare audits (--ultimate only) |
-| **Total** | **34** | **10** | |
+| **Total** | **35** | **10** | |
 
 ### 3.2 Quick Reference
 
@@ -132,6 +132,7 @@ Audits exist because:
 | 0831 | Web Assets (icons, buttons, responsive design, accessibility) | No |
 | 0832 | Cost Optimization (model hints, context loading, spawn efficiency) | Partial |
 | 0833 | Gitignore Encryption Review (encrypt vs ignore) | No (Ultimate) |
+| 0834 | Worktree Hygiene (stale worktrees, uncommitted changes) | No |
 | 0898 | Horizon Scanning Protocol | No |
 | 0899 | Meta-Audit (validation & execution) | No |
 
@@ -177,6 +178,7 @@ Audits for code quality, security, and development practices.
 | 0830 | Architecture Freshness | Monthly + on change | **Yes** |
 | 0831 | Web Assets | On landing page change | No |
 | 0832 | Cost Optimization | Monthly | Partial |
+| 0834 | Worktree Hygiene | Weekly + on cleanup | No |
 
 ### 4.1.1 Ultimate Tier Audits
 
@@ -227,7 +229,7 @@ Audits that govern the audit system itself.
 |-----------|--------|
 | **Per PR** | 0813 |
 | **Monthly + on change** | 0811, 0817 |
-| **Weekly** | 0816 |
+| **Weekly** | 0816, 0834 |
 | **Monthly** | 0815, 0821 |
 | **Quarterly** | 0809, 0810, 0812, 0814, 0818, 0819, 0820, 0822, 0825, 0827, 0898, 0899 |
 | **On Event** | 0808 (mining), 0824 (friction analysis), 0823 (incident), 0829 (lambda failures) |
@@ -411,6 +413,8 @@ Standard format for all audits:
 - [0831 - Web Assets](0831-audit-web-assets.md)
 - [0832 - Cost Optimization](0832-audit-cost-optimization.md) ✨
 
+- [0834 - Worktree Hygiene](0834-audit-worktree-hygiene.md)
+
 **Ultimate Tier (--ultimate only)**
 - [0833 - Gitignore Encryption Review](0833-audit-gitignore-encryption.md) 🔒
 
@@ -458,7 +462,7 @@ Cost optimization: use the cheapest model that can reliably execute each audit.
 
 | Model | Cost | Audits | Rationale |
 |-------|------|--------|-----------|
-| **Haiku** | $ | 0808, 0812, 0814, 0816, 0817, 0819, 0827, 0899 | Simple checklist, metric aggregation, file parsing |
+| **Haiku** | $ | 0808, 0812, 0814, 0816, 0817, 0819, 0827, 0834, 0899 | Simple checklist, metric aggregation, file parsing |
 | **Sonnet** | $$ | 0811, 0815, 0820, 0822, 0824, 0831, 0898 | Web research, framework analysis, moderate reasoning |
 | **Opus** | $$$ | 0809, 0810, 0818, 0821, 0823, 0825, 0829 | Complex reasoning, security analysis, incident review, remediation |
 
@@ -487,13 +491,14 @@ Cost optimization: use the cheapest model that can reliably execute each audit.
 | 0828 Build Artifact Freshness | Haiku | Timestamp comparison, manifest parsing |
 | 0829 Lambda Failure Remediation | **Opus** | Root cause analysis, code fixes, issue drafting |
 | 0831 Web Assets | Sonnet | Visual design evaluation, responsive testing, accessibility |
+| 0834 Worktree Hygiene | Haiku | Git command parsing, file status checks |
 | 0898 Horizon Scanning | Sonnet | Framework research, moderate analysis |
 | 0899 Meta-Audit | Haiku | Execution tracking, checklist validation |
 
 ### 11.3 Estimated Savings
 
 By using appropriate models instead of Opus for all audits:
-- **Haiku audits (8):** ~66% savings per audit
+- **Haiku audits (9):** ~66% savings per audit
 - **Sonnet audits (6):** ~25% savings per audit
 - **Opus audits (6):** No change (required for complexity)
 

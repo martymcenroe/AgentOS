@@ -21,6 +21,8 @@ Key Insight:
     - CAPACITY_EXHAUSTED (Google servers) → Exponential backoff makes sense
     - Exponential backoff is USELESS for account quota - rotation is the answer
     - Large prompts fail with -p flag → Use stdin instead (Issue #34)
+    - UNKNOWN errors → STOP IMMEDIATELY and print raw output for human diagnosis
+      (If you don't know the error, retrying will give the same unknown error!)
 
 Environment Variables:
     GEMINI_RETRY_MAX              Max retry attempts (default: 20)
@@ -173,11 +175,13 @@ def classify_error(output: str) -> ErrorClassification:
             message="429 error (will retry)"
         )
 
-    # Unknown error (assume retryable)
+    # Unknown error - DO NOT RETRY
+    # If we don't know what the error is, retrying will give the same result.
+    # Stop immediately and show the raw output so humans can diagnose.
     return ErrorClassification(
         error_type="unknown",
-        retryable=True,
-        message="Unknown error (will retry)"
+        retryable=False,
+        message="Unknown error - STOPPING (see raw output below)"
     )
 
 
@@ -302,6 +306,7 @@ def invoke_gemini(prompt: str, model: str, no_tools: bool = False) -> GeminiResu
             input=prompt if use_stdin else None,
             capture_output=True,
             text=True,
+            encoding='utf-8',  # Explicit UTF-8 for Unicode characters (box drawing, emojis, etc.)
             timeout=300  # 5 minute timeout per attempt
         )
 
@@ -621,12 +626,25 @@ def retry_gemini(prompt: str, model: str, logger: RetryLogger, no_tools: bool = 
             logger.log(
                 "PERMANENT_FAILURE",
                 attempt=attempt,
-                error_type=classification.error_type
+                error_type=classification.error_type,
+                raw_output=result.raw_output[:2000] if result.raw_output else ""
             )
             print(
                 f"[GEMINI-RETRY] Permanent failure: {classification.message}",
                 file=sys.stderr
             )
+
+            # For unknown errors, print the raw output so humans can diagnose
+            if classification.error_type == "unknown":
+                print(
+                    f"\n{'='*60}\n"
+                    f"RAW OUTPUT (so you can see what went wrong):\n"
+                    f"{'='*60}\n"
+                    f"{result.raw_output}\n"
+                    f"{'='*60}\n",
+                    file=sys.stderr
+                )
+
             return False, f"Permanent failure: {classification.message}"
 
         # Calculate delay
