@@ -62,6 +62,18 @@ CAPACITY_PATTERNS = [
     "RESOURCE_EXHAUSTED",
 ]
 
+# Patterns that indicate authentication/authorization failures
+AUTH_ERROR_PATTERNS = [
+    ("API_KEY_INVALID", "Invalid API key"),
+    ("API key not valid", "Invalid API key"),
+    ("INVALID_ARGUMENT", "Invalid API key or argument"),
+    ("PERMISSION_DENIED", "Permission denied - check API key permissions"),
+    ("UNAUTHENTICATED", "Authentication failed - API key rejected"),
+    ("invalid api key", "Invalid API key"),
+    ("401", "Authentication failed (HTTP 401)"),
+    ("403", "Permission denied (HTTP 403)"),
+]
+
 
 # =============================================================================
 # Data Classes
@@ -214,6 +226,38 @@ def parse_reset_time(error_output: str) -> Optional[float]:
         minutes = int(match.group(2))
         return hours + minutes / 60
     return None
+
+
+def parse_error_message(output: str, cred: "Credential") -> str:
+    """Parse raw output and return a human-readable error message."""
+    output_lower = output.lower()
+
+    # Check for authentication errors
+    for pattern, friendly_msg in AUTH_ERROR_PATTERNS:
+        if pattern.lower() in output_lower:
+            account_info = cred.account_name or cred.name
+            return f"{friendly_msg} for '{account_info}'"
+
+    # Check for quota errors
+    for pattern in QUOTA_EXHAUSTED_PATTERNS:
+        if pattern.lower() in output_lower:
+            account_info = cred.account_name or cred.name
+            reset_hours = parse_reset_time(output)
+            if reset_hours:
+                return f"Quota exhausted for '{account_info}' (resets in {reset_hours:.1f}h)"
+            return f"Quota exhausted for '{account_info}'"
+
+    # Check for capacity errors
+    for pattern in CAPACITY_PATTERNS:
+        if pattern.lower() in output_lower:
+            return f"Model capacity exhausted (temporary) - retry later"
+
+    # Generic error - include first 200 chars of output for debugging
+    if output.strip():
+        preview = output.strip()[:200].replace('\n', ' ')
+        return f"Unknown error: {preview}"
+
+    return "Unknown error (no output from Gemini CLI)"
 
 
 # =============================================================================
@@ -380,29 +424,36 @@ def rotate_and_invoke(
     # Try each credential
     errors = []
     for cred in available:
-        print(f"[ROTATE] Trying credential: {cred.name} ({cred.cred_type})", file=sys.stderr)
+        account_info = cred.account_name or cred.name
+        print(f"[ROTATE] Trying credential: {cred.name} ({cred.cred_type}, {account_info})", file=sys.stderr)
 
         success, response, output = invoke_gemini(cred, prompt, model, use_stdin)
 
         if success:
-            print(f"[ROTATE] Success with: {cred.name}", file=sys.stderr)
+            print(f"[ROTATE] Success with: {cred.name} ({account_info})", file=sys.stderr)
             state.last_success = cred.name
             state.last_success_time = datetime.now(timezone.utc).isoformat()
             save_state(state)
             return True, response, ""
 
-        # Check if quota exhausted
+        # Parse the error for a human-readable message
+        friendly_error = parse_error_message(output, cred)
+        print(f"[ROTATE] FAILED: {friendly_error}", file=sys.stderr)
+
+        # Check if quota exhausted - mark for future skip
         is_quota_error = any(p.lower() in output.lower() for p in QUOTA_EXHAUSTED_PATTERNS)
         if is_quota_error:
             reset_hours = parse_reset_time(output) or 24
             mark_credential_exhausted(cred, state, reset_hours)
-            print(f"[ROTATE] Credential {cred.name} quota exhausted (reset in {reset_hours:.1f}h)", file=sys.stderr)
-            errors.append(f"{cred.name}: quota exhausted")
-        else:
-            # Other error - don't mark as exhausted, might be temporary
-            errors.append(f"{cred.name}: {output[:100]}")
 
-    return False, "", f"All credentials failed: {'; '.join(errors)}"
+        # Check if auth error - these should be fixed, not retried
+        is_auth_error = any(p.lower() in output.lower() for p, _ in AUTH_ERROR_PATTERNS)
+        if is_auth_error:
+            print(f"[ROTATE] ⚠️  AUTH ERROR: Check API key for '{account_info}' in ~/.agentos/gemini-credentials.json", file=sys.stderr)
+
+        errors.append(friendly_error)
+
+    return False, "", f"All credentials failed:\n  - " + "\n  - ".join(errors)
 
 
 def print_status():
