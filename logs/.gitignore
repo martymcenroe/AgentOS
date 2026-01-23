@@ -1,0 +1,6 @@
+# Ignore all JSONL log files (production logs)
+*.jsonl
+
+# Keep this .gitignore and .gitkeep
+!.gitignore
+!.gitkeep

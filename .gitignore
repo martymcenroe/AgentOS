@@ -11,7 +11,9 @@ tmpclaude-*
 *.generated.json
 
 # Gemini retry logs (generated at runtime)
-logs/
+# Keep the directory structure but ignore log files
+logs/*.log
+logs/*.jsonl
 
 # Python cache
 __pycache__/
