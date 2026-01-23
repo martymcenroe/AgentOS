@@ -64,7 +64,7 @@ LLD Review Gate Check:
 **State the gate explicitly:**
 > "Executing LLD REVIEW GATE: Submitting LLD to Gemini before coding."
 
-**LLD location:** `docs/reports/{issue-id}/lld-*.md`
+**LLD location:** `docs/LLDs/active/{issue-id}-*.md`
 
 **Escape hatch:** For [HOTFIX] tagged issues, user can explicitly waive.
 ```
@@ -72,7 +72,7 @@ LLD Review Gate Check:
 ### Gate Workflow
 
 1. Agent receives a coding task
-2. Agent checks for existing LLD at `docs/reports/{issue-id}/lld-*.md`
+2. Agent checks for existing LLD at `docs/LLDs/active/{issue-id}-*.md`
 3. If no LLD exists:
    - Agent asks user: "Create LLD or waive?"
    - If create: Agent writes LLD, then submits for review

@@ -177,7 +177,7 @@ LLD Review Gate Check:
 **State the gate explicitly:**
 > "Executing LLD REVIEW GATE: Submitting LLD to Gemini before coding."
 
-**LLD location:** `docs/reports/{issue-id}/lld-*.md`
+**LLD location:** `docs/LLDs/active/{issue-id}-*.md` (move to `docs/LLDs/done/` after merge)
 
 **Escape hatch:** For [HOTFIX] tagged issues, user can explicitly waive.
 
@@ -199,10 +199,10 @@ LLD Review Gate Check:
 **Before implementation review, generate required reports:**
 
 Required files:
-- `docs/reports/{issue-id}/implementation-report.md`
-- `docs/reports/{issue-id}/test-report.md`
+- `docs/reports/active/{issue-id}-implementation-report.md`
+- `docs/reports/active/{issue-id}-test-report.md`
 
-Where `{issue-id}` is the GitHub issue integer (e.g., `docs/reports/27/`).
+Move to `docs/reports/done/` after merge.
 
 **Implementation Report minimum content:**
 - Issue reference (link)

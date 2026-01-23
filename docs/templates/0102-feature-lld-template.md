@@ -12,10 +12,69 @@
 - [ ] {Question 1}
 - [ ] {Question 2}
 
-## 2. Requirements
-{What must be true when this is done}
+## 2. Proposed Changes
 
-## 3. Alternatives Considered
+*This section is the **source of truth** for implementation. Describe exactly what will be built.*
+
+### 2.1 Files Changed
+
+| File | Change Type | Description |
+|------|-------------|-------------|
+| `{path/to/file.py}` | Add / Modify / Delete | {Brief description} |
+
+### 2.2 Dependencies
+
+*New packages, APIs, or services required.*
+
+```toml
+# pyproject.toml additions (if any)
+{package} = "^{version}"
+```
+
+### 2.3 Data Structures
+
+```python
+# Pseudocode - NOT implementation
+class ExampleState(TypedDict):
+    field_name: type  # Description
+```
+
+### 2.4 Function Signatures
+
+```python
+# Signatures only - implementation in source files
+def function_name(param: Type) -> ReturnType:
+    """Brief description of purpose."""
+    ...
+```
+
+### 2.5 Logic Flow (Pseudocode)
+
+```
+1. Receive input
+2. Validate input
+3. IF condition THEN
+   - Do A
+   ELSE
+   - Do B
+4. Return result
+```
+
+### 2.6 Technical Approach
+
+* **Module:** `src/...`
+* **Pattern:** {Design pattern if applicable}
+* **Key Decisions:** {Brief rationale for approach}
+
+## 3. Requirements
+
+*What must be true when this is done. These become acceptance criteria.*
+
+1. {Requirement 1}
+2. {Requirement 2}
+3. {Requirement 3}
+
+## 4. Alternatives Considered
 
 | Option | Pros | Cons | Decision |
 |--------|------|------|----------|
@@ -24,11 +83,11 @@
 
 **Rationale:** {Why the selected option was chosen}
 
-## 4. Data & Fixtures
+## 5. Data & Fixtures
 
 *Per [0108-lld-pre-implementation-review.md](0108-lld-pre-implementation-review.md) - complete this section BEFORE implementation.*
 
-### 4.1 Data Sources
+### 5.1 Data Sources
 
 | Attribute | Value |
 |-----------|-------|
@@ -38,28 +97,28 @@
 | Refresh | {Manual, scheduled, real-time} |
 | Copyright/License | {License or "N/A"} |
 
-### 4.2 Data Pipeline
+### 5.2 Data Pipeline
 
 ```
 {Source} ──{method}──► {Transform} ──{method}──► {Destination}
 ```
 
-### 4.3 Test Fixtures
+### 5.3 Test Fixtures
 
 | Fixture | Source | Notes |
 |---------|--------|-------|
 | {e.g., Mock API response} | {Generated / Downloaded / Hardcoded} | {Data hygiene concerns?} |
 
-### 4.4 Deployment Pipeline
+### 5.4 Deployment Pipeline
 
 {How does data get from dev → test → production?}
 
 **If data source is external:** Is a separate utility needed? Create issue if yes.
 
-## 5. Diagram
+## 6. Diagram
 *{Write "N/A" if not applicable - do not delete sections}*
 
-### 5.1 Mermaid Quality Gate
+### 6.1 Mermaid Quality Gate
 
 Before finalizing any diagram, verify in [Mermaid Live Editor](https://mermaid.live) or GitHub preview:
 
@@ -86,7 +145,7 @@ AI agents MUST render and view the diagram before committing:
 
 *Reference: [0006-mermaid-diagrams.md](0006-mermaid-diagrams.md)*
 
-### 5.2 Diagram
+### 6.2 Diagram
 
 ```mermaid
 sequenceDiagram
@@ -101,41 +160,7 @@ sequenceDiagram
 
 ```
 
-## 6. Technical Approach
-
-* **Module:** `src/...`
-* **Dependencies:** {packages, APIs}
-* **Pattern:** {Design pattern if applicable}
-
-## 7. Interface Specification
-
-### 7.1 Data Structures
-```python
-# Pseudocode - NOT implementation
-class ExampleState(TypedDict):
-    field_name: type  # Description
-```
-
-### 7.2 Function Signatures
-```python
-# Signatures only - implementation in source files
-def function_name(param: Type) -> ReturnType:
-    """Brief description of purpose."""
-    ...
-```
-
-### 7.3 Logic Flow (Pseudocode)
-```
-1. Receive input
-2. Validate input
-3. IF condition THEN
-   - Do A
-   ELSE
-   - Do B
-4. Return result
-```
-
-## 8. Security Considerations
+## 7. Security Considerations
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
@@ -144,7 +169,7 @@ def function_name(param: Type) -> ReturnType:
 
 **Fail Mode:** {Fail Open / Fail Closed} - {Justification}
 
-## 9. Performance Considerations
+## 8. Performance Considerations
 
 | Metric | Budget | Approach |
 |--------|--------|----------|
@@ -154,19 +179,19 @@ def function_name(param: Type) -> ReturnType:
 
 **Bottlenecks:** {Known performance concerns}
 
-## 10. Risks & Mitigations
+## 9. Risks & Mitigations
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
 | {Risk description} | High/Med/Low | High/Med/Low | {How addressed} |
 
-## 11. Verification & Testing
+## 10. Verification & Testing
 
 *Ref: [0005-testing-strategy-and-protocols.md](0005-testing-strategy-and-protocols.md)*
 
 **Testing Philosophy:** Strive for 100% automated test coverage. Manual tests are a last resort for scenarios that genuinely cannot be automated (e.g., visual inspection, hardware interaction). Every scenario marked "Manual" requires justification.
 
-### 11.1 Test Scenarios
+### 10.1 Test Scenarios
 
 | ID | Scenario | Type | Input | Expected Output | Pass Criteria |
 |----|----------|------|-------|-----------------|---------------|
@@ -181,7 +206,7 @@ def function_name(param: Type) -> ReturnType:
 - `Auto-Live` - Automated but hits real external services (may be slow/flaky)
 - `Manual` - Requires human execution (MUST include justification why automation is impossible)
 
-### 11.2 Test Commands
+### 10.2 Test Commands
 
 ```bash
 # Run all automated tests
@@ -194,7 +219,7 @@ poetry run pytest tests/test_{module}.py -v -m "not live"
 poetry run pytest tests/test_{module}.py -v -m live
 ```
 
-### 11.3 Manual Tests (Only If Unavoidable)
+### 10.3 Manual Tests (Only If Unavoidable)
 
 **If no manual tests required:** Write "N/A - All scenarios automated."
 
@@ -206,7 +231,7 @@ poetry run pytest tests/test_{module}.py -v -m live
 
 *Full test results recorded in Implementation Report (0103) or Test Report (0113).*
 
-## 12. Definition of Done
+## 11. Definition of Done
 
 ### Code
 - [ ] Implementation complete and linted
@@ -241,7 +266,7 @@ poetry run pytest tests/test_{module}.py -v -m live
 
 | ID | Comment | Implemented? |
 |----|---------|--------------|
-| {R}{N}.1 | "{Quote or summary of comment}" | ✅ YES - {where addressed} / ⏳ PENDING / ❌ NO - {reason} |
+| {R}{N}.1 | "{Quote or summary of comment}" | YES - {where addressed} / PENDING / NO - {reason} |
 | {R}{N}.2 | "{Comment}" | {status} |
 
 *Repeat section for each review round. Use IDs like G1.1 (Gemini Review 1, Comment 1), O2.3 (Orchestrator Review 2, Comment 3).*

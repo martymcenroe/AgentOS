@@ -95,7 +95,7 @@ Skill documentation uses the c/p convention (CLI + Prompt pairs).
 | `0629c-Manual-LLD-Review-Prompt.md` | Stable | Manual LLD review |
 | `0630c-Manual-Implementation-Review-Prompt.md` | Stable | Manual implementation review |
 
-### Audits (08xx) - 28 files
+### Audits (08xx) - 34 files
 
 | File | Status | Description |
 |------|--------|-------------|
@@ -204,11 +204,11 @@ Skill documentation uses the c/p convention (CLI + Prompt pairs).
 | Templates | 10 | All stable |
 | ADRs | 6 | All stable |
 | Skills | 30 | All stable |
-| Audits | 28 | All stable |
+| Audits | 34 | 28 stable, 6 stubs |
 | Runbooks | 5 | All stable |
 | Tools | 12 | 10 stable, 2 beta |
 | Commands | 9 | All stable |
-| **Total Docs** | **88** | |
+| **Total Docs** | **94** | |
 | **Total Tools** | **12** | |
 
 ---

@@ -88,71 +88,76 @@ Audits exist because:
 
 | Category | Count | Auto-Fix | Focus |
 |----------|-------|----------|-------|
-| Documentation Health | 7 | 6 | Docs-code alignment, inventory, terminology |
-| Core Development | 19 | 4 | Code quality, security, privacy, accessibility, cost, worktree hygiene |
-| AI Governance | 7 | 0 | AI-specific controls and compliance |
-| Meta | 2 | 0 | Audit system governance |
-| Ultimate | 1 | 0 | Expensive/rare audits (--ultimate only) |
-| **Total** | **35** | **10** | |
+| Core Audits (0801-0817) | 17 | 3 | Security, privacy, AI governance, permissions |
+| Extended Audits (0832-0840) | 9 | 1 | Cost, structure, hygiene, references |
+| Documentation Health (0841-0846) | 6 | 4 | Docs-code alignment (STUBS) |
+| Meta (0899) | 1 | 0 | Audit system governance |
+| **Total** | **33** | **8** | |
+
+*Note: Documentation Health audits (0841-0846) are stub files pending implementation.*
 
 ### 3.2 Quick Reference
 
+**Existing Audits (with files):**
+
 | Audit | One-Line Description | Auto-Fix |
 |-------|----------------------|----------|
-| 0801 | Open issues currency (stale/complete issues) | No |
-| 0802 | Reports completeness (closed issues have reports) | **Yes** |
-| 0803 | LLD-to-code alignment verification | No |
-| 0804 | File inventory drift detection | **Yes** |
-| 0805 | Terminology consistency (deprecated terms) | **Yes** |
-| 0806 | Architecture drift (code vs docs) | **Yes** |
-| 0807 | AgentOS health check (system self-audit) | **Yes** |
-| 0808 | Permission problem mining (zugzwang violations, checkpoint tracking) | **Yes** |
-| 0824 | Permission friction analysis (find missing allows) | **Yes** |
-| 0809 | Application Security (OWASP, ASVS, extension) | No |
-| 0825 | AI Safety (LLM, Agentic, NIST AI RMF) | No |
-| 0810 | Privacy (GDPR-aware, data handling) | No |
-| 0811 | Accessibility | No |
-| 0812 | Performance | No |
-| 0813 | Code Quality | CI |
-| 0814 | License Compliance | No |
-| 0817 | Wiki Alignment | No |
-| 0815 | Claude Code workflow compliance | No |
-| 0816 | Dependabot PR management | Semi |
-| 0818 | AI Management System (ISO 42001) | No |
-| 0819 | AI Supply Chain (OWASP LLM03, AIBOM) | No |
-| 0820 | Explainability (XAI) | No |
-| 0821 | Agentic AI Governance (OWASP Agentic) | No |
-| 0822 | Bias & Fairness | No |
-| 0823 | AI Incident Post-Mortem | No |
-| 0826 | Cross-Browser Testing (Firefox/Chrome parity) | CI |
-| 0827 | Infrastructure Integration (Lambda, DynamoDB, API Gateway) | No |
-| 0828 | Build Artifact Freshness | **Yes** |
-| 0829 | Lambda Failure Remediation (proactive fix or draft issue) | No |
-| 0830 | Architecture Freshness (documentation completeness and currency) | **Yes** |
-| 0831 | Web Assets (icons, buttons, responsive design, accessibility) | No |
-| 0832 | Cost Optimization (model hints, context loading, spawn efficiency) | Partial |
-| 0833 | Gitignore Encryption Review (encrypt vs ignore) | No (Ultimate) |
-| 0834 | Worktree Hygiene (stale worktrees, uncommitted changes) | No |
-| 0898 | Horizon Scanning Protocol | No |
-| 0899 | Meta-Audit (validation & execution) | No |
+| 0801 | Security (OWASP, ASVS) | No |
+| 0802 | Privacy (GDPR-aware, data handling) | No |
+| 0803 | Code Quality | CI |
+| 0804 | Accessibility (WCAG) | No |
+| 0805 | License Compliance | No |
+| 0806 | Bias & Fairness | No |
+| 0807 | Explainability (XAI) | No |
+| 0808 | AI Safety (LLM, NIST AI RMF) | No |
+| 0809 | Agentic AI Governance (OWASP Agentic) | No |
+| 0810 | AI Management System (ISO 42001) | No |
+| 0811 | AI Incident Post-Mortem | No |
+| 0812 | AI Supply Chain (OWASP LLM03, AIBOM) | No |
+| 0813 | Claude Code Capabilities | No |
+| 0814 | Horizon Scanning Protocol | No |
+| 0815 | Permission Friction | **Yes** |
+| 0816 | Permission Permissiveness | **Yes** |
+| 0817 | AgentOS Self-Audit | **Yes** |
+| 0832 | Cost Optimization | Partial |
+| 0833 | Gitignore Encryption Review | No (Ultimate) |
+| 0834 | Worktree Hygiene | No |
+| 0835 | Structure Compliance | No |
+| 0836 | Gitignore Consistency | No |
+| 0837 | README Compliance | No |
+| 0838 | Broken References | No |
+| 0839 | Wiki Alignment | No |
+| 0840 | Cross-Project Harvest | No |
+| 0899 | Meta-Audit | No |
+
+**Documentation Health Audits (new stubs):**
+
+| Audit | One-Line Description | Auto-Fix |
+|-------|----------------------|----------|
+| 0841 | Open Issues Currency (stale/complete issues) | No |
+| 0842 | Reports Completeness (closed issues have reports) | **Yes** |
+| 0843 | LLD-to-Code Alignment | No |
+| 0844 | File Inventory Drift | **Yes** |
+| 0845 | Terminology Consistency | **Yes** |
+| 0846 | Architecture Drift (code vs docs) | **Yes** |
 
 ---
 
 ## 4. Audit Categories
 
-### 4.0 Documentation Health Audits
+### 4.0 Documentation Health Audits (0841-0846 STUBS)
 
-Audits ensuring documentation stays aligned with code and complete.
+Audits ensuring documentation stays aligned with code and complete. **These are stub files pending implementation.**
 
 | Number | Name | Frequency | Auto-Fix |
 |--------|------|-----------|----------|
-| 0801 | Open Issues Currency | Weekly | No |
-| 0802 | Reports Completeness | Weekly | **Yes** |
-| 0803 | LLD-to-Code Alignment | On change | No |
-| 0804 | File Inventory Drift | Weekly | **Yes** |
-| 0805 | Terminology Consistency | On rename | **Yes** |
-| 0806 | Architecture Drift | Monthly | **Yes** |
-| 0807 | AgentOS Health Check | Monthly | **Yes** |
+| 0841 | Open Issues Currency | Weekly | No |
+| 0842 | Reports Completeness | Weekly | **Yes** |
+| 0843 | LLD-to-Code Alignment | On change | No |
+| 0844 | File Inventory Drift | Weekly | **Yes** |
+| 0845 | Terminology Consistency | On rename | **Yes** |
+| 0846 | Architecture Drift | Monthly | **Yes** |
+| 0817 | AgentOS Self-Audit | Monthly | **Yes** |
 
 ### 4.1 Core Development Audits
 
@@ -160,25 +165,21 @@ Audits for code quality, security, and development practices.
 
 | Number | Name | Frequency | Auto-Fix |
 |--------|------|-----------|----------|
-| 0808 | Permission Problem Mining | Weekly / On friction | **Yes** |
-| 0824 | Permission Friction | On friction | **Yes** |
-| 0809 | Security | Quarterly | No |
-| 0810 | Privacy | Quarterly | No |
-| 0811 | Accessibility | Monthly + on change | No |
-| 0812 | Performance | Quarterly | No |
-| 0813 | Code Quality | Per PR | CI |
-| 0814 | License Compliance | Quarterly | No |
-| 0817 | Wiki Alignment | Monthly + on change | No |
-| 0815 | Claude Code Workflow | Monthly | No |
-| 0816 | Dependabot PRs | Weekly | Semi |
-| 0826 | Cross-Browser Testing | On extension changes | CI |
-| 0827 | Infrastructure Integration | Quarterly | No |
-| 0828 | Build Artifact Freshness | On deploy | **Yes** |
-| 0829 | Lambda Failure Remediation | On-demand / cleanup --full | No |
-| 0830 | Architecture Freshness | Monthly + on change | **Yes** |
-| 0831 | Web Assets | On landing page change | No |
+| 0801 | Security (OWASP) | Quarterly | No |
+| 0802 | Privacy (GDPR) | Quarterly | No |
+| 0803 | Code Quality | Per PR | CI |
+| 0804 | Accessibility (WCAG) | Monthly + on change | No |
+| 0805 | License Compliance | Quarterly | No |
+| 0815 | Permission Friction | On friction | **Yes** |
+| 0816 | Permission Permissiveness | Weekly / On friction | **Yes** |
 | 0832 | Cost Optimization | Monthly | Partial |
 | 0834 | Worktree Hygiene | Weekly + on cleanup | No |
+| 0835 | Structure Compliance | Monthly | No |
+| 0836 | Gitignore Consistency | On change | No |
+| 0837 | README Compliance | On change | No |
+| 0838 | Broken References | Weekly | No |
+| 0839 | Wiki Alignment | Monthly + on change | No |
+| 0840 | Cross-Project Harvest | Monthly | No |
 
 ### 4.1.1 Ultimate Tier Audits
 
@@ -202,13 +203,14 @@ Audits specific to AI system governance, compliance, and responsible AI.
 
 | Number | Name | Frequency | Framework |
 |--------|------|-----------|-----------|
-| 0818 | AI Management System | Quarterly | ISO/IEC 42001:2023 |
-| 0819 | AI Supply Chain | Quarterly | OWASP LLM03:2025, SPDX 3.0 |
-| 0820 | Explainability | Quarterly | XAI, EU AI Act Art. 13 |
-| 0821 | Agentic AI Governance | Monthly | OWASP Agentic 2026 |
-| 0822 | Bias & Fairness | Quarterly | ISO 24027, NIST |
-| 0823 | AI Incident Post-Mortem | On incident | NIST AI RMF |
-| 0825 | AI Safety | Quarterly | OWASP LLM 2025, NIST AI RMF |
+| 0806 | Bias & Fairness | Quarterly | ISO 24027, NIST |
+| 0807 | Explainability | Quarterly | XAI, EU AI Act Art. 13 |
+| 0808 | AI Safety | Quarterly | OWASP LLM 2025, NIST AI RMF |
+| 0809 | Agentic AI Governance | Monthly | OWASP Agentic 2026 |
+| 0810 | AI Management System | Quarterly | ISO/IEC 42001:2023 |
+| 0811 | AI Incident Post-Mortem | On incident | NIST AI RMF |
+| 0812 | AI Supply Chain | Quarterly | OWASP LLM03:2025, SPDX 3.0 |
+| 0814 | Horizon Scanning | Quarterly | Threat monitoring |
 
 ### 4.3 Meta Audits
 
@@ -216,7 +218,6 @@ Audits that govern the audit system itself.
 
 | Number | Name | Frequency | Purpose |
 |--------|------|-----------|---------|
-| 0898 | Horizon Scanning Protocol | Quarterly | Discover missing audits |
 | 0899 | Meta-Audit | Quarterly | Validate audit execution |
 
 ---
@@ -227,11 +228,12 @@ Audits that govern the audit system itself.
 
 | Frequency | Audits |
 |-----------|--------|
-| **Per PR** | 0813 |
-| **Monthly + on change** | 0811, 0817 |
-| **Weekly** | 0816, 0834 |
-| **Monthly** | 0815, 0821 |
-| **Quarterly** | 0809, 0810, 0812, 0814, 0818, 0819, 0820, 0822, 0825, 0827, 0898, 0899 |
+| **Per PR** | 0803 |
+| **Monthly + on change** | 0804, 0817, 0839 |
+| **Weekly** | 0816, 0834, 0838, 0841, 0842, 0844 |
+| **Monthly** | 0809, 0815, 0832, 0835, 0840, 0846 |
+| **Quarterly** | 0801, 0802, 0805, 0806, 0807, 0808, 0810, 0812, 0814, 0899 |
+| **On incident** | 0811 |
 | **On Event** | 0808 (mining), 0824 (friction analysis), 0823 (incident), 0829 (lambda failures) |
 
 ### 5.2 Calendar View
@@ -384,55 +386,50 @@ Standard format for all audits:
 
 ### 10.1 By Number
 
-**Documentation Health (0801-0807)**
-- [0801 - Open Issues Currency](0801-open-issues-audit.md)
-- [0802 - Reports Completeness](0802-reports-completeness-audit.md) ✨
-- [0803 - LLD-to-Code Alignment](0803-lld-code-audit.md)
-- [0804 - File Inventory Drift](0804-inventory-audit.md) ✨
-- [0805 - Terminology Consistency](0805-terminology-audit.md) ✨
-- [0806 - Architecture Drift](0806-architecture-audit.md) ✨
-- [0807 - AgentOS Health Check](0807-agentos-audit.md) ✨
+**Core Audits (0801-0817)**
+- [0801 - Security](0801-security-audit.md)
+- [0802 - Privacy](0802-privacy-audit.md)
+- [0803 - Code Quality](0803-code-quality-audit.md)
+- [0804 - Accessibility](0804-accessibility-audit.md)
+- [0805 - License Compliance](0805-license-compliance.md)
+- [0806 - Bias & Fairness](0806-bias-fairness.md)
+- [0807 - Explainability](0807-explainability.md)
+- [0808 - AI Safety](0808-ai-safety-audit.md)
+- [0809 - Agentic AI Governance](0809-agentic-ai-governance.md)
+- [0810 - AI Management System](0810-ai-management-system.md)
+- [0811 - AI Incident Post-Mortem](0811-ai-incident-post-mortem.md)
+- [0812 - AI Supply Chain](0812-ai-supply-chain.md)
+- [0813 - Claude Capabilities](0813-claude-capabilities.md)
+- [0814 - Horizon Scanning](0814-horizon-scanning-protocol.md)
+- [0815 - Permission Friction](0815-permission-friction.md) ✨
+- [0816 - Permission Permissiveness](0816-permission-permissiveness.md) ✨
+- [0817 - AgentOS Self-Audit](0817-agentos-audit.md) ✨
 
-**Core Development (0808-0831)**
-- [0808 - Permission Permissiveness](0808-audit-permission-permissiveness.md) ✨
-- [0824 - Permission Friction](0824-audit-permission-friction.md) ✨
-- [0809 - Security](0809-audit-security.md)
-- [0810 - Privacy](0810-audit-privacy.md)
-- [0811 - Accessibility](0811-audit-accessibility.md)
-- [0812 - Performance](0812-audit-performance.md)
-- [0813 - Code Quality](0813-audit-code-quality.md)
-- [0814 - License Compliance](0814-audit-license-compliance.md)
-- [0817 - Wiki Alignment](0817-audit-wiki-alignment.md)
-- [0815 - Claude Code Capabilities](0815-audit-claude-capabilities.md)
-- [0816 - Dependabot PRs](0816-audit-dependabot-prs.md)
-- [0826 - Cross-Browser Testing](0826-audit-cross-browser-testing.md)
-- [0827 - Infrastructure Integration](0827-audit-infrastructure-integration.md)
-- [0828 - Build Artifact Freshness](0828-audit-build-artifact-freshness.md) ✨
-- [0829 - Lambda Failure Remediation](0829-audit-lambda-failure-remediation.md)
-- [0830 - Architecture Freshness](0830-audit-architecture-freshness.md) ✨
-- [0831 - Web Assets](0831-audit-web-assets.md)
+**Extended Audits (0832-0840)**
 - [0832 - Cost Optimization](0832-audit-cost-optimization.md) ✨
-
-- [0834 - Worktree Hygiene](0834-audit-worktree-hygiene.md)
-
-**Ultimate Tier (--ultimate only)**
 - [0833 - Gitignore Encryption Review](0833-audit-gitignore-encryption.md) 🔒
+- [0834 - Worktree Hygiene](0834-audit-worktree-hygiene.md)
+- [0835 - Structure Compliance](0835-audit-structure-compliance.md)
+- [0836 - Gitignore Consistency](0836-audit-gitignore-consistency.md)
+- [0837 - README Compliance](0837-audit-readme-compliance.md)
+- [0838 - Broken References](0838-audit-broken-references.md)
+- [0839 - Wiki Alignment](0839-audit-wiki-alignment.md)
+- [0840 - Cross-Project Harvest](0840-cross-project-harvest.md)
 
-**AI Governance (0818-0825)**
-- [0818 - AI Management System](0818-audit-ai-management-system.md)
-- [0819 - AI Supply Chain](0819-audit-ai-supply-chain.md)
-- [0820 - Explainability](0820-audit-explainability.md)
-- [0821 - Agentic AI Governance](0821-audit-agentic-ai-governance.md)
-- [0822 - Bias & Fairness](0822-audit-bias-fairness.md)
-- [0823 - AI Incident Post-Mortem](0823-audit-ai-incident-post-mortem.md)
-- [0825 - AI Safety](0825-audit-ai-safety.md)
+**Documentation Health (0841-0846) - STUBS**
+- [0841 - Open Issues Currency](0841-audit-open-issues.md) 📝
+- [0842 - Reports Completeness](0842-audit-reports-completeness.md) ✨📝
+- [0843 - LLD-to-Code Alignment](0843-audit-lld-code-alignment.md) 📝
+- [0844 - File Inventory Drift](0844-audit-file-inventory.md) ✨📝
+- [0845 - Terminology Consistency](0845-audit-terminology.md) ✨📝
+- [0846 - Architecture Drift](0846-audit-architecture-drift.md) ✨📝
 
-**Meta (0898-0899)**
-- [0898 - Horizon Scanning Protocol](0898-horizon-scanning-protocol.md)
+**Meta (0899)**
 - [0899 - Meta-Audit](0899-meta-audit.md)
 
-✨ = Auto-fix capability (audit automatically fixes findings rather than just reporting)
-🔒 = Ultimate tier (only runs with `--ultimate` flag or direct invocation)
+✨ = Auto-fix capability
+🔒 = Ultimate tier (only runs with `--ultimate` flag)
+📝 = Stub file (implementation pending)
 
 ### 10.2 By Topic
 
@@ -534,6 +531,7 @@ By using appropriate models instead of Opus for all audits:
 
 | Date | Change |
 |------|--------|
+| 2026-01-21 | **Major index reconciliation.** Fixed numbering collision: index described conceptual audits (0801-0807 Documentation Health) that conflicted with actual files (0801-security, 0802-privacy, etc.). Solution: Renumbered Documentation Health audits to 0841-0846 (stubs created). Fixed duplicates: 0817→0839 (wiki alignment), 0832→0840 (cross-project harvest). Updated all Quick Links to point to actual files. Total audits: 33 (27 implemented + 6 stubs). |
 | 2026-01-16 | Created 0833 (Gitignore Encryption Review) for encrypt vs ignore recommendations. Added Ultimate tier for expensive/rare audits (--ultimate flag). Part of Issue #18 (git-crypt ideas folder). Total audits: 34. |
 | 2026-01-12 | Added auto-fix capability to 9 audits (0802, 0804, 0805, 0806, 0807, 0808, 0824, 0828, 0830). Added Documentation Health category (0801-0807) to index. Total audits: 32. |
 | 2026-01-11 | Renumbered 0827-audit-web-assets.md to 0831 (resolved duplicate with 0827-infrastructure-integration). Total audits: 25. |

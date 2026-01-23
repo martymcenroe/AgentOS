@@ -1,11 +1,31 @@
 # AgentOS Documentation Index
 
-**Version:** 2.0
-**Last Updated:** 2026-01-13
+**Version:** 3.0
+**Last Updated:** 2026-01-21
 
 ---
 
-## Quick Links
+## Primary Documentation: GitHub Wiki
+
+📖 **[AgentOS Wiki](https://github.com/martymcenroe/AgentOS/wiki)** - Main documentation portal for enterprise users
+
+### Key Wiki Pages
+
+| Page | Audience | Description |
+|------|----------|-------------|
+| [Home](https://github.com/martymcenroe/AgentOS/wiki) | Everyone | Overview and architecture diagram |
+| [Multi-Agent Orchestration](https://github.com/martymcenroe/AgentOS/wiki/Multi-Agent-Orchestration) | Architects | Core architecture - 12+ concurrent agents |
+| [LangGraph Evolution](https://github.com/martymcenroe/AgentOS/wiki/LangGraph-Evolution) | Tech Leaders | Roadmap to enterprise state machines |
+| [Measuring Productivity](https://github.com/martymcenroe/AgentOS/wiki/Measuring-Productivity) | VPs/Leadership | KPIs, metrics, dashboards |
+| [Gemini Verification](https://github.com/martymcenroe/AgentOS/wiki/Gemini-Verification) | Architects | Multi-model review architecture |
+| [Governance Gates](https://github.com/martymcenroe/AgentOS/wiki/Governance-Gates) | Security Teams | LLD, implementation, report gates |
+| [Permission Friction](https://github.com/martymcenroe/AgentOS/wiki/Permission-Friction) | Developers | Adoption optimization |
+| [Security & Compliance](https://github.com/martymcenroe/AgentOS/wiki/Security-Compliance) | Security Teams | OWASP, GDPR, AI Safety |
+| [Quick Start](https://github.com/martymcenroe/AgentOS/wiki/Quick-Start) | Developers | 5-minute setup guide |
+
+---
+
+## Quick Links (Local Docs)
 
 | Need to... | Go to |
 |------------|-------|

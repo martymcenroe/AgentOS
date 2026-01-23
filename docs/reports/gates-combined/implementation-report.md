@@ -72,7 +72,7 @@ Plus: **Gemini Submission Gate (#30)** - Ensures all Gemini calls use `gemini-re
 - Specifies quota exhaustion handling
 
 ### LLD REVIEW GATE (#27)
-- Requires LLD at `docs/reports/{issue-id}/lld-*.md`
+- Requires LLD at `docs/LLDs/active/{issue-id}-*.md`
 - Uses tree-diagram format for decision flow
 - Includes escape hatch for hotfixes
 - Requires explicit gate statement
