@@ -128,15 +128,30 @@ Session: {SESSION_NAME}
    - Branch HAS worktree: OK (active work)
    - Branch has NO worktree + remote gone: Orphan candidate
 
-2. **Auto-Delete Orphaned Branches** (Normal and Full, unless --no-auto-delete):
+2. **Auto-Delete Orphaned LOCAL Branches** (Normal and Full, unless --no-auto-delete):
    - Safety: Not main, remote shows `gone`, no worktree
    - Action: `git -C ... branch -D {branch-name}`
 
-3. **Open PRs** - Flag if any exist
+3. **CRITICAL: Delete Stale REMOTE Branches for Merged PRs** (Normal and Full):
+   - Get merged PRs: `gh pr list --repo {GITHUB_REPO} --state merged --limit 50 --json headRefName`
+   - Get remote branches: `git -C ... branch -r` (exclude origin/main, origin/HEAD)
+   - For each remote branch (e.g., `origin/57-foo`):
+     - If branch name appears in merged PR list → DELETE IT
+     - Action: `git -C ... push origin --delete {branch-name}`
+   - This is NON-NEGOTIABLE. Merged PR branches MUST be deleted.
 
-4. **Stashes** - Document any found
+4. **Verify No Orphaned Worktrees** (Normal and Full):
+   - List worktrees: `git -C ... worktree list`
+   - For each worktree (not main):
+     - Check if corresponding branch has an OPEN PR
+     - If PR is MERGED or CLOSED: worktree is orphaned → REPORT AS ERROR
+   - Worktrees for merged work MUST be removed manually (safety)
 
-5. **Purge tmpclaude Files** (ALL modes):
+5. **Open PRs** - Flag if any exist
+
+6. **Stashes** - Document any found
+
+7. **Purge tmpclaude Files** (ALL modes):
    - Claude Code leaves orphaned `tmpclaude-*-cwd` files (temp CWD markers)
    - Delete them: `find /c/Users/mcwiz/Projects/{PROJECT_NAME} -name "tmpclaude-*-cwd" -type f -delete`
    - Report count in results
@@ -196,12 +211,19 @@ git -C /c/Users/mcwiz/Projects/{PROJECT_NAME} branch -r
 | Git Status | Clean / {details} |
 | Open PRs | 0 / {count} open |
 | Open Issues | {count} |
-| Branches | Only main / {list} |
+| Local Branches | Only main / {list} |
+| Remote Branches | Only main / {list} |
 | Worktrees | Only main / {list} |
-| Auto-Deleted | {count} branches / Skipped |
+| Local Orphans Deleted | {count} branches / 0 |
+| **Remote Stale Deleted** | {count} branches / 0 |
+| **Orphan Worktrees** | None / **ERROR: {list}** |
 | Stashes | None / {count} |
 | tmpclaude Purged | {count} files / 0 |
 | Commit | Pushed / Skipped (quick) |
+
+**BLOCKING CONDITIONS (must be resolved):**
+- Orphan worktrees (worktree exists but PR merged/closed)
+- Stale remote branches (remote branch exists but PR merged)
 
 Flag any unexpected conditions.
 ```

@@ -569,6 +569,27 @@ git worktree add ../ProjectName-{IssueID} -b {IssueID}-short-desc
 git -C ../ProjectName-{IssueID} push -u origin HEAD
 ```
 
+### POST-MERGE CLEANUP (MANDATORY)
+
+**After ANY PR is merged, execute this cleanup IMMEDIATELY:**
+
+```
+Post-Merge Cleanup:
+├── Remove worktree: git worktree remove ../ProjectName-{ID}
+├── Delete local branch: git branch -d {ID}-desc
+├── Delete remote branch: git push origin --delete {ID}-desc
+│   (or use --delete-branch flag on gh pr merge)
+├── Pull merged changes: git pull
+└── Verify: git branch -a (should show only main)
+```
+
+**This is NON-NEGOTIABLE.** Stale branches and orphaned worktrees:
+- Confuse future agents about active work
+- Accumulate garbage in the repo
+- Signal incomplete work to the orchestrator
+
+**If you merge a PR, you MUST clean up.** No exceptions.
+
 ---
 
 ### CODING TASK GATE (EXECUTE IMMEDIATELY)
