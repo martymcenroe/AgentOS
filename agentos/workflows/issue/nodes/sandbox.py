@@ -23,7 +23,7 @@ def check_vscode_available() -> tuple[bool, str]:
         If available is True, error_message is empty.
 
     Note: If productized, expand to check_editor_available(cmd: str)
-    supporting --editor flag for Sublime, vim, etc.
+    supporting --editor flag for other editors.
     """
     # Check if 'code' is in PATH
     code_path = shutil.which("code")
