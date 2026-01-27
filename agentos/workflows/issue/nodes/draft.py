@@ -119,6 +119,7 @@ def call_claude_headless(prompt: str, system_prompt: str | None = None) -> str:
             input=prompt,  # Pass prompt via stdin
             capture_output=True,
             text=True,
+            encoding="utf-8",  # Windows defaults to cp1252 which chokes on unicode
             timeout=300,  # 5 minute timeout
         )
 
