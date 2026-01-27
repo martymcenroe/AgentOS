@@ -23,7 +23,6 @@ from agentos.workflows.issue.audit import (
     AUDIT_ACTIVE_DIR,
     ensure_audit_directories,
     generate_slug,
-    get_audit_dir,
     get_repo_root,
     slug_exists,
 )
@@ -113,8 +112,7 @@ def run_new_workflow(brief_file: str) -> int:
             print(f"Cleaning checkpoint and audit directory for '{slug}'...")
             # Delete audit directory
             import shutil
-            from agentos.workflows.issue.audit import get_audit_dir
-            audit_dir = get_audit_dir(slug, repo_root)
+            audit_dir = repo_root / AUDIT_ACTIVE_DIR / slug
             if audit_dir.exists():
                 shutil.rmtree(audit_dir)
                 print(f"  Deleted: {audit_dir}")
@@ -151,7 +149,7 @@ def run_new_workflow(brief_file: str) -> int:
                 if choice == SlugCollisionChoice.CLEAN:
                     # Recursive clean handling
                     print(f"Cleaning checkpoint and audit directory for '{new_slug}'...")
-                    audit_dir = get_audit_dir(new_slug, repo_root)
+                    audit_dir = repo_root / AUDIT_ACTIVE_DIR / new_slug
                     if audit_dir.exists():
                         shutil.rmtree(audit_dir)
                         print(f"  Deleted: {audit_dir}")
