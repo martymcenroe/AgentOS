@@ -24,6 +24,7 @@ class SlugCollisionChoice(str, Enum):
 
     RESUME = "R"  # Resume existing workflow from checkpoint
     NEW_NAME = "N"  # Enter a new slug name
+    CLEAN = "C"  # Clean checkpoint and audit dir, start fresh
     ABORT = "A"  # Exit cleanly
 
 

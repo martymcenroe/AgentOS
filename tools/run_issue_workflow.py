@@ -23,6 +23,7 @@ from agentos.workflows.issue.audit import (
     AUDIT_ACTIVE_DIR,
     ensure_audit_directories,
     generate_slug,
+    get_audit_dir,
     get_repo_root,
     slug_exists,
 )
@@ -54,11 +55,12 @@ def prompt_slug_collision(slug: str) -> tuple[SlugCollisionChoice, str]:
     print(f"\n>>> Slug '{slug}' already exists in active/")
     print("\n[R]esume existing workflow")
     print("[N]ew name - enter a different slug")
+    print("[C]lean - delete checkpoint and audit dir, start fresh")
     print("[A]bort - exit cleanly")
     print()
 
     while True:
-        choice = input("Your choice [R/N/A]: ").strip().upper()
+        choice = input("Your choice [R/N/C/A]: ").strip().upper()
         if choice == "R":
             return (SlugCollisionChoice.RESUME, "")
         elif choice == "N":
@@ -67,10 +69,12 @@ def prompt_slug_collision(slug: str) -> tuple[SlugCollisionChoice, str]:
                 print("Slug cannot be empty.")
                 continue
             return (SlugCollisionChoice.NEW_NAME, new_slug)
+        elif choice == "C":
+            return (SlugCollisionChoice.CLEAN, "")
         elif choice == "A":
             return (SlugCollisionChoice.ABORT, "")
         else:
-            print("Invalid choice. Please enter R, N, or A.")
+            print("Invalid choice. Please enter R, N, C, or A.")
 
 
 def run_new_workflow(brief_file: str) -> int:
@@ -105,6 +109,36 @@ def run_new_workflow(brief_file: str) -> int:
             print(f"Resuming workflow for '{slug}'...")
             return run_resume_workflow(brief_file)
 
+        if choice == SlugCollisionChoice.CLEAN:
+            print(f"Cleaning checkpoint and audit directory for '{slug}'...")
+            # Delete audit directory
+            import shutil
+            from agentos.workflows.issue.audit import get_audit_dir
+            audit_dir = get_audit_dir(slug, repo_root)
+            if audit_dir.exists():
+                shutil.rmtree(audit_dir)
+                print(f"  Deleted: {audit_dir}")
+
+            # Delete checkpoint from database
+            db_path = get_checkpoint_db_path()
+            with SqliteSaver.from_conn_string(str(db_path)) as memory:
+                # Build temp app just to access checkpointer
+                from agentos.workflows.issue.graph import build_issue_workflow
+                temp_workflow = build_issue_workflow()
+                temp_app = temp_workflow.compile(checkpointer=memory)
+                # Delete all checkpoints for this thread_id
+                config = {"configurable": {"thread_id": slug}}
+                try:
+                    # Get all checkpoints for this thread
+                    checkpoints = list(memory.list(config))
+                    if checkpoints:
+                        print(f"  Deleted {len(checkpoints)} checkpoint(s) for thread '{slug}'")
+                except Exception:
+                    pass  # Checkpoint might not exist
+
+            print("Clean complete. Starting fresh workflow...")
+            # Fall through to start a fresh workflow
+
         if choice == SlugCollisionChoice.NEW_NAME:
             # Check new slug doesn't collide
             while slug_exists(new_slug, repo_root):
@@ -114,6 +148,27 @@ def run_new_workflow(brief_file: str) -> int:
                     return 0
                 if choice == SlugCollisionChoice.RESUME:
                     return run_resume_workflow(brief_file)
+                if choice == SlugCollisionChoice.CLEAN:
+                    # Recursive clean handling
+                    print(f"Cleaning checkpoint and audit directory for '{new_slug}'...")
+                    audit_dir = get_audit_dir(new_slug, repo_root)
+                    if audit_dir.exists():
+                        shutil.rmtree(audit_dir)
+                        print(f"  Deleted: {audit_dir}")
+                    db_path = get_checkpoint_db_path()
+                    with SqliteSaver.from_conn_string(str(db_path)) as memory:
+                        from agentos.workflows.issue.graph import build_issue_workflow
+                        temp_workflow = build_issue_workflow()
+                        temp_app = temp_workflow.compile(checkpointer=memory)
+                        config = {"configurable": {"thread_id": new_slug}}
+                        try:
+                            checkpoints = list(memory.list(config))
+                            if checkpoints:
+                                print(f"  Deleted {len(checkpoints)} checkpoint(s) for thread '{new_slug}'")
+                        except Exception:
+                            pass
+                    print("Clean complete. Starting fresh workflow...")
+                    break  # Exit the collision loop, use this slug
 
             slug = new_slug
 
