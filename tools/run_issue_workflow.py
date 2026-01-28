@@ -215,7 +215,12 @@ def run_new_workflow(brief_file: str) -> int:
         }
 
         # Use brief filename as thread ID for checkpointing
-        config = {"configurable": {"thread_id": slug}}
+        # Start with default recursion limit
+        recursion_limit = 25  # LangGraph default
+        config = {
+            "configurable": {"thread_id": slug},
+            "recursion_limit": recursion_limit
+        }
 
         print(f"\n{'=' * 60}")
         print("Issue Creation Workflow")
@@ -225,14 +230,11 @@ def run_new_workflow(brief_file: str) -> int:
         print(f"{'=' * 60}\n")
 
         # Run the workflow with recursion limit handling
-        recursion_limit = 25  # LangGraph default
         try:
             while True:
                 final_state = None
                 try:
-                    for event in app.stream(
-                        initial_state, config, {"recursion_limit": recursion_limit}
-                    ):
+                    for event in app.stream(initial_state, config):
                         # Process each node's output
                         for node_name, node_output in event.items():
                             print(f"\n>>> Executing: {node_name}")
@@ -267,7 +269,7 @@ def run_new_workflow(brief_file: str) -> int:
                 except RecursionError as e:
                     # Hit maximum turns limit
                     print(f"\n{'=' * 60}")
-                    print(f"⚠️  MAXIMUM TURNS REACHED ({recursion_limit} iterations)")
+                    print(f"WARNING: MAXIMUM TURNS REACHED ({recursion_limit} iterations)")
                     print(f"{'=' * 60}")
                     print("\nOptions:")
                     print("[0-9] Add more turns (enter digit to add, e.g., 5 adds 5 more)")
@@ -275,12 +277,19 @@ def run_new_workflow(brief_file: str) -> int:
                     print("[C]lean and exit - delete checkpoint and audit directory")
                     print()
 
-                    choice = input("Your choice: ").strip().upper()
+                    # Test mode: auto-save and exit
+                    import os
+                    if os.environ.get("AGENTOS_TEST_MODE") == "1":
+                        choice = "S"
+                        print(f"Your choice: {choice} (TEST MODE - auto-save on recursion limit)")
+                    else:
+                        choice = input("Your choice: ").strip().upper()
 
                     if choice.isdigit():
                         additional_turns = int(choice)
                         if additional_turns > 0:
                             recursion_limit += additional_turns
+                            config["recursion_limit"] = recursion_limit
                             print(f"\n>>> Extending limit to {recursion_limit} turns, resuming...")
                             initial_state = None  # Resume from checkpoint
                             continue
@@ -348,7 +357,12 @@ def run_resume_workflow(brief_file: str) -> int:
         app = workflow.compile(checkpointer=memory)
 
         # Use brief filename as thread ID
-        config = {"configurable": {"thread_id": slug}}
+        # Start with default recursion limit
+        recursion_limit = 25  # LangGraph default
+        config = {
+            "configurable": {"thread_id": slug},
+            "recursion_limit": recursion_limit
+        }
 
         print(f"\n{'=' * 60}")
         print("Resuming Issue Creation Workflow")
@@ -357,7 +371,6 @@ def run_resume_workflow(brief_file: str) -> int:
         print(f"{'=' * 60}\n")
 
         # Resume the workflow with recursion limit handling
-        recursion_limit = 25  # LangGraph default
         try:
             # Get current state from checkpoint
             state = app.get_state(config)
@@ -370,7 +383,7 @@ def run_resume_workflow(brief_file: str) -> int:
             while True:
                 try:
                     # Continue the workflow
-                    for event in app.stream(None, config, {"recursion_limit": recursion_limit}):
+                    for event in app.stream(None, config):
                         for node_name, node_output in event.items():
                             print(f"\n>>> Executing: {node_name}")
                             if node_output.get("error_message"):
@@ -394,7 +407,7 @@ def run_resume_workflow(brief_file: str) -> int:
                 except RecursionError as e:
                     # Hit maximum turns limit
                     print(f"\n{'=' * 60}")
-                    print(f"⚠️  MAXIMUM TURNS REACHED ({recursion_limit} iterations)")
+                    print(f"WARNING: MAXIMUM TURNS REACHED ({recursion_limit} iterations)")
                     print(f"{'=' * 60}")
                     print("\nOptions:")
                     print("[0-9] Add more turns (enter digit to add, e.g., 5 adds 5 more)")
@@ -402,12 +415,19 @@ def run_resume_workflow(brief_file: str) -> int:
                     print("[C]lean and exit - delete checkpoint and audit directory")
                     print()
 
-                    choice = input("Your choice: ").strip().upper()
+                    # Test mode: auto-save and exit
+                    import os
+                    if os.environ.get("AGENTOS_TEST_MODE") == "1":
+                        choice = "S"
+                        print(f"Your choice: {choice} (TEST MODE - auto-save on recursion limit)")
+                    else:
+                        choice = input("Your choice: ").strip().upper()
 
                     if choice.isdigit():
                         additional_turns = int(choice)
                         if additional_turns > 0:
                             recursion_limit += additional_turns
+                            config["recursion_limit"] = recursion_limit
                             print(f"\n>>> Extending limit to {recursion_limit} turns, resuming...")
                             continue
                         else:

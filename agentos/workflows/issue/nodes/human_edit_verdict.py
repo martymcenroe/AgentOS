@@ -255,7 +255,7 @@ def human_edit_verdict(state: IssueWorkflowState) -> dict[str, Any]:
     if clean:
         # Perfectly clean - auto-file
         print(f"\n{'=' * 60}")
-        print("✓ Verdict PASSED with no suggestions")
+        print("VERDICT PASSED with no suggestions")
         print(f"{'=' * 60}")
         print(">>> Auto-filing issue to GitHub (N6)...")
         return {
@@ -267,7 +267,7 @@ def human_edit_verdict(state: IssueWorkflowState) -> dict[str, Any]:
     else:
         # Has feedback - auto-revise
         print(f"\n{'=' * 60}")
-        print("⚠ Verdict has feedback (suggestions/architecture)")
+        print("WARNING: Verdict has feedback (suggestions/architecture)")
         print(f"{'=' * 60}")
         print(">>> Auto-sending to Claude for revision (N2)...")
         return {
