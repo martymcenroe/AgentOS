@@ -44,9 +44,19 @@ from agentos.workflows.issue.state import IssueWorkflowState, SlugCollisionChoic
 def get_checkpoint_db_path() -> Path:
     """Get path to SQLite checkpoint database.
 
+    Supports AGENTOS_WORKFLOW_DB environment variable for worktree isolation.
+
     Returns:
-        Path to ~/.agentos/issue_workflow.db
+        Path to checkpoint database. Uses AGENTOS_WORKFLOW_DB if set,
+        otherwise falls back to ~/.agentos/issue_workflow.db
     """
+    # Support environment variable for worktree isolation
+    if db_path_env := os.environ.get("AGENTOS_WORKFLOW_DB"):
+        db_path = Path(db_path_env)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return db_path
+
+    # Default: ~/.agentos/issue_workflow.db
     db_dir = Path.home() / ".agentos"
     db_dir.mkdir(parents=True, exist_ok=True)
     return db_dir / "issue_workflow.db"
