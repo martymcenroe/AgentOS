@@ -18,11 +18,13 @@ from pathlib import Path
 from agentos.workflows.lld.audit import (
     assemble_context,
     create_lld_audit_dir,
+    embed_review_evidence,
     get_repo_root,
     next_file_number,
     save_approved_metadata,
     save_audit_file,
     save_final_lld,
+    update_lld_status,
 )
 from agentos.workflows.lld.state import HumanDecision, LLDWorkflowState
 
@@ -395,7 +397,9 @@ def review(state: LLDWorkflowState) -> dict:
 def finalize(state: LLDWorkflowState) -> dict:
     """N4: Save approved LLD to final location.
 
-    - Copies LLD to docs/LLDs/active/LLD-{issue_number}.md
+    - Embeds review evidence in LLD content
+    - Copies LLD to docs/lld/active/LLD-{issue_number}.md
+    - Updates lld-status.json tracking cache
     - Saves approved.json metadata
     - Logs success message
 
@@ -405,15 +409,41 @@ def finalize(state: LLDWorkflowState) -> dict:
     Returns:
         State updates with final_lld_path.
     """
+    from datetime import datetime
+
     print("\n[N4] Finalizing approved LLD...")
 
     issue_number = state.get("issue_id", state.get("issue_number", 0))
     issue_title = state.get("issue_title", "")
     lld_content = state.get("lld_content", "")
+    verdict_count = state.get("verdict_count", 1)
+
+    # Embed review evidence in LLD content before saving
+    review_date = datetime.now().strftime("%Y-%m-%d")
+    lld_content = embed_review_evidence(
+        lld_content,
+        verdict="APPROVED",
+        review_date=review_date,
+        review_count=verdict_count,
+    )
+    print(f"    Embedded review evidence (Gemini #{verdict_count}, {review_date})")
 
     # Save final LLD
     final_path = save_final_lld(issue_number, lld_content)
     print(f"    Saved to: {final_path}")
+
+    # Update tracking cache
+    update_lld_status(
+        issue_number=issue_number,
+        lld_path=str(final_path),
+        review_info={
+            "has_gemini_review": True,
+            "final_verdict": "APPROVED",
+            "last_review_date": review_date,
+            "review_count": verdict_count,
+        },
+    )
+    print(f"    Updated lld-status.json tracking")
 
     # Save approved metadata to audit trail
     audit_dir = Path(state.get("audit_dir", ""))
@@ -427,7 +457,7 @@ def finalize(state: LLDWorkflowState) -> dict:
             final_lld_path=str(final_path),
             total_iterations=state.get("iteration_count", 0),
             draft_count=state.get("draft_count", 0),
-            verdict_count=state.get("verdict_count", 0),
+            verdict_count=verdict_count,
         )
         print(f"    Metadata saved: {file_num:03d}-approved.json")
 

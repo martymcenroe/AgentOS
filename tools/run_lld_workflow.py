@@ -2,17 +2,22 @@
 """CLI runner for LLD Governance workflow.
 
 Issue #86: LLD Creation & Governance Review Workflow
-LLD: docs/LLDs/active/LLD-086-lld-governance-workflow.md
+Issue #95: --select and LLD Status Tracking
+LLD: docs/lld/active/LLD-086-lld-governance-workflow.md
 
 Usage:
     python tools/run_lld_workflow.py --issue 42
+    python tools/run_lld_workflow.py --select
+    python tools/run_lld_workflow.py --audit
     python tools/run_lld_workflow.py --issue 42 --auto
     python tools/run_lld_workflow.py --issue 42 --mock
     python tools/run_lld_workflow.py --issue 42 --context file.py --context another.md
     python tools/run_lld_workflow.py --issue 42 --resume
 
 Options:
-    --issue <number>      GitHub issue number (required)
+    --issue <number>      GitHub issue number
+    --select              Interactive picker for open GitHub issues
+    --audit               Rebuild lld-status.json from all LLD files
     --context <path>      Additional context files (can specify multiple)
     --auto                Auto mode: skip VS Code, auto-send to Gemini
     --mock                Mock mode: use fixtures instead of real APIs
@@ -35,10 +40,155 @@ os.environ["LANGCHAIN_API_KEY"] = ""
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
+import json
+import subprocess
+
 from langgraph.checkpoint.sqlite import SqliteSaver
 
+from agentos.workflows.lld.audit import (
+    check_lld_status,
+    load_lld_tracking,
+    rebuild_lld_cache,
+)
 from agentos.workflows.lld.graph import build_lld_workflow
 from agentos.workflows.lld.state import LLDWorkflowState
+
+
+def select_issue_interactive() -> tuple[int, str] | None:
+    """Interactive picker for open GitHub issues.
+
+    Flow:
+    1. Fetch open issues via gh CLI
+    2. Load lld-status.json for cached statuses
+    3. Filter out issues with status="approved"
+    4. Display with status indicators
+    5. Return (issue_number, title) or None
+
+    Returns:
+        Tuple of (issue_number, title) if selected, None if quit.
+    """
+    print("\nFetching open GitHub issues...")
+
+    try:
+        result = subprocess.run(
+            ["gh", "issue", "list", "--state", "open", "--json", "number,title", "--limit", "50"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        if result.returncode != 0:
+            print(f"Error fetching issues: {result.stderr.strip()}")
+            return None
+
+        issues = json.loads(result.stdout)
+
+    except subprocess.TimeoutExpired:
+        print("Timeout fetching issues from GitHub")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"Failed to parse issues: {e}")
+        return None
+
+    if not issues:
+        print("No open issues found.")
+        return None
+
+    # Load LLD tracking cache
+    tracking = load_lld_tracking()
+    lld_statuses = tracking.get("issues", {})
+
+    # Prepare display list with status indicators
+    display_items = []
+    for issue in issues:
+        issue_num = issue["number"]
+        title = issue["title"]
+
+        # Check LLD status
+        status = lld_statuses.get(str(issue_num), {})
+        lld_status = status.get("status", "new")
+
+        if lld_status == "approved":
+            indicator = "[SKIP - approved]"
+        elif lld_status == "draft":
+            indicator = "[DRAFT - has unreviewed LLD]"
+        elif lld_status == "blocked":
+            indicator = "[BLOCKED - needs revision]"
+        else:
+            indicator = "[NEW]"
+
+        display_items.append({
+            "number": issue_num,
+            "title": title,
+            "lld_status": lld_status,
+            "indicator": indicator,
+        })
+
+    # Display
+    print(f"\n{'=' * 60}")
+    print("Select Issue for LLD Creation")
+    print(f"{'=' * 60}\n")
+
+    for i, item in enumerate(display_items, 1):
+        if item["lld_status"] == "approved":
+            # Gray out approved issues
+            print(f"  [{i}] #{item['number']} {item['title'][:40]}")
+            print(f"       {item['indicator']}")
+        else:
+            print(f"  [{i}] #{item['number']} {item['title'][:40]}")
+            print(f"       {item['indicator']}")
+
+    print(f"\n  [q] Quit")
+    print()
+
+    # Test mode: select first non-approved issue
+    if os.environ.get("AGENTOS_TEST_MODE") == "1":
+        for i, item in enumerate(display_items, 1):
+            if item["lld_status"] != "approved":
+                choice = str(i)
+                print(f"Select issue [1-{len(display_items)}, q]: {choice} (TEST MODE - auto-select)")
+                return (item["number"], item["title"])
+        print("No non-approved issues available in test mode.")
+        return None
+
+    while True:
+        choice = input(f"Select issue [1-{len(display_items)}, q]: ").strip().lower()
+
+        if choice == "q":
+            return None
+
+        try:
+            idx = int(choice)
+            if 1 <= idx <= len(display_items):
+                item = display_items[idx - 1]
+
+                # Warn if selecting approved issue
+                if item["lld_status"] == "approved":
+                    print(f"\n>>> Issue #{item['number']} already has an approved LLD.")
+                    confirm = input("    Create new LLD anyway? [y/N]: ").strip().lower()
+                    if confirm != "y":
+                        continue
+
+                return (item["number"], item["title"])
+            else:
+                print(f"Invalid number. Enter 1-{len(display_items)} or q.")
+        except ValueError:
+            print("Invalid input. Enter a number or q.")
+
+
+def run_audit() -> int:
+    """Rebuild lld-status.json from all LLD files.
+
+    Returns:
+        Exit code (0 for success).
+    """
+    print(f"\n{'=' * 60}")
+    print("LLD Status Audit")
+    print(f"{'=' * 60}\n")
+
+    count = rebuild_lld_cache()
+
+    return 0
 
 
 def get_checkpoint_db_path() -> Path:
@@ -194,8 +344,14 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+    # Interactive issue picker
+    python tools/run_lld_workflow.py --select
+
     # Basic usage - generate LLD for issue
     python tools/run_lld_workflow.py --issue 42
+
+    # Rebuild LLD status cache
+    python tools/run_lld_workflow.py --audit
 
     # Auto mode - unattended execution
     python tools/run_lld_workflow.py --issue 42 --auto
@@ -214,8 +370,17 @@ Examples:
     parser.add_argument(
         "--issue",
         type=int,
-        required=True,
         help="GitHub issue number",
+    )
+    parser.add_argument(
+        "--select",
+        action="store_true",
+        help="Interactive picker for open GitHub issues",
+    )
+    parser.add_argument(
+        "--audit",
+        action="store_true",
+        help="Rebuild lld-status.json from all LLD files",
     )
     parser.add_argument(
         "--context",
@@ -246,6 +411,50 @@ Examples:
     )
 
     args = parser.parse_args()
+
+    # Handle --audit first
+    if args.audit:
+        return run_audit()
+
+    # Handle --select
+    if args.select:
+        result = select_issue_interactive()
+        if result is None:
+            print("No issue selected. Exiting.")
+            return 0
+
+        issue_number, title = result
+
+        # Post-selection check: verify LLD status
+        lld_status = check_lld_status(issue_number)
+        if lld_status and lld_status.get("status") == "approved":
+            print(f"\n>>> Issue #{issue_number} already has an approved LLD at:")
+            print(f"    {lld_status.get('lld_path')}")
+            confirm = input("\nCreate new LLD anyway? [y/N]: ").strip().lower()
+            if confirm != "y":
+                return 0
+
+        # Inject existing draft as context if present
+        context_files = args.context or []
+        if lld_status and lld_status.get("status") == "draft":
+            draft_path = lld_status.get("lld_path")
+            if draft_path:
+                print(f"\n>>> Found existing draft LLD, injecting as context:")
+                print(f"    {draft_path}")
+                context_files.insert(0, draft_path)
+
+        return run_workflow(
+            issue_number=issue_number,
+            context_files=context_files,
+            auto_mode=args.auto,
+            mock_mode=args.mock,
+            resume=args.resume,
+            max_iterations=args.max_iterations,
+        )
+
+    # Require --issue if not --select or --audit
+    if not args.issue:
+        parser.error("one of the arguments --issue --select --audit is required")
 
     return run_workflow(
         issue_number=args.issue,

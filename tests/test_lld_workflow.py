@@ -148,9 +148,9 @@ class TestSaveFinalLLD:
         assert path.exists()
         assert path.name == "LLD-042.md"
         assert path.read_text() == content
-        # Check path contains LLDs/active (works with both / and \ separators)
+        # Check path contains lld/active (works with both / and \ separators)
         assert path.parent.name == "active"
-        assert path.parent.parent.name == "LLDs"
+        assert path.parent.parent.name == "lld"
 
 
 class TestContextValidation:
