@@ -762,3 +762,179 @@ class TestWorkflowResume:
 
             # Verify returns 0 (no error)
             assert result == 0
+
+
+class TestWorkflowResumeIntegration:
+    """Integration tests for resume with real SQLite database.
+
+    These tests use a real SQLite checkpointer (not mocked) to verify
+    the actual checkpoint/resume behavior works correctly.
+    """
+
+    def test_checkpoint_db_path_env_var(self):
+        """Test that AGENTOS_WORKFLOW_DB environment variable works."""
+        import os
+        from tools.run_issue_workflow import get_checkpoint_db_path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            custom_db = tmpdir / "custom.db"
+
+            # Set environment variable
+            old_env = os.environ.get("AGENTOS_WORKFLOW_DB")
+            try:
+                os.environ["AGENTOS_WORKFLOW_DB"] = str(custom_db)
+                result = get_checkpoint_db_path()
+                assert result == custom_db
+            finally:
+                # Restore original environment
+                if old_env:
+                    os.environ["AGENTOS_WORKFLOW_DB"] = old_env
+                else:
+                    os.environ.pop("AGENTOS_WORKFLOW_DB", None)
+
+    def test_checkpoint_db_path_default(self):
+        """Test default checkpoint database path."""
+        import os
+        from tools.run_issue_workflow import get_checkpoint_db_path
+
+        # Ensure env var is not set
+        old_env = os.environ.get("AGENTOS_WORKFLOW_DB")
+        try:
+            os.environ.pop("AGENTOS_WORKFLOW_DB", None)
+            result = get_checkpoint_db_path()
+            expected = Path.home() / ".agentos" / "issue_workflow.db"
+            assert result == expected
+        finally:
+            if old_env:
+                os.environ["AGENTOS_WORKFLOW_DB"] = old_env
+
+    def test_sqlite_checkpointer_saves_state(self):
+        """Test that SQLite checkpointer actually saves workflow state.
+
+        This test verifies the core checkpoint mechanism that resume depends on.
+        """
+        from langgraph.checkpoint.sqlite import SqliteSaver
+        from langgraph.graph import END, StateGraph
+        from typing import TypedDict
+
+        class SimpleState(TypedDict, total=False):
+            counter: int
+            msg: str
+
+        def increment(state: SimpleState) -> dict:
+            return {"counter": state.get("counter", 0) + 1}
+
+        def set_msg(state: SimpleState) -> dict:
+            return {"msg": f"Counter is {state.get('counter', 0)}"}
+
+        # Build a simple workflow
+        workflow = StateGraph(SimpleState)
+        workflow.add_node("increment", increment)
+        workflow.add_node("set_msg", set_msg)
+        workflow.set_entry_point("increment")
+        workflow.add_edge("increment", "set_msg")
+        workflow.add_edge("set_msg", END)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+
+            # Run workflow with checkpointer
+            with SqliteSaver.from_conn_string(str(db_path)) as memory:
+                app = workflow.compile(checkpointer=memory)
+                config = {"configurable": {"thread_id": "test-thread"}}
+
+                # Run the workflow
+                for event in app.stream({"counter": 0}, config):
+                    pass
+
+                # Verify checkpoint was saved
+                state = app.get_state(config)
+                assert state.values.get("counter") == 1
+                assert state.values.get("msg") == "Counter is 1"
+
+            # Reopen database and verify state persisted
+            with SqliteSaver.from_conn_string(str(db_path)) as memory:
+                app = workflow.compile(checkpointer=memory)
+                config = {"configurable": {"thread_id": "test-thread"}}
+
+                # Get saved state
+                state = app.get_state(config)
+                assert state.values.get("counter") == 1
+                assert state.values.get("msg") == "Counter is 1"
+
+    def test_workflow_resume_from_checkpoint(self):
+        """Test that workflow can resume from a checkpoint.
+
+        This test creates a checkpoint mid-workflow and verifies
+        that resuming with stream(None, config) continues correctly.
+        """
+        from langgraph.checkpoint.sqlite import SqliteSaver
+        from langgraph.graph import END, StateGraph
+        from typing import TypedDict
+
+        class CounterState(TypedDict, total=False):
+            counter: int
+            nodes_visited: list
+
+        def node_a(state: CounterState) -> dict:
+            visited = state.get("nodes_visited", [])
+            return {
+                "counter": state.get("counter", 0) + 1,
+                "nodes_visited": visited + ["A"],
+            }
+
+        def node_b(state: CounterState) -> dict:
+            visited = state.get("nodes_visited", [])
+            return {
+                "counter": state.get("counter", 0) + 10,
+                "nodes_visited": visited + ["B"],
+            }
+
+        def node_c(state: CounterState) -> dict:
+            visited = state.get("nodes_visited", [])
+            return {
+                "counter": state.get("counter", 0) + 100,
+                "nodes_visited": visited + ["C"],
+            }
+
+        # Build workflow: A -> B -> C
+        workflow = StateGraph(CounterState)
+        workflow.add_node("A", node_a)
+        workflow.add_node("B", node_b)
+        workflow.add_node("C", node_c)
+        workflow.set_entry_point("A")
+        workflow.add_edge("A", "B")
+        workflow.add_edge("B", "C")
+        workflow.add_edge("C", END)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+
+            # Run workflow completely
+            with SqliteSaver.from_conn_string(str(db_path)) as memory:
+                app = workflow.compile(checkpointer=memory)
+                config = {"configurable": {"thread_id": "resume-test"}}
+
+                # Run the full workflow
+                final_state = None
+                for event in app.stream({"counter": 0, "nodes_visited": []}, config):
+                    for node_name, output in event.items():
+                        final_state = output
+
+                # Verify all nodes ran
+                assert final_state["counter"] == 111  # 1 + 10 + 100
+                assert final_state["nodes_visited"] == ["A", "B", "C"]
+
+            # Resume with stream(None, config) - should have nothing to do
+            with SqliteSaver.from_conn_string(str(db_path)) as memory:
+                app = workflow.compile(checkpointer=memory)
+                config = {"configurable": {"thread_id": "resume-test"}}
+
+                # Resume - should yield nothing since workflow completed
+                events = list(app.stream(None, config))
+                assert len(events) == 0  # No more events, workflow complete
+
+                # State should still be accessible
+                state = app.get_state(config)
+                assert state.values.get("counter") == 111

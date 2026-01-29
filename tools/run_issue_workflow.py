@@ -5,7 +5,7 @@ Issue #62: Governance Workflow StateGraph
 
 Usage:
     python tools/run_issue_workflow.py --brief <file.md>
-    python tools/run_issue_workflow.py --resume <file.md>
+    poetry run python tools/run_issue_workflow.py --resume <file.md>
 
 Options:
     --brief <file>    Path to ideation notes (starts new workflow)
@@ -44,9 +44,19 @@ from agentos.workflows.issue.state import IssueWorkflowState, SlugCollisionChoic
 def get_checkpoint_db_path() -> Path:
     """Get path to SQLite checkpoint database.
 
+    Supports AGENTOS_WORKFLOW_DB environment variable for worktree isolation.
+
     Returns:
-        Path to ~/.agentos/issue_workflow.db
+        Path to checkpoint database. Uses AGENTOS_WORKFLOW_DB if set,
+        otherwise falls back to ~/.agentos/issue_workflow.db
     """
+    # Support environment variable for worktree isolation
+    if db_path_env := os.environ.get("AGENTOS_WORKFLOW_DB"):
+        db_path = Path(db_path_env)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return db_path
+
+    # Default: ~/.agentos/issue_workflow.db
     db_dir = Path.home() / ".agentos"
     db_dir.mkdir(parents=True, exist_ok=True)
     return db_dir / "issue_workflow.db"
@@ -298,7 +308,7 @@ def run_new_workflow(brief_file: str) -> int:
                             continue
                     elif choice == "S":
                         print("\n>>> Workflow state saved.")
-                        print(f">>> Resume with: python tools/run_issue_workflow.py --resume {brief_file}")
+                        print(f">>> Resume with: poetry run python tools/run_issue_workflow.py --resume {brief_file}")
                         return 0
                     elif choice == "C":
                         print(f"\n>>> Cleaning checkpoint and audit directory for '{slug}'...")
@@ -324,7 +334,7 @@ def run_new_workflow(brief_file: str) -> int:
 
         except KeyboardInterrupt:
             print("\n\n>>> Interrupted by user. Workflow state saved.")
-            print(f">>> Resume with: python tools/run_issue_workflow.py --resume {brief_file}")
+            print(f">>> Resume with: poetry run python tools/run_issue_workflow.py --resume {brief_file}")
             return 0
 
     return 0
@@ -440,7 +450,7 @@ def run_resume_workflow(brief_file: str) -> int:
                             continue
                     elif choice == "S":
                         print("\n>>> Workflow state saved.")
-                        print(f">>> Resume with: python tools/run_issue_workflow.py --resume {brief_file}")
+                        print(f">>> Resume with: poetry run python tools/run_issue_workflow.py --resume {brief_file}")
                         return 0
                     elif choice == "C":
                         print(f"\n>>> Cleaning checkpoint and audit directory for '{slug}'...")
@@ -466,7 +476,7 @@ def run_resume_workflow(brief_file: str) -> int:
 
         except KeyboardInterrupt:
             print("\n\n>>> Interrupted by user. Workflow state saved.")
-            print(f">>> Resume with: python tools/run_issue_workflow.py --resume {brief_file}")
+            print(f">>> Resume with: poetry run python tools/run_issue_workflow.py --resume {brief_file}")
             return 0
 
     return 0
@@ -480,7 +490,7 @@ def main() -> int:
         epilog="""
 Examples:
     python tools/run_issue_workflow.py --brief my-feature-notes.md
-    python tools/run_issue_workflow.py --resume my-feature-notes.md
+    poetry run python tools/run_issue_workflow.py --resume my-feature-notes.md
         """,
     )
     parser.add_argument(
