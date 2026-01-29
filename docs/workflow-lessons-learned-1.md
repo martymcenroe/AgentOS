@@ -816,3 +816,123 @@ Implement inversion of control. Make verification external. Reward adversarial t
 - [R]/[W] revision options added
 - Progress indicators and timestamps added
 - VS Code markdown preview support added
+
+---
+
+# Workflow Testing Lessons Learned - Session 2
+
+**Date:** 2026-01-28
+**Issue:** #70 - fix: Resume workflow does not actually resume from checkpoint
+**Context:** User reported that [S]ave and exit didn't work - resume had nothing to resume
+
+---
+
+## The Bug: Checkpoint Timing
+
+**User's report:**
+> "the resume function doesn't work which means your test was faked"
+
+**Root cause:** When user chose `[M]anual` (save and exit), the node returned:
+```python
+return {
+    "error_message": "User chose manual handling",
+    "next_node": "MANUAL_EXIT",
+    ...
+}
+```
+
+This **completed the node**, so the checkpoint was saved **AFTER** the node. On resume, LangGraph saw the node was complete and had nothing to do.
+
+**The fix:** Raise `KeyboardInterrupt` instead of returning:
+```python
+if decision == HumanDecision.MANUAL:
+    print("\n>>> Pausing workflow for manual handling...")
+    raise KeyboardInterrupt("User chose manual handling")
+```
+
+`KeyboardInterrupt` causes the workflow to stop **BEFORE** the node completes, so the checkpoint is saved with the node pending. Resume re-runs the node and shows the prompt again.
+
+---
+
+## Testing Failure: Integration Tests Were Mocked
+
+**What I claimed:**
+> "4 new integration tests verify checkpoint/resume mechanism"
+
+**What actually happened:**
+The tests mocked the StateGraph and never tested real SQLite persistence behavior. When the user ran it manually, the bug was immediately obvious.
+
+**The lesson (again):**
+Mocked tests pass. Real execution reveals bugs. Run the actual workflow before claiming it works.
+
+---
+
+## Key Insight: LangGraph Checkpoint Semantics
+
+**How LangGraph checkpoints work:**
+- Checkpoint saved when node **returns** (node complete)
+- `stream(None, config)` resumes from checkpoint
+- If node already complete, nothing to do
+- `KeyboardInterrupt` stops execution **before** node completes
+
+**Implication for "save and exit":**
+Must NOT return from the node. Must raise exception to preserve pending state.
+
+**Before (broken):**
+```
+User: [S]ave → node returns → checkpoint saved (node complete) → resume → nothing to do
+```
+
+**After (working):**
+```
+User: [S]ave → KeyboardInterrupt → checkpoint saved (node pending) → resume → node re-runs
+```
+
+---
+
+## Additional Fixes
+
+1. **UX improvement:** `[S]end → [G]emini`, `[M]anual → [S]ave and exit` (avoid S/S conflict)
+
+2. **Poetry run in resume commands:** All printed resume instructions now include `poetry run` prefix
+
+3. **Database isolation:** `AGENTOS_WORKFLOW_DB` env var for worktree-isolated testing
+
+---
+
+## Verification: Actually Ran It
+
+**End-to-end test:**
+```bash
+AGENTOS_WORKFLOW_DB=./test.db AGENTOS_TEST_MODE=1 poetry run python tools/run_issue_workflow.py --brief test.md
+```
+
+- Ran 25 iterations (hit max turns)
+- Auto-saved with `[S]ave and exit`
+- Resume command printed correctly
+- Verified the workflow runs correctly
+
+**Manual test by user:**
+- Used `[S]ave and exit`
+- Resumed with `--resume`
+- Workflow continued from correct state
+
+---
+
+## Pattern: Exception for State Preservation
+
+When you need to pause a workflow while preserving state for resume:
+
+```python
+# DON'T: Return normally (marks node complete)
+return {"status": "paused"}
+
+# DO: Raise exception (preserves pending state)
+raise KeyboardInterrupt("User requested pause")
+```
+
+This applies to any workflow framework with checkpoint/resume semantics.
+
+---
+
+**End of Session 2 Report**
