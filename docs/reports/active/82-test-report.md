@@ -50,5 +50,26 @@ poetry run --directory /c/Users/mcwiz/Projects/AgentOS-82 pytest tests/test_issu
 
 `TestDraftNode::test_draft_revision_mode` - This test fails on main as well. It's testing draft revision feedback inclusion, which is unrelated to the brief idea detection fix.
 
+## Warnings Summary
+
+**Total Warnings:** 75
+
+| Count | Type | Source | Message |
+|-------|------|--------|---------|
+| 1 | `UserWarning` | langchain_core | "Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater" |
+| 7 | `DeprecationWarning` | pydantic.v1.typing | "ForwardRef._evaluate is a private API... will be removed in Python 3.16" |
+| 1 | `FutureWarning` | google.generativeai | "All support for the google.generativeai package has ended. Switch to google.genai" |
+| 33 | `DeprecationWarning` | langgraph.utils.runnable:224 | "'asyncio.iscoroutinefunction' is deprecated... use inspect.iscoroutinefunction()" |
+| 33 | `DeprecationWarning` | langgraph.utils.runnable:226 | "'asyncio.iscoroutinefunction' is deprecated... use inspect.iscoroutinefunction()" |
+
+**Analysis:**
+- All 75 warnings are from **dependencies**, not AgentOS project code
+- Python 3.14 compatibility: Pydantic v1 and asyncio APIs are deprecated (affects langchain, langgraph)
+- Google SDK migration needed: `google-generativeai` → `google-genai` package
+- **Action items:**
+  - None blocking this PR
+  - Future: Track langchain/langgraph upgrades for pydantic v2 support
+  - Future: Migrate gemini client to `google-genai` package
+
 ## Skipped Tests
 None
