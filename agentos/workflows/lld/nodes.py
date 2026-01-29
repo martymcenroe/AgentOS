@@ -485,13 +485,25 @@ def _mock_design(state: LLDWorkflowState) -> dict:
 def _mock_review(state: LLDWorkflowState) -> dict:
     """Mock implementation of review for testing.
 
-    Returns APPROVED on second iteration, BLOCKED on first.
+    Returns BLOCKED on first iteration, APPROVED on second.
+    At max iterations, stays BLOCKED and returns error.
     """
     iteration = state.get("iteration_count", 0)
     audit_dir = Path(state.get("audit_dir", ""))
 
-    # First iteration: reject. Second+: approve.
-    if iteration <= 1:
+    # Check max iterations first - don't auto-approve at max
+    if iteration >= MAX_ITERATIONS:
+        lld_status = "BLOCKED"
+        critique = """## Max Iterations Reached
+
+The maximum number of iterations has been reached.
+Please review the LLD manually.
+
+## Verdict
+[x] **BLOCKED** - Max iterations exceeded
+"""
+    # First iteration: reject
+    elif iteration <= 1:
         lld_status = "BLOCKED"
         critique = """## Pre-Flight Gate: PASSED
 
@@ -503,6 +515,7 @@ def _mock_review(state: LLDWorkflowState) -> dict:
 ## Verdict
 [x] **REVISE** - Fix Tier 1 issues first
 """
+    # Second+ iteration (before max): approve
     else:
         lld_status = "APPROVED"
         critique = """## Pre-Flight Gate: PASSED
