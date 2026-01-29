@@ -1,7 +1,7 @@
 # 0904 - Issue Governance Workflow
 
 **Category:** Runbook / Operational Procedure
-**Version:** 2.0
+**Version:** 2.1
 **Last Updated:** 2026-01-28
 
 ---
@@ -21,7 +21,7 @@ Create GitHub issues through a governed workflow that ensures human review at ev
 | VS Code CLI | `which code` (should return path) |
 | GitHub CLI authenticated | `gh auth status` (should show logged in) |
 | Poetry environment | `poetry run python --version` |
-| Brief file exists | Your idea written in markdown |
+| Brief file exists | Your idea written in markdown (or use `--select` to pick from `ideas/active/`) |
 
 ---
 
@@ -140,7 +140,7 @@ sequenceDiagram
 
 Create a markdown file with your issue idea. This is YOUR input - write whatever you want Claude to expand into a proper issue.
 
-**Location:** `docs/drafts/` (recommended) or anywhere
+**Location:** `ideas/active/` (recommended) or anywhere
 
 **Example brief:**
 ```markdown
@@ -155,6 +155,35 @@ Labels: enhancement, security
 ```
 
 ### Step 2: Run the Workflow
+
+**Option A: Interactive picker (recommended)**
+
+Pick from ideas already in `ideas/active/`:
+
+```bash
+poetry run --directory /c/Users/mcwiz/Projects/AgentOS python /c/Users/mcwiz/Projects/AgentOS/tools/run_issue_workflow.py --select
+```
+
+You'll see a numbered list of available ideas:
+```
+============================================================
+Select Idea from ideas/active/
+============================================================
+  [1] add-rate-limiting.md
+      Add rate limiting to API
+  [2] improve-logging.md
+      Improve structured logging
+
+  [q] Quit
+
+Select idea [1-2, q]: _
+```
+
+After the issue is filed, the idea file is automatically moved to `ideas/done/{issue#}-name.md`.
+
+**Option B: Direct path**
+
+Specify any brief file directly:
 
 ```bash
 poetry run --directory /c/Users/mcwiz/Projects/AgentOS python /c/Users/mcwiz/Projects/AgentOS/tools/run_issue_workflow.py --brief /path/to/your-brief.md
@@ -309,7 +338,18 @@ All artifacts are saved to `docs/audit/active/{slug}/`:
 
 **Verdict history:** Each verdict is appended to `state.verdict_history` and sent back to Claude on revision.
 
-After the issue is filed, the folder is automatically moved to `docs/audit/done/`.
+After the issue is filed:
+- Audit folder is moved to `docs/audit/done/{issue#}-{slug}/`
+- If using `--select`, the source idea is moved to `ideas/done/{issue#}-name.md`
+
+### Ideas Folder Structure
+
+```
+ideas/
+├── active/     # Ideas ready to work on (inbox)
+├── done/       # Ideas filed as issues (auto-moved after filing)
+└── someday/    # "Maybe never" concepts
+```
 
 ---
 
@@ -381,3 +421,4 @@ The workflow will pause. Wait for quota reset (~24h) or the orchestrator will ro
 |---------|------|---------|
 | 1.0 | 2026-01-26 | Initial version |
 | 2.0 | 2026-01-28 | Auto-routing at N5, cumulative verdict history, recursion limit handling, stronger Claude instructions |
+| 2.1 | 2026-01-28 | Add `--select` flag for interactive idea picker, document ideas/ folder as staging area |
