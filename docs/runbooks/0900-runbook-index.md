@@ -24,6 +24,7 @@ Quick reference for the orchestrator (Marty) on how to run tools, commands, agen
 | 0903 | [Windows Scheduled Tasks](0903-windows-scheduled-tasks.md) | Reference | - | Sonnet |
 | 0904 | [Issue Governance Workflow](0904-issue-governance-workflow.md) | Manual | Per issue | Claude + Gemini |
 | 0905 | [Gemini Credentials](0905-gemini-credentials.md) | Manual | On credential issues | - |
+| 0906 | [LLD Governance Workflow](0906-lld-governance-workflow.md) | Manual | Per LLD | Claude + Gemini |
 
 ## Model Selection Guide
 
