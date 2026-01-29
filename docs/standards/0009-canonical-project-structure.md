@@ -57,6 +57,7 @@ Files in `docs/lld/` and `docs/reports/` use the issue number directly:
 project/
 ├── .claude/                    # Claude Code configuration
 ├── .git/                       # Git repository
+├── data/                       # App data: examples, templates, seeds
 ├── docs/                       # All documentation
 ├── src/                        # Application source (if applicable)
 ├── tests/                      # All tests
@@ -110,6 +111,9 @@ docs/
 │   └── (YYYY-MM-DD.md files)
 ├── audit-results/              # Historical audit outputs (90002)
 │   └── (YYYY-MM-DD.md files)
+├── media/                      # Artwork, videos, tutorials (4xxxx)
+├── legal/                      # ToS, privacy policy, regulatory compliance
+├── design/                     # UI mockups, icon prompts, style guides
 └── 00003-file-inventory.md     # Project file inventory (REQUIRED)
 ```
 
@@ -128,6 +132,7 @@ tests/
 ├── unit/                       # Fast, isolated tests
 ├── integration/                # Multiple components together
 ├── e2e/                        # End-to-end browser/system tests
+├── smoke/                      # Quick sanity/environment tests
 ├── contract/                   # Extension<->backend API agreements
 ├── visual/                     # Visual regression testing
 ├── benchmark/                  # Performance, load, latency
@@ -141,6 +146,7 @@ tests/
 **All directories are required**, even if empty (use `.gitkeep`).
 
 **Definitions:**
+- **smoke/** - Quick sanity tests: verify environment works before full test suite
 - **fixtures/** - Test *data*: sample JSON, mock HTML, database seeds
 - **harness/** - Test *infrastructure*: helper functions, mock servers, setup/teardown
 
