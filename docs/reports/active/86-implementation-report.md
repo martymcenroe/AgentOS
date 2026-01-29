@@ -29,6 +29,14 @@ Implemented a LangGraph-based workflow that orchestrates LLD creation from GitHu
 
 ## 4. Design Decisions
 
+### 4.0 Shared Audit Helpers (Refactoring)
+
+Extracted duplicate audit saving logic into shared helper functions:
+- `_save_draft_to_audit()`: Saves draft files, updates counters
+- `_save_verdict_to_audit()`: Saves verdict files, updates counters
+
+Both production and mock implementations now use these helpers, ensuring consistency and reducing code duplication.
+
 ### 4.1 LangGraph StateGraph Pattern
 
 Used LangGraph's StateGraph for workflow orchestration because:

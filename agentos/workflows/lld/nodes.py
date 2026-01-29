@@ -32,6 +32,66 @@ from agentos.workflows.lld.state import HumanDecision, LLDWorkflowState
 MAX_ITERATIONS = 5
 
 
+# ---------------------------------------------------------------------------
+# Shared audit helpers (used by both production and mock implementations)
+# ---------------------------------------------------------------------------
+
+
+def _save_draft_to_audit(
+    audit_dir: Path,
+    lld_content: str,
+    state: LLDWorkflowState,
+) -> tuple[int, int]:
+    """Save LLD draft to audit trail.
+
+    Args:
+        audit_dir: Path to audit directory.
+        lld_content: LLD content to save.
+        state: Current workflow state.
+
+    Returns:
+        Tuple of (file_num, draft_count).
+    """
+    draft_count = state.get("draft_count", 0) + 1
+    file_num = state.get("file_counter", 0)
+
+    if audit_dir.exists():
+        file_num = next_file_number(audit_dir)
+        save_audit_file(audit_dir, file_num, "draft.md", lld_content)
+        print(f"    Draft saved to audit: {file_num:03d}-draft.md")
+
+    return file_num, draft_count
+
+
+def _save_verdict_to_audit(
+    audit_dir: Path,
+    lld_status: str,
+    critique: str,
+    state: LLDWorkflowState,
+) -> tuple[int, int]:
+    """Save governance verdict to audit trail.
+
+    Args:
+        audit_dir: Path to audit directory.
+        lld_status: APPROVED or BLOCKED.
+        critique: Gemini critique text.
+        state: Current workflow state.
+
+    Returns:
+        Tuple of (file_num, verdict_count).
+    """
+    verdict_count = state.get("verdict_count", 0) + 1
+    file_num = state.get("file_counter", 0)
+
+    if audit_dir.exists():
+        file_num = next_file_number(audit_dir)
+        verdict_content = f"# Governance Verdict: {lld_status}\n\n{critique}"
+        save_audit_file(audit_dir, file_num, "verdict.md", verdict_content)
+        print(f"    Verdict saved to audit: {file_num:03d}-verdict.md")
+
+    return file_num, verdict_count
+
+
 def fetch_issue(state: LLDWorkflowState) -> dict:
     """N0: Fetch issue from GitHub and assemble context.
 
@@ -153,19 +213,13 @@ def design(state: LLDWorkflowState) -> dict:
 
     if design_status == "FAILED":
         return {
-            "error_message": f"Designer node failed",
+            "error_message": "Designer node failed",
             "design_status": "FAILED",
         }
 
-    # Save draft to our audit trail
+    # Save draft to audit trail using shared helper
     audit_dir = Path(state.get("audit_dir", ""))
-    if audit_dir.exists():
-        file_num = next_file_number(audit_dir)
-        save_audit_file(audit_dir, file_num, "draft.md", lld_content)
-        print(f"    Draft saved to audit: {file_num:03d}-draft.md")
-
-    # Track draft count
-    draft_count = state.get("draft_count", 0) + 1
+    file_num, draft_count = _save_draft_to_audit(audit_dir, lld_content, state)
 
     print(f"    Design status: {design_status}")
     print(f"    Draft path: {lld_draft_path}")
@@ -301,16 +355,11 @@ def review(state: LLDWorkflowState) -> dict:
     lld_status = result.get("lld_status", "BLOCKED")
     gemini_critique = result.get("gemini_critique", "")
 
-    # Save verdict to audit trail
+    # Save verdict to audit trail using shared helper
     audit_dir = Path(state.get("audit_dir", ""))
-    if audit_dir.exists():
-        file_num = next_file_number(audit_dir)
-        verdict_content = f"# Governance Verdict: {lld_status}\n\n{gemini_critique}"
-        save_audit_file(audit_dir, file_num, "verdict.md", verdict_content)
-        print(f"    Verdict saved to audit: {file_num:03d}-verdict.md")
-
-    # Track verdict count
-    verdict_count = state.get("verdict_count", 0) + 1
+    file_num, verdict_count = _save_verdict_to_audit(
+        audit_dir, lld_status, gemini_critique, state
+    )
 
     print(f"    Status: {lld_status}")
 
@@ -458,10 +507,8 @@ def _mock_design(state: LLDWorkflowState) -> dict:
 2. Mock requirement 2
 """
 
-    # Save to audit trail
-    if audit_dir.exists():
-        file_num = next_file_number(audit_dir)
-        save_audit_file(audit_dir, file_num, "draft.md", mock_lld)
+    # Save to audit trail using shared helper
+    file_num, draft_count = _save_draft_to_audit(audit_dir, mock_lld, state)
 
     # Save to drafts directory for VS Code to open
     repo_root = get_repo_root()
@@ -476,8 +523,8 @@ def _mock_design(state: LLDWorkflowState) -> dict:
         "design_status": "DRAFTED",
         "lld_content": mock_lld,
         "lld_draft_path": str(draft_path),
-        "draft_count": state.get("draft_count", 0) + 1,
-        "file_counter": file_num if audit_dir.exists() else state.get("file_counter", 0),
+        "draft_count": draft_count,
+        "file_counter": file_num,
         "error_message": "",
     }
 
@@ -530,11 +577,10 @@ No blocking issues found.
 [x] **APPROVED** - Ready for implementation
 """
 
-    # Save verdict to audit trail
-    if audit_dir.exists():
-        file_num = next_file_number(audit_dir)
-        verdict_content = f"# Governance Verdict: {lld_status}\n\n{critique}"
-        save_audit_file(audit_dir, file_num, "verdict.md", verdict_content)
+    # Save verdict to audit trail using shared helper
+    file_num, verdict_count = _save_verdict_to_audit(
+        audit_dir, lld_status, critique, state
+    )
 
     print(f"    [MOCK] Verdict: {lld_status}")
 
@@ -549,8 +595,8 @@ No blocking issues found.
     return {
         "lld_status": lld_status,
         "gemini_critique": critique,
-        "verdict_count": state.get("verdict_count", 0) + 1,
-        "file_counter": file_num if audit_dir.exists() else state.get("file_counter", 0),
+        "verdict_count": verdict_count,
+        "file_counter": file_num,
         "next_node": next_node,
         "error_message": "" if iteration < MAX_ITERATIONS else f"Max iterations ({MAX_ITERATIONS}) reached",
     }

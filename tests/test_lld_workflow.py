@@ -412,3 +412,346 @@ class TestMaxIterations:
 
         assert "Max iterations" in result.get("error_message", "")
         assert result.get("next_node") == "END"
+
+
+class TestProductionFetchIssue:
+    """Test production fetch_issue code path (non-mock mode).
+
+    These tests exercise the production code by mocking external dependencies
+    (subprocess.run) rather than using mock_mode=True.
+    """
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    @patch("agentos.workflows.lld.nodes.subprocess.run")
+    def test_fetch_issue_calls_gh_cli_correctly(self, mock_run, mock_root, tmp_path):
+        """Test that gh CLI is called with correct arguments."""
+        mock_root.return_value = tmp_path
+        (tmp_path / "docs" / "audit" / "active").mkdir(parents=True)
+
+        # Mock successful gh CLI response
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout='{"title": "Test Issue", "body": "Test body"}',
+            stderr="",
+        )
+
+        from agentos.workflows.lld.nodes import fetch_issue
+
+        state: LLDWorkflowState = {
+            "issue_number": 123,
+            "context_files": [],
+            "mock_mode": False,  # Production mode!
+        }
+
+        result = fetch_issue(state)
+
+        # Verify gh CLI was called correctly
+        mock_run.assert_called_once()
+        call_args = mock_run.call_args
+        assert call_args[0][0] == ["gh", "issue", "view", "123", "--json", "title,body"]
+        assert call_args[1]["capture_output"] is True
+        assert call_args[1]["text"] is True
+        assert call_args[1]["timeout"] == 30
+
+        # Verify result
+        assert result["issue_title"] == "Test Issue"
+        assert result["issue_body"] == "Test body"
+        assert result["error_message"] == ""
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    @patch("agentos.workflows.lld.nodes.subprocess.run")
+    def test_fetch_issue_handles_gh_cli_failure(self, mock_run, mock_root, tmp_path):
+        """Test error handling when gh CLI fails."""
+        mock_root.return_value = tmp_path
+
+        # Mock failed gh CLI response
+        mock_run.return_value = MagicMock(
+            returncode=1,
+            stdout="",
+            stderr="Could not resolve to an Issue with the number 999",
+        )
+
+        from agentos.workflows.lld.nodes import fetch_issue
+
+        state: LLDWorkflowState = {
+            "issue_number": 999,
+            "context_files": [],
+            "mock_mode": False,
+        }
+
+        result = fetch_issue(state)
+
+        assert "Issue #999 not found" in result["error_message"]
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    @patch("agentos.workflows.lld.nodes.subprocess.run")
+    def test_fetch_issue_handles_timeout(self, mock_run, mock_root, tmp_path):
+        """Test error handling when gh CLI times out."""
+        mock_root.return_value = tmp_path
+
+        import subprocess
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="gh", timeout=30)
+
+        from agentos.workflows.lld.nodes import fetch_issue
+
+        state: LLDWorkflowState = {
+            "issue_number": 42,
+            "context_files": [],
+            "mock_mode": False,
+        }
+
+        result = fetch_issue(state)
+
+        assert "Timeout" in result["error_message"]
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    @patch("agentos.workflows.lld.nodes.subprocess.run")
+    def test_fetch_issue_handles_invalid_json(self, mock_run, mock_root, tmp_path):
+        """Test error handling when gh CLI returns invalid JSON."""
+        mock_root.return_value = tmp_path
+
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="not valid json",
+            stderr="",
+        )
+
+        from agentos.workflows.lld.nodes import fetch_issue
+
+        state: LLDWorkflowState = {
+            "issue_number": 42,
+            "context_files": [],
+            "mock_mode": False,
+        }
+
+        result = fetch_issue(state)
+
+        assert "Failed to parse issue data" in result["error_message"]
+
+
+class TestProductionDesign:
+    """Test production design code path (non-mock mode).
+
+    These tests exercise the production code by mocking the designer node.
+    The designer node is imported lazily inside the function, so we mock
+    the module where it's imported from.
+    """
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    @patch("agentos.nodes.designer.design_lld_node")
+    def test_design_calls_designer_node(self, mock_designer, mock_root, tmp_path):
+        """Test that designer node is called with correct state."""
+        mock_root.return_value = tmp_path
+        (tmp_path / "docs" / "audit" / "active" / "42-lld").mkdir(parents=True)
+
+        # Mock successful design response
+        mock_designer.return_value = {
+            "design_status": "DRAFTED",
+            "lld_content": "# Test LLD Content",
+            "lld_draft_path": str(tmp_path / "draft.md"),
+        }
+
+        from agentos.workflows.lld.nodes import design
+
+        state: LLDWorkflowState = {
+            "issue_id": 42,
+            "issue_number": 42,
+            "iteration_count": 0,
+            "draft_count": 0,
+            "audit_dir": str(tmp_path / "docs" / "audit" / "active" / "42-lld"),
+            "mock_mode": False,  # Production mode!
+        }
+
+        result = design(state)
+
+        # Verify designer was called
+        mock_designer.assert_called_once()
+        call_args = mock_designer.call_args[0][0]
+        assert call_args["issue_id"] == 42
+        assert call_args["iteration_count"] == 0
+
+        # Verify result
+        assert result["design_status"] == "DRAFTED"
+        assert result["lld_content"] == "# Test LLD Content"
+        assert result["draft_count"] == 1
+        assert result["error_message"] == ""
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    @patch("agentos.nodes.designer.design_lld_node")
+    def test_design_handles_failure(self, mock_designer, mock_root, tmp_path):
+        """Test error handling when designer node fails."""
+        mock_root.return_value = tmp_path
+
+        mock_designer.return_value = {
+            "design_status": "FAILED",
+            "lld_content": "",
+            "lld_draft_path": "",
+        }
+
+        from agentos.workflows.lld.nodes import design
+
+        state: LLDWorkflowState = {
+            "issue_id": 42,
+            "mock_mode": False,
+        }
+
+        result = design(state)
+
+        assert result["design_status"] == "FAILED"
+        assert "Designer node failed" in result["error_message"]
+
+
+class TestProductionReview:
+    """Test production review code path (non-mock mode).
+
+    These tests exercise the production code by mocking the governance node.
+    The governance node is imported lazily inside the function, so we mock
+    the module where it's imported from.
+    """
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    @patch("agentos.nodes.governance.review_lld_node")
+    def test_review_calls_governance_node(self, mock_governance, mock_root, tmp_path):
+        """Test that governance node is called with correct state."""
+        mock_root.return_value = tmp_path
+        (tmp_path / "docs" / "audit" / "active" / "42-lld").mkdir(parents=True)
+
+        mock_governance.return_value = {
+            "lld_status": "APPROVED",
+            "gemini_critique": "All good!",
+        }
+
+        from agentos.workflows.lld.nodes import review
+
+        state: LLDWorkflowState = {
+            "issue_id": 42,
+            "lld_content": "# LLD Content",
+            "lld_draft_path": "/path/to/draft.md",
+            "iteration_count": 2,
+            "verdict_count": 1,
+            "audit_dir": str(tmp_path / "docs" / "audit" / "active" / "42-lld"),
+            "mock_mode": False,  # Production mode!
+        }
+
+        result = review(state)
+
+        # Verify governance was called
+        mock_governance.assert_called_once()
+        call_args = mock_governance.call_args[0][0]
+        assert call_args["issue_id"] == 42
+        assert call_args["lld_content"] == "# LLD Content"
+        assert call_args["iteration_count"] == 2
+
+        # Verify result
+        assert result["lld_status"] == "APPROVED"
+        assert result["next_node"] == "N4_finalize"
+        assert result["error_message"] == ""
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    @patch("agentos.nodes.governance.review_lld_node")
+    def test_review_routes_to_human_edit_on_block(self, mock_governance, mock_root, tmp_path):
+        """Test routing to human_edit when review blocks."""
+        mock_root.return_value = tmp_path
+        (tmp_path / "docs" / "audit" / "active" / "42-lld").mkdir(parents=True)
+
+        mock_governance.return_value = {
+            "lld_status": "BLOCKED",
+            "gemini_critique": "Missing section 5",
+        }
+
+        from agentos.workflows.lld.nodes import review
+
+        state: LLDWorkflowState = {
+            "issue_id": 42,
+            "lld_content": "# LLD Content",
+            "iteration_count": 1,
+            "verdict_count": 0,
+            "audit_dir": str(tmp_path / "docs" / "audit" / "active" / "42-lld"),
+            "mock_mode": False,
+        }
+
+        result = review(state)
+
+        assert result["lld_status"] == "BLOCKED"
+        assert result["next_node"] == "N2_human_edit"
+        assert result["gemini_critique"] == "Missing section 5"
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    @patch("agentos.nodes.governance.review_lld_node")
+    def test_review_enforces_max_iterations_production(self, mock_governance, mock_root, tmp_path):
+        """Test max iterations enforcement in production mode."""
+        mock_root.return_value = tmp_path
+        (tmp_path / "docs" / "audit" / "active" / "42-lld").mkdir(parents=True)
+
+        mock_governance.return_value = {
+            "lld_status": "BLOCKED",
+            "gemini_critique": "Still not good enough",
+        }
+
+        from agentos.workflows.lld.nodes import review
+
+        state: LLDWorkflowState = {
+            "issue_id": 42,
+            "lld_content": "# LLD Content",
+            "iteration_count": 5,  # At max
+            "verdict_count": 4,
+            "audit_dir": str(tmp_path / "docs" / "audit" / "active" / "42-lld"),
+            "mock_mode": False,
+        }
+
+        result = review(state)
+
+        assert "Max iterations" in result["error_message"]
+        assert result["next_node"] == "END"
+
+
+class TestSharedAuditHelpers:
+    """Test the shared audit helper functions."""
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    def test_save_draft_to_audit_creates_file(self, mock_root, tmp_path):
+        """Test _save_draft_to_audit creates file correctly."""
+        mock_root.return_value = tmp_path
+        audit_dir = tmp_path / "audit"
+        audit_dir.mkdir()
+
+        from agentos.workflows.lld.nodes import _save_draft_to_audit
+
+        state: LLDWorkflowState = {
+            "draft_count": 0,
+            "file_counter": 0,
+        }
+
+        file_num, draft_count = _save_draft_to_audit(
+            audit_dir, "# Draft Content", state
+        )
+
+        assert file_num == 1
+        assert draft_count == 1
+        assert (audit_dir / "001-draft.md").exists()
+        assert (audit_dir / "001-draft.md").read_text() == "# Draft Content"
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    def test_save_verdict_to_audit_creates_file(self, mock_root, tmp_path):
+        """Test _save_verdict_to_audit creates file correctly."""
+        mock_root.return_value = tmp_path
+        audit_dir = tmp_path / "audit"
+        audit_dir.mkdir()
+
+        from agentos.workflows.lld.nodes import _save_verdict_to_audit
+
+        state: LLDWorkflowState = {
+            "verdict_count": 0,
+            "file_counter": 0,
+        }
+
+        file_num, verdict_count = _save_verdict_to_audit(
+            audit_dir, "APPROVED", "All good!", state
+        )
+
+        assert file_num == 1
+        assert verdict_count == 1
+        assert (audit_dir / "001-verdict.md").exists()
+        content = (audit_dir / "001-verdict.md").read_text()
+        assert "APPROVED" in content
+        assert "All good!" in content
