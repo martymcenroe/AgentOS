@@ -93,7 +93,7 @@ sequenceDiagram
         User->>VSCode: 9. Review/edit Claude draft
         User->>VSCode: 10. Close editor
         VSCode-->>Python: 11. Editor closed
-        Python->>User: 12. [S]end to Gemini / [R]evise / [M]anual?
+        Python->>User: 12. [G]emini / [R]evise / [S]ave?
         alt User selects Revise
             User->>Python: R + feedback
             Note over Python: Loop to N2
@@ -235,9 +235,9 @@ VS Code opens with the draft. This is your chance to:
 **Prompt:** `Iteration {n} | Draft #{n}`
 
 Choose:
-- **[S]end** - Send to Gemini for review
+- **[G]emini** - Send to Gemini for review
 - **[R]evise** - Send back to Claude with feedback
-- **[M]anual** - File the issue yourself (exits workflow)
+- **[S]ave and exit** - Pause workflow for later (resume with `--resume`)
 
 **If Claude asked for clarification:** Provide feedback via [R]evise option.
 
@@ -402,7 +402,7 @@ The workflow will pause. Wait for quota reset (~24h) or the orchestrator will ro
 **Solutions:**
 1. Review verdict history in audit trail - identify the conflict
 2. Use `[R]evise` at N3 to provide orchestrator guidance
-3. If truly stuck, use `[M]anual` to file manually
+3. If truly stuck, use `[S]ave and exit` to pause, then file manually via `gh issue create`
 
 ---
 
