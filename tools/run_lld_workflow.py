@@ -23,7 +23,7 @@ Options:
     --auto                Auto mode: skip VS Code, auto-send to Gemini
     --mock                Mock mode: use fixtures instead of real APIs
     --resume              Resume interrupted workflow from checkpoint
-    --max-iterations <n>  Maximum review iterations (default: 5)
+    --max-iterations <n>  Maximum review iterations (default: 20)
     --repo <path>         Target repository root (default: auto-detect via git)
     --help                Show this help message
 """
@@ -273,6 +273,7 @@ def run_workflow(
         "auto_mode": auto_mode,
         "mock_mode": mock_mode,
         "iteration_count": 0,
+        "max_iterations": max_iterations,
         "draft_count": 0,
         "verdict_count": 0,
     }
@@ -300,30 +301,81 @@ def run_workflow(
         else:
             input_state = initial_state
 
-        # Stream workflow events
+        # Stream workflow events with iteration extension support
         final_state = None
-        try:
-            for event in app.stream(input_state, config):
-                # Event is dict of {node_name: state_updates}
-                for node_name, state_update in event.items():
-                    final_state = state_update
+        current_max = max_iterations
 
-                    # Check for errors
-                    error = state_update.get("error_message", "")
-                    if error:
-                        if "MANUAL" in error:
-                            print(f"\n[EXIT] {error}")
-                            return 0  # Manual exit is not an error
-                        elif "Max iterations" in error:
-                            print(f"\n[EXIT] {error}")
-                            return 1
-                        else:
-                            print(f"\n[ERROR] {error}")
-                            return 1
+        while True:
+            try:
+                for event in app.stream(input_state, config):
+                    # Event is dict of {node_name: state_updates}
+                    for node_name, state_update in event.items():
+                        final_state = state_update
 
-        except KeyboardInterrupt:
-            print("\n\n[INTERRUPTED] Workflow interrupted. Use --resume to continue.")
-            return 130  # Standard exit code for SIGINT
+                        # Check for errors
+                        error = state_update.get("error_message", "")
+                        if error:
+                            if "MANUAL" in error:
+                                print(f"\n[EXIT] {error}")
+                                return 0  # Manual exit is not an error
+                            elif error.startswith("MAX_ITERATIONS_REACHED:"):
+                                # Parse current max from error
+                                current_max = int(error.split(":")[1])
+                                print(f"\n{'=' * 60}")
+                                print(f"WARNING: MAXIMUM ITERATIONS REACHED ({current_max})")
+                                print(f"{'=' * 60}")
+                                print("\nOptions:")
+                                print("[N] Add more iterations (enter any number, e.g., 10 or 50)")
+                                print("[S]ave and exit - workflow state preserved for resume")
+                                print("[M]anual - exit for manual handling")
+                                print()
+
+                                # Test mode: auto-save
+                                if os.environ.get("AGENTOS_TEST_MODE") == "1":
+                                    choice = "S"
+                                    print(f"Your choice: {choice} (TEST MODE - auto-save)")
+                                else:
+                                    choice = input("Your choice: ").strip().upper()
+
+                                if choice.isdigit():
+                                    additional = int(choice)
+                                    if additional > 0:
+                                        new_max = current_max + additional
+                                        print(f"\n>>> Extending limit to {new_max} iterations, resuming...")
+                                        # Update state with new max and resume
+                                        input_state = None  # Resume from checkpoint
+                                        # We need to update max_iterations in the saved state
+                                        # Get current state and update it
+                                        saved_state = app.get_state(config)
+                                        if saved_state.values:
+                                            app.update_state(
+                                                config,
+                                                {"max_iterations": new_max, "error_message": ""},
+                                            )
+                                        current_max = new_max
+                                        break  # Break inner loop to restart stream
+                                    else:
+                                        print("Invalid number. Must be > 0.")
+                                        return 1
+                                elif choice == "S":
+                                    print("\n>>> Workflow state saved.")
+                                    print(f">>> Resume with: --issue {issue_number} --resume")
+                                    return 0
+                                elif choice == "M":
+                                    return 0
+                                else:
+                                    print("Invalid choice.")
+                                    return 1
+                            else:
+                                print(f"\n[ERROR] {error}")
+                                return 1
+                else:
+                    # Stream completed without MAX_ITERATIONS_REACHED
+                    break
+
+            except KeyboardInterrupt:
+                print("\n\n[INTERRUPTED] Workflow interrupted. Use --resume to continue.")
+                return 130  # Standard exit code for SIGINT
 
     # Check final outcome
     if final_state:
@@ -339,7 +391,7 @@ def run_workflow(
             return 0
 
         error = final_state.get("error_message", "")
-        if error:
+        if error and not error.startswith("MAX_ITERATIONS_REACHED:"):
             print(f"\n[ERROR] {error}")
             return 1
 
@@ -418,8 +470,8 @@ Examples:
     parser.add_argument(
         "--max-iterations",
         type=int,
-        default=5,
-        help="Maximum review iterations (default: 5)",
+        default=20,
+        help="Maximum review iterations (default: 20)",
     )
     parser.add_argument(
         "--repo",

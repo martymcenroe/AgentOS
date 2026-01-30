@@ -37,7 +37,8 @@ class LLDWorkflowState(TypedDict, total=False):
         # Workflow tracking
         audit_dir: Path to docs/audit/active/{issue_number}-lld/.
         file_counter: Sequential number for audit files (001, 002, ...).
-        iteration_count: Total loop iterations (max 5).
+        iteration_count: Total loop iterations.
+        max_iterations: Maximum allowed iterations (default 20, can be extended).
 
         # Current artifacts (compatible with existing nodes)
         lld_draft_path: Path to current draft file.
@@ -76,6 +77,7 @@ class LLDWorkflowState(TypedDict, total=False):
     audit_dir: str
     file_counter: int
     iteration_count: int
+    max_iterations: int
 
     # Current artifacts (compatible with existing nodes)
     lld_draft_path: str

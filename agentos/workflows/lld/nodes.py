@@ -31,8 +31,8 @@ from agentos.workflows.lld.state import HumanDecision, LLDWorkflowState
 # Configuration constants
 GH_CLI_TIMEOUT_SECONDS = 30
 
-# Maximum iterations before forcing exit
-MAX_ITERATIONS = 5
+# Default maximum iterations (can be overridden via state["max_iterations"])
+DEFAULT_MAX_ITERATIONS = 20
 
 
 # ---------------------------------------------------------------------------
@@ -260,7 +260,8 @@ def human_edit(state: LLDWorkflowState) -> dict:
         State updates with next_node and possibly user_feedback.
     """
     iteration = state.get("iteration_count", 0) + 1
-    print(f"\n[N2] Human Edit Gate (Iteration {iteration}/{MAX_ITERATIONS})")
+    max_iterations = state.get("max_iterations", DEFAULT_MAX_ITERATIONS)
+    print(f"\n[N2] Human Edit Gate (Iteration {iteration}/{max_iterations})")
 
     # Auto mode: skip prompt, auto-send
     if state.get("auto_mode"):
@@ -375,13 +376,14 @@ def review(state: LLDWorkflowState) -> dict:
 
     # Check max iterations
     iteration = state.get("iteration_count", 0)
-    if lld_status != "APPROVED" and iteration >= MAX_ITERATIONS:
+    max_iterations = state.get("max_iterations", DEFAULT_MAX_ITERATIONS)
+    if lld_status != "APPROVED" and iteration >= max_iterations:
         return {
             "lld_status": lld_status,
             "gemini_critique": gemini_critique,
             "verdict_count": verdict_count,
             "file_counter": file_num if audit_dir.exists() else state.get("file_counter", 0),
-            "error_message": f"Max iterations ({MAX_ITERATIONS}) reached. Please review manually.",
+            "error_message": f"MAX_ITERATIONS_REACHED:{max_iterations}",
             "next_node": "END",
         }
 
@@ -582,10 +584,11 @@ def _mock_review(state: LLDWorkflowState) -> dict:
     At max iterations, stays BLOCKED and returns error.
     """
     iteration = state.get("iteration_count", 0)
+    max_iterations = state.get("max_iterations", DEFAULT_MAX_ITERATIONS)
     audit_dir = Path(state.get("audit_dir", ""))
 
     # Check max iterations first - don't auto-approve at max
-    if iteration >= MAX_ITERATIONS:
+    if iteration >= max_iterations:
         lld_status = "BLOCKED"
         critique = """## Max Iterations Reached
 
@@ -633,7 +636,7 @@ No blocking issues found.
     # Determine next node
     if lld_status == "APPROVED":
         next_node = "N4_finalize"
-    elif iteration >= MAX_ITERATIONS:
+    elif iteration >= max_iterations:
         next_node = "END"
     else:
         next_node = "N2_human_edit"
@@ -644,5 +647,5 @@ No blocking issues found.
         "verdict_count": verdict_count,
         "file_counter": file_num,
         "next_node": next_node,
-        "error_message": "" if iteration < MAX_ITERATIONS else f"Max iterations ({MAX_ITERATIONS}) reached",
+        "error_message": "" if iteration < max_iterations else f"MAX_ITERATIONS_REACHED:{max_iterations}",
     }
