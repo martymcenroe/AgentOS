@@ -301,6 +301,7 @@ def run_new_workflow(
             "brief_content": "",
             "slug": slug if slug_exists(slug, root) else "",
             "source_idea": source_idea,
+            "repo_root": str(root),
             "audit_dir": "",
             "file_counter": 0,
             "iteration_count": 0,

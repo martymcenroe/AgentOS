@@ -66,8 +66,11 @@ def open_vscode_folder(folder_path: str) -> tuple[bool, str]:
         return False, f"Unexpected error launching VS Code: {type(e).__name__}: {e}"
 
 
-def get_repo_name() -> str:
+def get_repo_name(repo_root: str | None = None) -> str:
     """Get repository name in owner/repo format.
+
+    Args:
+        repo_root: Repository root path to run gh from. If None, uses cwd.
 
     Returns:
         Repository name like "martymcenroe/AgentOS".
@@ -75,11 +78,13 @@ def get_repo_name() -> str:
     Raises:
         RuntimeError: If not in a git repository or no remote.
     """
+    cmd = ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]
     result = subprocess.run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
+        cmd,
         capture_output=True,
         text=True,
         timeout=10,
+        cwd=repo_root,  # Run from target repo directory
     )
     if result.returncode != 0:
         raise RuntimeError(f"Failed to get repo name: {result.stderr}")
@@ -303,9 +308,10 @@ def file_issue(state: IssueWorkflowState) -> dict[str, Any]:
     if not draft_path or not Path(draft_path).exists():
         return {"error_message": "No draft file to file"}
 
-    # Get repo name
+    # Get repo name (use repo_root for cross-repo workflows)
+    repo_root = state.get("repo_root", "")
     try:
-        repo = get_repo_name()
+        repo = get_repo_name(repo_root if repo_root else None)
     except RuntimeError as e:
         return {"error_message": str(e)}
 

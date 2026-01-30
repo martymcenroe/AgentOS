@@ -46,6 +46,7 @@ class IssueWorkflowState(TypedDict, total=False):
         brief_content: Loaded brief text content.
         slug: Derived from brief filename, used for audit directory.
         source_idea: Path to original idea in ideas/active/ (for cleanup after filing).
+        repo_root: Target repository root path (for cross-repo workflows).
 
         # Workflow tracking
         audit_dir: Path to docs/audit/active/{slug}/.
@@ -78,6 +79,7 @@ class IssueWorkflowState(TypedDict, total=False):
     brief_content: str
     slug: str
     source_idea: str
+    repo_root: str
 
     # Workflow tracking
     audit_dir: str
