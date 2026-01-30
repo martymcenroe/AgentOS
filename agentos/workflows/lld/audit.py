@@ -33,7 +33,7 @@ class ApprovedMetadata(TypedDict):
 
 
 # Base directories relative to repo root
-AUDIT_ACTIVE_DIR = Path("docs/audit/active")
+AUDIT_ACTIVE_DIR = Path("docs/lineage/active")
 LLD_ACTIVE_DIR = Path("docs/lld/active")
 LLD_DONE_DIR = Path("docs/lld/done")
 LLD_STATUS_FILE = Path("docs/lld/lld-status.json")

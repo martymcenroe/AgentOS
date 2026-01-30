@@ -32,8 +32,8 @@ class FiledMetadata(TypedDict):
 
 
 # Base directories relative to repo root
-AUDIT_ACTIVE_DIR = Path("docs/audit/active")
-AUDIT_DONE_DIR = Path("docs/audit/done")
+AUDIT_ACTIVE_DIR = Path("docs/lineage/active")
+AUDIT_DONE_DIR = Path("docs/lineage/done")
 
 # Ideas directories (staging area for workflow)
 IDEAS_ACTIVE_DIR = Path("ideas/active")
