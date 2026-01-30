@@ -355,24 +355,25 @@ def file_issue(state: IssueWorkflowState) -> dict[str, Any]:
                 verdict_count,
             )
 
-            # Move to done/
-            done_dir = move_to_done(audit_dir, issue_number, slug)
+            # Move to done/ (use repo_root for cross-repo workflows)
+            repo_root_path = Path(repo_root) if repo_root else None
+            done_dir = move_to_done(audit_dir, issue_number, slug, repo_root_path)
             print(f">>> Audit trail moved to: {done_dir}")
 
             # Move source idea to done/ if workflow was started from --select
             source_idea = state.get("source_idea", "")
             if source_idea:
                 try:
-                    idea_done_path = move_idea_to_done(source_idea, issue_number)
+                    idea_done_path = move_idea_to_done(source_idea, issue_number, repo_root_path)
                     print(f">>> Idea moved to: {idea_done_path}")
                 except FileNotFoundError:
                     print(f"Warning: Source idea not found: {source_idea}")
                 except Exception as e:
                     print(f"Warning: Failed to move idea: {e}")
 
-            # Batch commit
+            # Batch commit (use repo_root for cross-repo workflows)
             try:
-                batch_commit(done_dir, issue_number)
+                batch_commit(done_dir, issue_number, repo_root_path)
                 print(f">>> Committed audit trail for #{issue_number}")
             except subprocess.CalledProcessError as e:
                 print(f"Warning: Failed to commit audit trail: {e}")

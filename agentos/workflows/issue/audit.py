@@ -240,18 +240,19 @@ def move_to_done(
     return done_dir
 
 
-def batch_commit(audit_dir: Path, issue_number: int) -> None:
+def batch_commit(audit_dir: Path, issue_number: int, repo_root: Path | None = None) -> None:
     """Commit all audit files in a single commit.
 
     Args:
         audit_dir: Path to the audit directory (in done/).
         issue_number: GitHub issue number for commit message.
+        repo_root: Repository root path. Auto-detected if None.
     """
-    repo_root = get_repo_root()
+    root = repo_root or get_repo_root()
 
     # Stage all files in audit_dir
     subprocess.run(
-        ["git", "-C", str(repo_root), "add", str(audit_dir)],
+        ["git", "-C", str(root), "add", str(audit_dir)],
         check=True,
         timeout=30,
     )
@@ -259,7 +260,7 @@ def batch_commit(audit_dir: Path, issue_number: int) -> None:
     # Commit
     commit_msg = f"docs(audit): add audit trail for issue #{issue_number}"
     subprocess.run(
-        ["git", "-C", str(repo_root), "commit", "-m", commit_msg],
+        ["git", "-C", str(root), "commit", "-m", commit_msg],
         check=True,
         timeout=30,
     )

@@ -66,8 +66,9 @@ def load_brief(state: IssueWorkflowState) -> dict[str, Any]:
             "error_message": f"Could not generate valid slug from: {brief_file}",
         }
 
-    # Check for slug collision
-    repo_root = get_repo_root()
+    # Check for slug collision (use repo_root from state for cross-repo workflows)
+    repo_root_str = state.get("repo_root", "")
+    repo_root = Path(repo_root_str) if repo_root_str else get_repo_root()
     if slug_exists(slug, repo_root):
         # Collision detected - this will be handled by the graph's
         # interrupt mechanism. Return state indicating collision.
@@ -133,8 +134,9 @@ def handle_slug_collision(
                 "error_message": "No new slug provided",
             }
 
-        # Validate new slug doesn't collide
-        repo_root = get_repo_root()
+        # Validate new slug doesn't collide (use repo_root from state for cross-repo workflows)
+        repo_root_str = state.get("repo_root", "")
+        repo_root = Path(repo_root_str) if repo_root_str else get_repo_root()
         if slug_exists(new_slug, repo_root):
             return {
                 "error_message": f"SLUG_COLLISION:{new_slug}",
