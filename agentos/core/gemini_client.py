@@ -11,6 +11,8 @@ Ported from tools/gemini-rotate.py for programmatic use.
 
 import json
 import os
+import shutil
+import subprocess
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -81,12 +83,13 @@ AUTH_ERROR_PATTERNS = [
 
 @dataclass
 class Credential:
-    """A Gemini credential (API key)."""
+    """A Gemini credential (API key or OAuth)."""
 
     name: str
-    key: str
+    key: str  # API key for api_key type, empty for oauth type
     enabled: bool = True
     account_name: str = ""
+    cred_type: str = "api_key"  # "api_key" or "oauth"
 
 
 @dataclass
@@ -159,6 +162,90 @@ class GeminiClient:
         self.state_file = state_file
         self._credentials: Optional[list[Credential]] = None
         self._state: Optional[RotationState] = None
+        self._gemini_cli = self._find_gemini_cli()
+
+    def _find_gemini_cli(self) -> Optional[str]:
+        """Find the gemini CLI executable."""
+        cli = shutil.which("gemini")
+        if cli:
+            return cli
+        # Try common locations on Windows
+        npm_gemini = Path.home() / "AppData" / "Roaming" / "npm" / "gemini.cmd"
+        if npm_gemini.exists():
+            return str(npm_gemini)
+        npm_gemini_unix = Path.home() / "AppData" / "Roaming" / "npm" / "gemini"
+        if npm_gemini_unix.exists():
+            return str(npm_gemini_unix)
+        return None
+
+    def _invoke_via_cli(
+        self,
+        system_instruction: str,
+        content: str,
+    ) -> tuple[bool, str, str]:
+        """
+        Invoke Gemini via CLI (for OAuth credentials).
+
+        The CLI doesn't have a --system flag, so we prepend the system
+        instruction to the content with clear delineation.
+
+        Returns:
+            Tuple of (success, response_text, error_message)
+        """
+        if not self._gemini_cli:
+            return False, "", "Gemini CLI not found"
+
+        # Combine system instruction and content
+        # Use clear markers so the model knows the difference
+        import tempfile
+
+        full_prompt = (
+            f"<system_instruction>\n{system_instruction}\n</system_instruction>\n\n"
+            f"<user_content>\n{content}\n</user_content>"
+        )
+
+        prompt_file = None
+
+        try:
+            # Write combined prompt to temp file
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".txt", delete=False, encoding="utf-8"
+            ) as f:
+                f.write(full_prompt)
+                prompt_file = f.name
+
+            result = subprocess.run(
+                [
+                    self._gemini_cli,
+                    "--prompt",
+                    f"@{prompt_file}",
+                    "--model",
+                    self.model,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120,  # 2 minute timeout
+            )
+
+            if result.returncode == 0 and result.stdout:
+                return True, result.stdout.strip(), ""
+            else:
+                error_msg = (
+                    result.stderr.strip() or result.stdout.strip() or "Unknown error"
+                )
+                return False, "", error_msg
+
+        except subprocess.TimeoutExpired:
+            return False, "", "CLI timeout (120s)"
+        except Exception as e:
+            return False, "", str(e)
+        finally:
+            # Clean up temp file
+            if prompt_file:
+                try:
+                    os.unlink(prompt_file)
+                except OSError:
+                    pass
 
     def invoke(
         self,
@@ -225,42 +312,76 @@ class GeminiClient:
                 total_attempts += 1
 
                 try:
-                    # Configure API key
-                    genai.configure(api_key=cred.key)
-
-                    # Create model instance
-                    model = genai.GenerativeModel(
-                        model_name=self.model,
-                        system_instruction=system_instruction,
-                    )
-
-                    # Make the API call
-                    response = model.generate_content(content)
-
-                    # Check for successful response
-                    if response.text:
-                        # Verify model used (if available in response metadata)
-                        model_verified = self.model  # Default to requested model
-
-                        # Update state on success
-                        state.last_success = cred.name
-                        state.last_success_time = datetime.now(timezone.utc).isoformat()
-                        self._save_state(state)
-
-                        duration_ms = int((time.time() - start_time) * 1000)
-
-                        return GeminiCallResult(
-                            success=True,
-                            response=response.text,
-                            raw_response=str(response),
-                            error_type=None,
-                            error_message=None,
-                            credential_used=cred.name,
-                            rotation_occurred=rotation_occurred,
-                            attempts=total_attempts,
-                            duration_ms=duration_ms,
-                            model_verified=model_verified,
+                    # Use different approach based on credential type
+                    if cred.cred_type == "oauth":
+                        # OAuth: use CLI subprocess
+                        success, response_text, error_msg = self._invoke_via_cli(
+                            system_instruction, content
                         )
+                        if success:
+                            # Update state on success
+                            state.last_success = cred.name
+                            state.last_success_time = datetime.now(
+                                timezone.utc
+                            ).isoformat()
+                            self._save_state(state)
+
+                            duration_ms = int((time.time() - start_time) * 1000)
+
+                            return GeminiCallResult(
+                                success=True,
+                                response=response_text,
+                                raw_response=response_text,
+                                error_type=None,
+                                error_message=None,
+                                credential_used=cred.name,
+                                rotation_occurred=rotation_occurred,
+                                attempts=total_attempts,
+                                duration_ms=duration_ms,
+                                model_verified=self.model,
+                            )
+                        else:
+                            # Raise exception to trigger error handling
+                            raise RuntimeError(error_msg)
+                    else:
+                        # API key: use SDK
+                        genai.configure(api_key=cred.key)
+
+                        # Create model instance
+                        model = genai.GenerativeModel(
+                            model_name=self.model,
+                            system_instruction=system_instruction,
+                        )
+
+                        # Make the API call
+                        response = model.generate_content(content)
+
+                        # Check for successful response
+                        if response.text:
+                            # Verify model used (if available in response metadata)
+                            model_verified = self.model  # Default to requested model
+
+                            # Update state on success
+                            state.last_success = cred.name
+                            state.last_success_time = datetime.now(
+                                timezone.utc
+                            ).isoformat()
+                            self._save_state(state)
+
+                            duration_ms = int((time.time() - start_time) * 1000)
+
+                            return GeminiCallResult(
+                                success=True,
+                                response=response.text,
+                                raw_response=str(response),
+                                error_type=None,
+                                error_message=None,
+                                credential_used=cred.name,
+                                rotation_occurred=rotation_occurred,
+                                attempts=total_attempts,
+                                duration_ms=duration_ms,
+                                model_verified=model_verified,
+                            )
 
                 except Exception as e:
                     error_str = str(e)
@@ -305,7 +426,11 @@ class GeminiClient:
         )
 
     def _load_credentials(self) -> list[Credential]:
-        """Load credentials from config file."""
+        """Load credentials from config file.
+
+        OAuth credentials are loaded first (they have higher quota limits),
+        followed by API key credentials.
+        """
         if self._credentials is not None:
             return self._credentials
 
@@ -318,16 +443,35 @@ class GeminiClient:
         with open(self.credentials_file, encoding="utf-8") as f:
             data = json.load(f)
 
-        self._credentials = [
-            Credential(
-                name=c.get("name", "unnamed"),
-                key=c.get("key", ""),
-                enabled=c.get("enabled", True),
-                account_name=c.get("account-name", ""),
-            )
-            for c in data.get("credentials", [])
-        ]
+        credentials = []
 
+        # Load OAuth credentials first (higher quota limits)
+        for c in data.get("credentials", []):
+            if c.get("type") == "oauth" and c.get("enabled", True):
+                credentials.append(
+                    Credential(
+                        name=c.get("name", "unnamed"),
+                        key="",  # OAuth doesn't use API key
+                        enabled=True,
+                        account_name=c.get("account-name", ""),
+                        cred_type="oauth",
+                    )
+                )
+
+        # Then load API key credentials
+        for c in data.get("credentials", []):
+            if c.get("type") == "api_key" and c.get("key") and c.get("enabled", True):
+                credentials.append(
+                    Credential(
+                        name=c.get("name", "unnamed"),
+                        key=c.get("key", ""),
+                        enabled=True,
+                        account_name=c.get("account-name", ""),
+                        cred_type="api_key",
+                    )
+                )
+
+        self._credentials = credentials
         return self._credentials
 
     def _load_state(self) -> RotationState:

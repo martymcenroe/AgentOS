@@ -115,6 +115,7 @@ def design_lld_node(state: AgentState) -> dict[str, Any]:
                     "lld_draft_path": "",
                     "lld_content": "",
                     "iteration_count": iteration_count,
+                    "error_message": str(e),
                 }
 
         # Step 2: Load system instruction from 0705-lld-generator.md
@@ -144,6 +145,7 @@ def design_lld_node(state: AgentState) -> dict[str, Any]:
                 "lld_draft_path": "",
                 "lld_content": "",
                 "iteration_count": iteration_count,
+                "error_message": str(e),
             }
 
         # Step 3: Initialize GeminiClient with GOVERNANCE_MODEL
@@ -195,6 +197,7 @@ def design_lld_node(state: AgentState) -> dict[str, Any]:
                 "lld_draft_path": "",
                 "lld_content": "",
                 "iteration_count": iteration_count,
+                "error_message": result.error_message or "Gemini API error",
             }
 
         # Step 5: Write draft to disk (use repo_root for cross-repo workflows)
@@ -225,6 +228,7 @@ def design_lld_node(state: AgentState) -> dict[str, Any]:
                 "lld_draft_path": "",
                 "lld_content": "",
                 "iteration_count": iteration_count,
+                "error_message": f"File write failed: {e}",
             }
 
         # Step 6: Log success to audit trail
@@ -284,6 +288,7 @@ def design_lld_node(state: AgentState) -> dict[str, Any]:
             "lld_draft_path": "",
             "lld_content": "",
             "iteration_count": iteration_count,
+            "error_message": f"Model configuration error: {e}",
         }
 
     except Exception as e:
@@ -311,6 +316,7 @@ def design_lld_node(state: AgentState) -> dict[str, Any]:
             "lld_draft_path": "",
             "lld_content": "",
             "iteration_count": iteration_count,
+            "error_message": f"Unexpected error: {e}",
         }
 
 

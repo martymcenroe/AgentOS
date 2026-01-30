@@ -228,8 +228,10 @@ def design(state: LLDWorkflowState) -> dict:
     lld_draft_path = result.get("lld_draft_path", "")
 
     if design_status == "FAILED":
+        error_msg = result.get("error_message", "Unknown error")
+        print(f"    [ERROR] Designer failed: {error_msg}")
         return {
-            "error_message": "Designer node failed",
+            "error_message": f"Designer node failed: {error_msg}",
             "design_status": "FAILED",
         }
 
