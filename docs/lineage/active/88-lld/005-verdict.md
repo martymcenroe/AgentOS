@@ -1,0 +1,3 @@
+# Governance Verdict: BLOCK
+
+The LLD proposes a solid "The Librarian" feature using a localized RAG approach with optional dependencies, which aligns well with the project's lightweight philosophy. The architectural separation (Adapter pattern) is commendable. However, strictly enforcing "Worktree Scope" requires the CLI tool to robustly resolve the project root rather than relying on the Current Working Directory (CWD). Additionally, limits on file ingestion are needed to prevent resource exhaustion.

@@ -1,0 +1,3 @@
+# Governance Verdict: BLOCK
+
+The LLD proposes a structured naming convention using a deterministic wordlist. However, the design contains a **Critical Logical Flaw** regarding the wordlist size (80 words) and collision handling strategy. If uniqueness is enforced against both `active` and `done` directories (as implied), the system will enter an infinite loop or fail completely after the 80th issue is created. This must be fixed before implementation.

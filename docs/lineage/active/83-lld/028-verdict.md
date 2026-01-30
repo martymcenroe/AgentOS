@@ -1,0 +1,3 @@
+# Governance Verdict: BLOCK
+
+The LLD provides a strong security foundation for file naming (sanitization, deterministic hashing) but contains a **critical architectural flaw** regarding scalability. The proposed word generation logic coupled with the small wordlist size (~80 words) effectively limits the tool to ~80 total issues per repository before crashing. This must be addressed before implementation.
