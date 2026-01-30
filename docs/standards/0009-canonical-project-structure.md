@@ -111,6 +111,11 @@ docs/
 │   └── (YYYY-MM-DD.md files)
 ├── audit-results/              # Historical audit outputs (90002)
 │   └── (YYYY-MM-DD.md files)
+├── lineage/                    # Workflow artifacts (design review trail)
+│   ├── active/                 # Issues currently in design review
+│   │   └── {issue-id}/         # Per-issue folder with numbered artifacts
+│   └── done/                   # Completed (filed to GitHub)
+│       └── {issue-id}/
 ├── media/                      # Artwork, videos, tutorials (4xxxx)
 ├── legal/                      # ToS, privacy policy, regulatory compliance
 ├── design/                     # UI mockups, icon prompts, style guides
@@ -120,8 +125,33 @@ docs/
 **Key rules:**
 - `lld/active/` and `lld/done/` - LLDs move from active to done when implemented
 - `reports/active/` and `reports/done/` - Reports move when merged
-- Files are **FLAT** within active/done (no subdirectories per issue)
+- `lineage/active/` and `lineage/done/` - Design review artifacts move when issue is filed
+- Files in lld/ and reports/ are **FLAT** (no subdirectories per issue)
+- Files in lineage/ are **NESTED** by issue (each issue gets its own folder)
 - Session logs and audit results use date-based names, not numbered
+
+### Lineage Structure (`docs/lineage/`)
+
+The lineage folder captures the design review workflow - the "paper trail" showing how each issue evolved from idea through Gemini review to filing.
+
+```
+docs/lineage/
+├── active/                     # Issues currently in design review
+│   └── {issue-id}/             # e.g., 4-footnote-handling/
+│       ├── 001-brief.md        # Initial idea/problem statement
+│       ├── 002-draft.md        # First LLD draft (Claude)
+│       ├── 003-verdict.md      # Gemini review verdict
+│       ├── 004-draft.md        # Revised draft after feedback
+│       ├── 005-verdict.md      # Second review verdict
+│       └── 006-filed.json      # Filing metadata
+└── done/                       # Completed (filed to GitHub)
+    └── {issue-id}/
+```
+
+**Naming convention:**
+- Folder: `{issue-number}-{short-description}/` (e.g., `4-footnote-handling/`)
+- Files: `{NNN}-{type}.{ext}` where NNN is sequence number (001, 002, ...)
+- Types: `brief`, `draft`, `verdict`, `filed`
 
 ---
 
