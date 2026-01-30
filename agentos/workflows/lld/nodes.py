@@ -266,9 +266,16 @@ def human_edit(state: LLDWorkflowState) -> dict:
     # Auto mode: skip prompt, auto-send
     if state.get("auto_mode"):
         print("    Auto mode: sending to review...")
+        # Read LLD from disk (same as manual mode)
+        lld_draft_path = state.get("lld_draft_path", "")
+        if lld_draft_path and Path(lld_draft_path).exists():
+            lld_content = Path(lld_draft_path).read_text(encoding="utf-8")
+        else:
+            lld_content = state.get("lld_content", "")
         return {
             "iteration_count": iteration,
             "next_node": "N3_review",
+            "lld_content": lld_content,
             "user_feedback": "",
         }
 
@@ -425,7 +432,16 @@ def finalize(state: LLDWorkflowState) -> dict:
     issue_number = state.get("issue_id", state.get("issue_number", 0))
     issue_title = state.get("issue_title", "")
     lld_content = state.get("lld_content", "")
+    lld_draft_path = state.get("lld_draft_path", "")
     verdict_count = state.get("verdict_count", 1)
+
+    # Safety: if lld_content is empty, read from draft path
+    if not lld_content and lld_draft_path and Path(lld_draft_path).exists():
+        print(f"    Reading LLD from disk: {lld_draft_path}")
+        lld_content = Path(lld_draft_path).read_text(encoding="utf-8")
+
+    if not lld_content:
+        return {"error_message": "No LLD content to save - lld_content is empty and no draft file found"}
 
     # Get repo_root from state for cross-repo workflows
     repo_root_str = state.get("repo_root", "")

@@ -395,11 +395,12 @@ class TestMaxIterations:
 
         from agentos.workflows.lld.nodes import review
 
-        # State at max iterations
+        # State at max iterations (explicitly set max_iterations for test)
         state: LLDWorkflowState = {
             "issue_number": 42,
             "mock_mode": True,
             "iteration_count": 5,  # At max
+            "max_iterations": 5,  # Explicit max for test
             "audit_dir": str(tmp_path / "docs" / "audit" / "active" / "42-lld"),
             "verdict_count": 4,
         }
@@ -410,7 +411,7 @@ class TestMaxIterations:
         # Review should reject and set error
         result = review(state)
 
-        assert "Max iterations" in result.get("error_message", "")
+        assert "MAX_ITERATIONS" in result.get("error_message", "")
         assert result.get("next_node") == "END"
 
 
@@ -694,6 +695,7 @@ class TestProductionReview:
             "issue_id": 42,
             "lld_content": "# LLD Content",
             "iteration_count": 5,  # At max
+            "max_iterations": 5,  # Explicit max for test
             "verdict_count": 4,
             "audit_dir": str(tmp_path / "docs" / "audit" / "active" / "42-lld"),
             "mock_mode": False,
@@ -701,8 +703,226 @@ class TestProductionReview:
 
         result = review(state)
 
-        assert "Max iterations" in result["error_message"]
+        assert "MAX_ITERATIONS" in result["error_message"]
         assert result["next_node"] == "END"
+
+
+class TestAutoModeLLDContent:
+    """Test that auto mode properly reads and saves LLD content.
+
+    These tests specifically verify the bug where auto_mode=True was
+    not reading LLD content from disk, resulting in empty LLDs being
+    sent to review and saved to the final location.
+
+    Bug scenario:
+    1. designer.py generates LLD and saves to disk, returns empty lld_content
+    2. human_edit in auto mode skipped reading from disk
+    3. review received empty content
+    4. finalize saved empty/minimal content
+
+    The fix ensures human_edit reads from disk in auto mode.
+    """
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    def test_auto_mode_reads_lld_from_disk(self, mock_root, tmp_path):
+        """Test human_edit in auto mode reads LLD from draft file.
+
+        This is the core bug fix: when designer saves LLD to disk but
+        returns empty lld_content, auto mode must read from disk.
+        """
+        mock_root.return_value = tmp_path
+
+        # Create draft file with actual content
+        drafts_dir = tmp_path / "docs" / "LLDs" / "drafts"
+        drafts_dir.mkdir(parents=True)
+        draft_path = drafts_dir / "42-LLD.md"
+        draft_content = """# LLD-042: Real Feature
+
+## 1. Context & Goal
+
+This is the actual LLD content that was saved to disk.
+
+## 2. Proposed Changes
+
+Real implementation details here.
+"""
+        draft_path.write_text(draft_content, encoding="utf-8")
+
+        from agentos.workflows.lld.nodes import human_edit
+
+        # Simulate state where designer returned empty lld_content
+        # but saved actual content to lld_draft_path
+        state: LLDWorkflowState = {
+            "issue_number": 42,
+            "auto_mode": True,
+            "mock_mode": False,  # Not using mock mode!
+            "iteration_count": 0,
+            "lld_content": "",  # Empty! Bug scenario
+            "lld_draft_path": str(draft_path),  # But path exists
+        }
+
+        result = human_edit(state)
+
+        # Key assertion: lld_content must be populated from disk
+        assert result.get("lld_content") == draft_content
+        assert "## 1. Context & Goal" in result.get("lld_content", "")
+        assert len(result.get("lld_content", "")) > 100
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    def test_auto_mode_e2e_saves_actual_content(self, mock_root, tmp_path):
+        """Test full auto mode E2E saves real LLD content, not just header.
+
+        This verifies the complete flow: design → human_edit → review → finalize
+        results in a final LLD with actual content.
+        """
+        mock_root.return_value = tmp_path
+
+        # Create necessary directories
+        (tmp_path / "docs" / "lld" / "active").mkdir(parents=True)
+        (tmp_path / "docs" / "LLDs" / "drafts").mkdir(parents=True)
+        (tmp_path / "docs" / "audit" / "active").mkdir(parents=True)
+
+        from agentos.workflows.lld.nodes import (
+            fetch_issue,
+            design,
+            human_edit,
+            review,
+            finalize,
+        )
+
+        # Run full workflow in auto + mock mode
+        state: LLDWorkflowState = {
+            "issue_number": 99,
+            "context_files": [],
+            "auto_mode": True,
+            "mock_mode": True,
+            "iteration_count": 0,
+        }
+
+        # N0: Fetch
+        result = fetch_issue(state)
+        state.update(result)
+
+        # N1: Design (creates draft with content)
+        result = design(state)
+        state.update(result)
+
+        # Verify design created real content
+        assert state.get("lld_draft_path")
+        assert Path(state.get("lld_draft_path")).exists()
+        draft_on_disk = Path(state.get("lld_draft_path")).read_text(encoding="utf-8")
+        assert "## 1. Context & Goal" in draft_on_disk
+
+        # N2: Human edit (auto mode - should read from disk)
+        result = human_edit(state)
+        state.update(result)
+
+        # KEY ASSERTION: lld_content must have the actual content
+        assert "## 1. Context & Goal" in state.get("lld_content", "")
+        assert len(state.get("lld_content", "")) > 200
+
+        # N3: Review (first iteration rejects in mock)
+        result = review(state)
+        state.update(result)
+
+        # N2: Human edit again
+        result = human_edit(state)
+        state.update(result)
+
+        # Content should still be present
+        assert "## 1. Context & Goal" in state.get("lld_content", "")
+
+        # N3: Review (second iteration approves in mock)
+        result = review(state)
+        state.update(result)
+        assert state.get("lld_status") == "APPROVED"
+
+        # N4: Finalize
+        result = finalize(state)
+        state.update(result)
+
+        # CRITICAL: Final saved LLD must have actual content
+        final_path = Path(state.get("final_lld_path"))
+        assert final_path.exists()
+
+        final_content = final_path.read_text(encoding="utf-8")
+
+        # Must contain original LLD sections, not just review header
+        assert "## 1. Context & Goal" in final_content
+        assert "## 2. Proposed Changes" in final_content
+
+        # Review header should also be present (embedded)
+        assert "Review Summary" in final_content or "APPROVED" in final_content
+
+        # Content should be substantial, not just ~150 bytes
+        assert len(final_content) > 500, f"Final LLD too short: {len(final_content)} bytes"
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    def test_finalize_reads_from_disk_when_content_empty(self, mock_root, tmp_path):
+        """Test finalize safety check reads from disk if lld_content is empty."""
+        mock_root.return_value = tmp_path
+
+        # Create directories and draft file
+        (tmp_path / "docs" / "lld" / "active").mkdir(parents=True)
+        (tmp_path / "docs" / "audit" / "active" / "42-lld").mkdir(parents=True)
+
+        draft_content = """# LLD-042: Recovery Test
+
+## 1. Context & Goal
+This content should be recovered from disk.
+
+## 2. Implementation
+Details here.
+"""
+        draft_path = tmp_path / "draft.md"
+        draft_path.write_text(draft_content, encoding="utf-8")
+
+        from agentos.workflows.lld.nodes import finalize
+
+        # Simulate buggy state where lld_content is empty
+        state: LLDWorkflowState = {
+            "issue_id": 42,
+            "issue_title": "Test Issue",
+            "lld_content": "",  # Empty - the bug scenario
+            "lld_draft_path": str(draft_path),
+            "verdict_count": 1,
+            "audit_dir": str(tmp_path / "docs" / "audit" / "active" / "42-lld"),
+        }
+
+        result = finalize(state)
+
+        # Should succeed, not error
+        assert result.get("error_message") == ""
+        assert result.get("final_lld_path")
+
+        # Final file should have actual content
+        final_path = Path(result.get("final_lld_path"))
+        final_content = final_path.read_text(encoding="utf-8")
+        assert "## 1. Context & Goal" in final_content
+        assert "recovered from disk" in final_content
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    def test_finalize_errors_when_no_content_available(self, mock_root, tmp_path):
+        """Test finalize returns error when both content and file are missing."""
+        mock_root.return_value = tmp_path
+
+        (tmp_path / "docs" / "lld" / "active").mkdir(parents=True)
+
+        from agentos.workflows.lld.nodes import finalize
+
+        state: LLDWorkflowState = {
+            "issue_id": 42,
+            "issue_title": "Test Issue",
+            "lld_content": "",  # Empty
+            "lld_draft_path": "/nonexistent/path.md",  # Doesn't exist
+            "verdict_count": 1,
+        }
+
+        result = finalize(state)
+
+        # Should return error
+        assert "No LLD content" in result.get("error_message", "")
+        assert not result.get("final_lld_path")
 
 
 class TestSharedAuditHelpers:
