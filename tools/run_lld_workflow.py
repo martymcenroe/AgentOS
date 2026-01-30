@@ -225,6 +225,7 @@ def run_workflow(
     mock_mode: bool = False,
     resume: bool = False,
     max_iterations: int = 5,
+    repo_root: Path | None = None,
 ) -> int:
     """Run the LLD governance workflow.
 
@@ -235,6 +236,7 @@ def run_workflow(
         mock_mode: If True, use fixtures instead of real APIs.
         resume: If True, resume from checkpoint.
         max_iterations: Maximum review iterations.
+        repo_root: Target repository root path (for cross-repo workflows).
 
     Returns:
         Exit code (0 for success, non-zero for error).
@@ -269,6 +271,7 @@ def run_workflow(
     initial_state: LLDWorkflowState = {
         "issue_number": issue_number,
         "context_files": context_files or [],
+        "repo_root": str(repo_root) if repo_root else "",
         "auto_mode": auto_mode,
         "mock_mode": mock_mode,
         "iteration_count": 0,
@@ -474,6 +477,7 @@ Examples:
             mock_mode=args.mock,
             resume=args.resume,
             max_iterations=args.max_iterations,
+            repo_root=repo_root,
         )
 
     # Require --issue if not --select or --audit
@@ -487,6 +491,7 @@ Examples:
         mock_mode=args.mock,
         resume=args.resume,
         max_iterations=args.max_iterations,
+        repo_root=repo_root,
     )
 
 

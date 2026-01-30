@@ -26,6 +26,7 @@ class LLDWorkflowState(TypedDict, total=False):
         # Input
         issue_number: GitHub issue number to create LLD for.
         context_files: Paths to additional context files (--context flag).
+        repo_root: Target repository root path (for cross-repo workflows).
 
         # Issue content (populated by N0)
         issue_id: Same as issue_number (for compatibility with existing nodes).
@@ -63,6 +64,7 @@ class LLDWorkflowState(TypedDict, total=False):
     # Input
     issue_number: int
     context_files: list[str]
+    repo_root: str
 
     # Issue content
     issue_id: int  # Alias for compatibility with designer.py/governance.py

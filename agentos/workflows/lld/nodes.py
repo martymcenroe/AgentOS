@@ -542,8 +542,9 @@ def _mock_design(state: LLDWorkflowState) -> dict:
     # Save to audit trail using shared helper
     file_num, draft_count = _save_draft_to_audit(audit_dir, mock_lld, state)
 
-    # Save to drafts directory for VS Code to open
-    repo_root = get_repo_root()
+    # Save to drafts directory for VS Code to open (use repo_root from state for cross-repo)
+    repo_root_str = state.get("repo_root", "")
+    repo_root = Path(repo_root_str) if repo_root_str else get_repo_root()
     drafts_dir = repo_root / "docs" / "LLDs" / "drafts"
     drafts_dir.mkdir(parents=True, exist_ok=True)
     draft_path = drafts_dir / f"{issue_number}-LLD.md"
