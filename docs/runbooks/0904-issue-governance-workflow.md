@@ -1,8 +1,8 @@
 # 0904 - Issue Governance Workflow
 
 **Category:** Runbook / Operational Procedure
-**Version:** 2.1
-**Last Updated:** 2026-01-28
+**Version:** 2.2
+**Last Updated:** 2026-01-29
 
 ---
 
@@ -181,7 +181,19 @@ Select idea [1-2, q]: _
 
 After the issue is filed, the idea file is automatically moved to `ideas/done/{issue#}-name.md`.
 
-**Option B: Direct path**
+**Option B: Cross-repo usage**
+
+Run the workflow from AgentOS against a different repository:
+
+```bash
+poetry run --directory /c/Users/mcwiz/Projects/AgentOS python \
+  /c/Users/mcwiz/Projects/AgentOS/tools/run_issue_workflow.py \
+  --repo /c/Users/mcwiz/Projects/YourProject --select
+```
+
+The `--repo` flag specifies the target repository. This is required when running from a different working directory because `poetry run --directory` changes the working directory to AgentOS.
+
+**Option C: Direct path**
 
 Specify any brief file directly:
 
@@ -422,3 +434,4 @@ The workflow will pause. Wait for quota reset (~24h) or the orchestrator will ro
 | 1.0 | 2026-01-26 | Initial version |
 | 2.0 | 2026-01-28 | Auto-routing at N5, cumulative verdict history, recursion limit handling, stronger Claude instructions |
 | 2.1 | 2026-01-28 | Add `--select` flag for interactive idea picker, document ideas/ folder as staging area |
+| 2.2 | 2026-01-29 | Add `--repo` flag for cross-repo workflow usage |

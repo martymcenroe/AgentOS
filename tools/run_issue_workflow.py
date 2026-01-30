@@ -8,12 +8,14 @@ Usage:
     python tools/run_issue_workflow.py --select
     python tools/run_issue_workflow.py --select --auto
     poetry run python tools/run_issue_workflow.py --resume <file.md>
+    poetry run python tools/run_issue_workflow.py --repo /path/to/repo --select
 
 Options:
     --brief <file>    Path to ideation notes (starts new workflow)
     --select          Interactive idea picker from ideas/active/
     --resume <file>   Resume interrupted workflow by brief filename
     --auto            Auto mode: skip VS Code, auto-send to Gemini, open done/ at end
+    --repo <path>     Target repository root (default: auto-detect via git)
     --help            Show this help message
 """
 
@@ -67,16 +69,19 @@ def extract_idea_title(idea_file: Path) -> str:
     return "Untitled"
 
 
-def select_idea_interactive() -> tuple[str, bool] | None:
+def select_idea_interactive(repo_root: Path | None = None) -> tuple[str, bool] | None:
     """Show interactive picker for ideas in ideas/active/.
+
+    Args:
+        repo_root: Repository root path. Auto-detected if None.
 
     Returns:
         Tuple of (path_to_idea, from_ideas_folder) if selected, None if quit.
         from_ideas_folder is True to indicate the workflow should track source_idea.
     """
-    repo_root = get_repo_root()
-    ideas = list_ideas(repo_root)
-    encrypted_count = count_encrypted_ideas(repo_root)
+    root = repo_root or get_repo_root()
+    ideas = list_ideas(root)
+    encrypted_count = count_encrypted_ideas(root)
 
     if not ideas and encrypted_count == 0:
         print("\nNo ideas found in ideas/active/")
@@ -182,18 +187,26 @@ def prompt_slug_collision(slug: str) -> tuple[SlugCollisionChoice, str]:
             print("Invalid choice. Please enter R, N, C, or A.")
 
 
-def run_new_workflow(brief_file: str, source_idea: str = "") -> int:
+def run_new_workflow(
+    brief_file: str,
+    source_idea: str = "",
+    repo_root: Path | None = None,
+) -> int:
     """Run a new issue creation workflow.
 
     Args:
         brief_file: Path to the brief file.
         source_idea: Path to original idea in ideas/active/ (for cleanup after filing).
+        repo_root: Repository root path. Auto-detected if None.
 
     Returns:
         Exit code (0 for success, 1 for error).
     """
+    # Resolve repo root
+    root = repo_root or get_repo_root()
+
     # Ensure audit directories exist
-    ensure_audit_directories()
+    ensure_audit_directories(root)
 
     # Check if brief file exists
     if not Path(brief_file).exists():
@@ -202,9 +215,8 @@ def run_new_workflow(brief_file: str, source_idea: str = "") -> int:
 
     # Generate slug and check for collision
     slug = generate_slug(brief_file)
-    repo_root = get_repo_root()
 
-    if slug_exists(slug, repo_root):
+    if slug_exists(slug, root):
         choice, new_slug = prompt_slug_collision(slug)
 
         if choice == SlugCollisionChoice.ABORT:
@@ -213,13 +225,13 @@ def run_new_workflow(brief_file: str, source_idea: str = "") -> int:
 
         if choice == SlugCollisionChoice.RESUME:
             print(f"Resuming workflow for '{slug}'...")
-            return run_resume_workflow(brief_file)
+            return run_resume_workflow(brief_file, repo_root=root)
 
         if choice == SlugCollisionChoice.CLEAN:
             print(f"Cleaning checkpoint and audit directory for '{slug}'...")
             # Delete audit directory
             import shutil
-            audit_dir = repo_root / AUDIT_ACTIVE_DIR / slug
+            audit_dir = root / AUDIT_ACTIVE_DIR / slug
             if audit_dir.exists():
                 shutil.rmtree(audit_dir)
                 print(f"  Deleted: {audit_dir}")
@@ -245,17 +257,17 @@ def run_new_workflow(brief_file: str, source_idea: str = "") -> int:
 
         if choice == SlugCollisionChoice.NEW_NAME:
             # Check new slug doesn't collide
-            while slug_exists(new_slug, repo_root):
+            while slug_exists(new_slug, root):
                 print(f"Slug '{new_slug}' also exists!")
                 choice, new_slug = prompt_slug_collision(new_slug)
                 if choice == SlugCollisionChoice.ABORT:
                     return 0
                 if choice == SlugCollisionChoice.RESUME:
-                    return run_resume_workflow(brief_file)
+                    return run_resume_workflow(brief_file, repo_root=root)
                 if choice == SlugCollisionChoice.CLEAN:
                     # Recursive clean handling
                     print(f"Cleaning checkpoint and audit directory for '{new_slug}'...")
-                    audit_dir = repo_root / AUDIT_ACTIVE_DIR / new_slug
+                    audit_dir = root / AUDIT_ACTIVE_DIR / new_slug
                     if audit_dir.exists():
                         shutil.rmtree(audit_dir)
                         print(f"  Deleted: {audit_dir}")
@@ -287,7 +299,7 @@ def run_new_workflow(brief_file: str, source_idea: str = "") -> int:
         initial_state: IssueWorkflowState = {
             "brief_file": brief_file,
             "brief_content": "",
-            "slug": slug if slug_exists(slug, repo_root) else "",
+            "slug": slug if slug_exists(slug, root) else "",
             "source_idea": source_idea,
             "audit_dir": "",
             "file_counter": 0,
@@ -395,7 +407,7 @@ def run_new_workflow(brief_file: str, source_idea: str = "") -> int:
                     elif choice == "C":
                         print(f"\n>>> Cleaning checkpoint and audit directory for '{slug}'...")
                         import shutil
-                        audit_dir = repo_root / AUDIT_ACTIVE_DIR / slug
+                        audit_dir = root / AUDIT_ACTIVE_DIR / slug
                         if audit_dir.exists():
                             shutil.rmtree(audit_dir)
                             print(f"  Deleted: {audit_dir}")
@@ -422,20 +434,21 @@ def run_new_workflow(brief_file: str, source_idea: str = "") -> int:
     return 0
 
 
-def run_resume_workflow(brief_file: str) -> int:
+def run_resume_workflow(brief_file: str, repo_root: Path | None = None) -> int:
     """Resume an interrupted workflow.
 
     Args:
         brief_file: Path to the original brief file.
+        repo_root: Repository root path. Auto-detected if None.
 
     Returns:
         Exit code (0 for success, 1 for error).
     """
     slug = generate_slug(brief_file)
-    repo_root = get_repo_root()
+    root = repo_root or get_repo_root()
 
     # Check if there's an active workflow for this slug
-    if not slug_exists(slug, repo_root):
+    if not slug_exists(slug, root):
         print(f"Error: No active workflow found for '{slug}'")
         print(f"Start a new workflow with: --brief {brief_file}")
         return 1
@@ -537,7 +550,7 @@ def run_resume_workflow(brief_file: str) -> int:
                     elif choice == "C":
                         print(f"\n>>> Cleaning checkpoint and audit directory for '{slug}'...")
                         import shutil
-                        audit_dir = repo_root / AUDIT_ACTIVE_DIR / slug
+                        audit_dir = root / AUDIT_ACTIVE_DIR / slug
                         if audit_dir.exists():
                             shutil.rmtree(audit_dir)
                             print(f"  Deleted: {audit_dir}")
@@ -575,6 +588,7 @@ Examples:
     python tools/run_issue_workflow.py --select
     python tools/run_issue_workflow.py --select --auto
     poetry run python tools/run_issue_workflow.py --resume my-feature-notes.md
+    poetry run python tools/run_issue_workflow.py --repo /path/to/repo --select
         """,
     )
     parser.add_argument(
@@ -597,30 +611,51 @@ Examples:
         action="store_true",
         help="Auto mode: skip VS Code, auto-send to Gemini, open done/ at end",
     )
+    parser.add_argument(
+        "--repo",
+        type=str,
+        help="Target repository root (default: auto-detect via git)",
+    )
 
     args = parser.parse_args()
+
+    # Resolve and validate repo root if provided
+    repo_root = None
+    if args.repo:
+        repo_root = Path(args.repo).resolve()
+        if not (repo_root / ".git").exists():
+            print(f"Error: {repo_root} is not a git repository")
+            return 1
 
     # Set auto mode environment variable if flag is used
     if args.auto:
         os.environ["AGENTOS_AUTO_MODE"] = "1"
 
     if args.select:
-        result = select_idea_interactive()
+        result = select_idea_interactive(repo_root)
         if result is None:
             print("No idea selected. Exiting.")
             return 0
         idea_path, from_ideas = result
-        return run_new_workflow(idea_path, source_idea=idea_path if from_ideas else "")
+        return run_new_workflow(
+            idea_path,
+            source_idea=idea_path if from_ideas else "",
+            repo_root=repo_root,
+        )
     elif args.brief:
         # Auto-detect if brief is from ideas/active/ and set source_idea
         brief_path = Path(args.brief).resolve()
-        repo_root = get_repo_root()
-        ideas_active = repo_root / "ideas" / "active"
+        root = repo_root or get_repo_root()
+        ideas_active = root / "ideas" / "active"
         if brief_path.parent == ideas_active:
-            return run_new_workflow(args.brief, source_idea=str(brief_path))
-        return run_new_workflow(args.brief)
+            return run_new_workflow(
+                args.brief,
+                source_idea=str(brief_path),
+                repo_root=repo_root,
+            )
+        return run_new_workflow(args.brief, repo_root=repo_root)
     elif args.resume:
-        return run_resume_workflow(args.resume)
+        return run_resume_workflow(args.resume, repo_root=repo_root)
     else:
         parser.print_help()
         return 1

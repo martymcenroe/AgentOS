@@ -13,6 +13,7 @@ Usage:
     python tools/run_lld_workflow.py --issue 42 --mock
     python tools/run_lld_workflow.py --issue 42 --context file.py --context another.md
     python tools/run_lld_workflow.py --issue 42 --resume
+    python tools/run_lld_workflow.py --repo /path/to/repo --select
 
 Options:
     --issue <number>      GitHub issue number
@@ -23,6 +24,7 @@ Options:
     --mock                Mock mode: use fixtures instead of real APIs
     --resume              Resume interrupted workflow from checkpoint
     --max-iterations <n>  Maximum review iterations (default: 5)
+    --repo <path>         Target repository root (default: auto-detect via git)
     --help                Show this help message
 """
 
@@ -54,7 +56,7 @@ from agentos.workflows.lld.graph import build_lld_workflow
 from agentos.workflows.lld.state import LLDWorkflowState
 
 
-def select_issue_interactive() -> tuple[int, str] | None:
+def select_issue_interactive(repo_root: Path | None = None) -> tuple[int, str] | None:
     """Interactive picker for open GitHub issues.
 
     Flow:
@@ -63,6 +65,9 @@ def select_issue_interactive() -> tuple[int, str] | None:
     3. Filter out issues with status="approved"
     4. Display with status indicators
     5. Return (issue_number, title) or None
+
+    Args:
+        repo_root: Repository root path. Auto-detected if None.
 
     Returns:
         Tuple of (issue_number, title) if selected, None if quit.
@@ -95,7 +100,7 @@ def select_issue_interactive() -> tuple[int, str] | None:
         return None
 
     # Load LLD tracking cache
-    tracking = load_lld_tracking()
+    tracking = load_lld_tracking(repo_root)
     lld_statuses = tracking.get("issues", {})
 
     # Prepare display list with status indicators
@@ -176,8 +181,11 @@ def select_issue_interactive() -> tuple[int, str] | None:
             print("Invalid input. Enter a number or q.")
 
 
-def run_audit() -> int:
+def run_audit(repo_root: Path | None = None) -> int:
     """Rebuild lld-status.json from all LLD files.
+
+    Args:
+        repo_root: Repository root path. Auto-detected if None.
 
     Returns:
         Exit code (0 for success).
@@ -186,7 +194,7 @@ def run_audit() -> int:
     print("LLD Status Audit")
     print(f"{'=' * 60}\n")
 
-    count = rebuild_lld_cache()
+    count = rebuild_lld_cache(repo_root)
 
     return 0
 
@@ -364,6 +372,9 @@ Examples:
 
     # Resume interrupted workflow
     python tools/run_lld_workflow.py --issue 42 --resume
+
+    # Cross-repo usage
+    python tools/run_lld_workflow.py --repo /path/to/repo --select
 """,
     )
 
@@ -409,16 +420,29 @@ Examples:
         default=5,
         help="Maximum review iterations (default: 5)",
     )
+    parser.add_argument(
+        "--repo",
+        type=str,
+        help="Target repository root (default: auto-detect via git)",
+    )
 
     args = parser.parse_args()
 
+    # Resolve and validate repo root if provided
+    repo_root = None
+    if args.repo:
+        repo_root = Path(args.repo).resolve()
+        if not (repo_root / ".git").exists():
+            print(f"Error: {repo_root} is not a git repository")
+            return 1
+
     # Handle --audit first
     if args.audit:
-        return run_audit()
+        return run_audit(repo_root)
 
     # Handle --select
     if args.select:
-        result = select_issue_interactive()
+        result = select_issue_interactive(repo_root)
         if result is None:
             print("No issue selected. Exiting.")
             return 0
@@ -426,7 +450,7 @@ Examples:
         issue_number, title = result
 
         # Post-selection check: verify LLD status
-        lld_status = check_lld_status(issue_number)
+        lld_status = check_lld_status(issue_number, repo_root)
         if lld_status and lld_status.get("status") == "approved":
             print(f"\n>>> Issue #{issue_number} already has an approved LLD at:")
             print(f"    {lld_status.get('lld_path')}")

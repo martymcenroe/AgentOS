@@ -1,7 +1,7 @@
 # 0906 - LLD Governance Workflow
 
 **Category:** Runbook / Operational Procedure
-**Version:** 1.0
+**Version:** 1.1
 **Last Updated:** 2026-01-29
 
 ---
@@ -101,6 +101,18 @@ Select issue [1-3, q]: _
 poetry run python tools/run_lld_workflow.py --issue 42
 ```
 
+**Option C: Cross-repo usage**
+
+Run the workflow from AgentOS against a different repository:
+
+```bash
+poetry run --directory /c/Users/mcwiz/Projects/AgentOS python \
+  /c/Users/mcwiz/Projects/AgentOS/tools/run_lld_workflow.py \
+  --repo /c/Users/mcwiz/Projects/YourProject --select
+```
+
+The `--repo` flag specifies the target repository. This is required when running from a different working directory because `poetry run --directory` changes the working directory to AgentOS.
+
 ### Step 2: Add Context (Optional)
 
 Include additional files for Claude to reference:
@@ -187,6 +199,14 @@ Rebuild LLD status cache from all LLD files:
 
 ```bash
 poetry run python tools/run_lld_workflow.py --audit
+```
+
+For cross-repo audit:
+
+```bash
+poetry run --directory /c/Users/mcwiz/Projects/AgentOS python \
+  /c/Users/mcwiz/Projects/AgentOS/tools/run_lld_workflow.py \
+  --repo /c/Users/mcwiz/Projects/YourProject --audit
 ```
 
 Output:
@@ -314,3 +334,4 @@ All `--context` paths must be within the repository root. Use relative paths:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-01-29 | Initial version with --select, --audit, and status tracking |
+| 1.1 | 2026-01-29 | Add `--repo` flag for cross-repo workflow usage |
