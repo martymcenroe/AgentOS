@@ -319,6 +319,7 @@ def run_workflow(
         current_max = max_iterations
 
         while True:
+            restart_stream = False
             try:
                 for event in app.stream(input_state, config):
                     # Event is dict of {node_name: state_updates}
@@ -368,7 +369,8 @@ def run_workflow(
                                         # Also update recursion_limit
                                         recursion_limit = new_max * 10
                                         config["recursion_limit"] = recursion_limit
-                                        break  # Break inner loop to restart stream
+                                        restart_stream = True
+                                        break  # Break inner loop
                                     else:
                                         print("Invalid number. Must be > 0.")
                                         return 1
@@ -384,9 +386,14 @@ def run_workflow(
                             else:
                                 print(f"\n[ERROR] {error}")
                                 return 1
-                else:
-                    # Stream completed without MAX_ITERATIONS_REACHED
-                    break
+
+                    # Check if we need to restart the stream
+                    if restart_stream:
+                        break  # Break outer for loop to restart stream
+
+                # If we didn't restart, stream completed normally
+                if not restart_stream:
+                    break  # Exit while loop
 
             except KeyboardInterrupt:
                 print("\n\n[INTERRUPTED] Workflow interrupted. Use --resume to continue.")
