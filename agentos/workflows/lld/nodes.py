@@ -209,6 +209,7 @@ def design(state: LLDWorkflowState) -> dict:
     # Call existing designer node
     # Pass issue content from state to avoid re-fetching (cross-repo support)
     # Pass repo_root so draft is written to correct location
+    # Pass user_feedback and lld_content for revision mode
     designer_state = {
         "issue_id": state.get("issue_id", state.get("issue_number")),
         "issue_title": state.get("issue_title", ""),
@@ -216,6 +217,8 @@ def design(state: LLDWorkflowState) -> dict:
         "repo_root": state.get("repo_root", ""),
         "iteration_count": state.get("iteration_count", 0),
         "auto_mode": state.get("auto_mode", False),
+        "user_feedback": state.get("user_feedback", ""),
+        "lld_content": state.get("lld_content", ""),  # Previous draft for revision
     }
 
     result = design_lld_node(designer_state)
@@ -243,6 +246,8 @@ def design(state: LLDWorkflowState) -> dict:
         "lld_draft_path": lld_draft_path,
         "draft_count": draft_count,
         "file_counter": file_num if audit_dir.exists() else state.get("file_counter", 0),
+        "gemini_critique": "",  # Clear critique after generating new draft
+        "user_feedback": "",  # Clear feedback after it's been used
         "error_message": "",
     }
 
@@ -266,21 +271,33 @@ def human_edit(state: LLDWorkflowState) -> dict:
     max_iterations = state.get("max_iterations", DEFAULT_MAX_ITERATIONS)
     print(f"\n[N2] Human Edit Gate (Iteration {iteration}/{max_iterations})")
 
-    # Auto mode: skip prompt, auto-send
+    # Auto mode: decide based on whether we have critique feedback
     if state.get("auto_mode"):
-        print("    Auto mode: sending to review...")
-        # Read LLD from disk (same as manual mode)
-        lld_draft_path = state.get("lld_draft_path", "")
-        if lld_draft_path and Path(lld_draft_path).exists():
-            lld_content = Path(lld_draft_path).read_text(encoding="utf-8")
+        gemini_critique = state.get("gemini_critique", "")
+
+        if gemini_critique:
+            # Previous review was BLOCKED - go back to design with critique as feedback
+            print("    Auto mode: revision needed, returning to designer...")
+            return {
+                "iteration_count": iteration,
+                "next_node": "N1_design",
+                "user_feedback": f"Gemini review feedback:\n{gemini_critique}",
+            }
         else:
-            lld_content = state.get("lld_content", "")
-        return {
-            "iteration_count": iteration,
-            "next_node": "N3_review",
-            "lld_content": lld_content,
-            "user_feedback": "",
-        }
+            # First iteration or just created - send to review
+            print("    Auto mode: sending to review...")
+            # Read LLD from disk (same as manual mode)
+            lld_draft_path = state.get("lld_draft_path", "")
+            if lld_draft_path and Path(lld_draft_path).exists():
+                lld_content = Path(lld_draft_path).read_text(encoding="utf-8")
+            else:
+                lld_content = state.get("lld_content", "")
+            return {
+                "iteration_count": iteration,
+                "next_node": "N3_review",
+                "lld_content": lld_content,
+                "user_feedback": "",
+            }
 
     # Show critique if available
     critique = state.get("gemini_critique", "")
@@ -592,6 +609,8 @@ def _mock_design(state: LLDWorkflowState) -> dict:
         "lld_draft_path": str(draft_path),
         "draft_count": draft_count,
         "file_counter": file_num,
+        "gemini_critique": "",  # Clear critique after generating new draft
+        "user_feedback": "",  # Clear feedback after it's been used
         "error_message": "",
     }
 

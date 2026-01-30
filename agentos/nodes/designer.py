@@ -151,7 +151,20 @@ def design_lld_node(state: AgentState) -> dict[str, Any]:
         client = GeminiClient(model=GOVERNANCE_MODEL)
 
         # Step 4: Build prompt and invoke Gemini
+        # Include feedback and previous draft if this is a revision
+        user_feedback = state.get("user_feedback", "")
+        previous_draft = state.get("lld_content", "")
+
         content = f"## Issue Title\n{title}\n\n## Issue Body\n{body}"
+
+        if user_feedback and previous_draft:
+            # Revision mode: include previous draft and feedback
+            content += f"\n\n## Previous LLD Draft (REVISE THIS)\n{previous_draft}"
+            content += f"\n\n## Reviewer Feedback (ADDRESS THESE ISSUES)\n{user_feedback}"
+            print("    Revision mode: incorporating reviewer feedback...")
+        elif user_feedback:
+            # Feedback but no draft - include feedback only
+            content += f"\n\n## Reviewer Feedback\n{user_feedback}"
         result = client.invoke(
             system_instruction=system_instruction,
             content=content,

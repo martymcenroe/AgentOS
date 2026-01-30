@@ -314,12 +314,17 @@ class TestMockModeE2E:
 
     @patch("agentos.workflows.lld.audit.get_repo_root")
     def test_happy_path_mock(self, mock_root, tmp_path):
-        """Test full workflow with mock mode - approve on second iteration."""
+        """Test full workflow with mock mode - approve on second design iteration.
+
+        Flow: fetch → design → human_edit → review (BLOCKED)
+              → human_edit → design (revision) → human_edit → review (APPROVED)
+              → finalize
+        """
         mock_root.return_value = tmp_path
 
         # Create necessary directories
-        (tmp_path / "docs" / "LLDs" / "active").mkdir(parents=True)
-        (tmp_path / "docs" / "LLDs" / "drafts").mkdir(parents=True)
+        (tmp_path / "docs" / "lld" / "active").mkdir(parents=True)
+        (tmp_path / "docs" / "llds" / "drafts").mkdir(parents=True)
         (tmp_path / "docs" / "audit" / "active").mkdir(parents=True)
 
         from agentos.workflows.lld.nodes import (
@@ -347,29 +352,42 @@ class TestMockModeE2E:
         assert state.get("issue_title") == "Mock Issue #42"
         assert state.get("error_message") == ""
 
-        # N1: Design
+        # N1: Design (first draft)
         result = design(state)
         state.update(result)
         assert state.get("design_status") == "DRAFTED"
         assert state.get("lld_content") is not None
 
-        # N2: Human edit (auto mode)
+        # N2: Human edit (auto mode, no critique yet → review)
         result = human_edit(state)
         state.update(result)
         assert state.get("next_node") == "N3_review"
 
-        # N3: Review (first iteration - reject)
+        # N3: Review (first iteration - mock rejects)
         result = review(state)
         state.update(result)
         assert state.get("lld_status") == "BLOCKED"
         assert state.get("next_node") == "N2_human_edit"
+        assert state.get("gemini_critique")  # Should have critique
 
-        # N2: Human edit again (auto mode)
+        # N2: Human edit (auto mode, has critique → design)
+        result = human_edit(state)
+        state.update(result)
+        assert state.get("next_node") == "N1_design"
+        assert state.get("user_feedback")  # Should have feedback for designer
+
+        # N1: Design (revision with feedback)
+        result = design(state)
+        state.update(result)
+        assert state.get("design_status") == "DRAFTED"
+        assert state.get("gemini_critique") == ""  # Cleared after new draft
+
+        # N2: Human edit (auto mode, no critique after new draft → review)
         result = human_edit(state)
         state.update(result)
         assert state.get("next_node") == "N3_review"
 
-        # N3: Review (second iteration - approve)
+        # N3: Review (second iteration - mock approves)
         result = review(state)
         state.update(result)
         assert state.get("lld_status") == "APPROVED"
@@ -923,6 +941,147 @@ Details here.
         # Should return error
         assert "No LLD content" in result.get("error_message", "")
         assert not result.get("final_lld_path")
+
+
+class TestAutoModeRevisionFlow:
+    """Test that auto mode properly handles revision cycles.
+
+    When Gemini returns BLOCKED, auto mode should:
+    1. Go back to N1_design (not N3_review)
+    2. Pass critique as user_feedback
+    3. Designer generates revised draft
+    4. New draft is saved to audit trail
+
+    Bug scenario (issue #7):
+    - First draft created: 002-draft.md
+    - Review rejects: 003-verdict.md
+    - Auto mode loops N2→N3→N2→N3... without creating new drafts
+    - Result: Only one draft, 27 verdicts, all reviewing same content
+    """
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    def test_auto_mode_with_critique_goes_to_design(self, mock_root, tmp_path):
+        """Test human_edit routes to N1_design when there's critique feedback."""
+        mock_root.return_value = tmp_path
+
+        from agentos.workflows.lld.nodes import human_edit
+
+        state: LLDWorkflowState = {
+            "issue_number": 42,
+            "auto_mode": True,
+            "iteration_count": 1,
+            "gemini_critique": "Missing safety section. Add error handling.",
+            "lld_content": "# Old draft",
+        }
+
+        result = human_edit(state)
+
+        # Should go to design, not review
+        assert result.get("next_node") == "N1_design"
+        # Feedback should contain the critique
+        assert "Missing safety section" in result.get("user_feedback", "")
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    def test_auto_mode_without_critique_goes_to_review(self, mock_root, tmp_path):
+        """Test human_edit routes to N3_review when no critique (first iteration)."""
+        mock_root.return_value = tmp_path
+
+        drafts_dir = tmp_path / "docs" / "LLDs" / "drafts"
+        drafts_dir.mkdir(parents=True)
+        draft_path = drafts_dir / "42-LLD.md"
+        draft_path.write_text("# Initial draft content", encoding="utf-8")
+
+        from agentos.workflows.lld.nodes import human_edit
+
+        state: LLDWorkflowState = {
+            "issue_number": 42,
+            "auto_mode": True,
+            "iteration_count": 0,
+            "gemini_critique": "",  # No critique yet
+            "lld_content": "",
+            "lld_draft_path": str(draft_path),
+        }
+
+        result = human_edit(state)
+
+        # Should go to review
+        assert result.get("next_node") == "N3_review"
+        # Content should be read from disk
+        assert "Initial draft content" in result.get("lld_content", "")
+
+    @patch("agentos.workflows.lld.audit.get_repo_root")
+    def test_revision_flow_creates_multiple_drafts(self, mock_root, tmp_path):
+        """Test full revision flow creates new draft on each design iteration.
+
+        This is the key test: verify that each design iteration creates a
+        new draft file in the audit trail.
+        """
+        mock_root.return_value = tmp_path
+
+        # Create directories
+        (tmp_path / "docs" / "lld" / "active").mkdir(parents=True)
+        (tmp_path / "docs" / "llds" / "drafts").mkdir(parents=True)
+        (tmp_path / "docs" / "audit" / "active").mkdir(parents=True)
+
+        from agentos.workflows.lld.nodes import (
+            fetch_issue,
+            design,
+            human_edit,
+            review,
+        )
+
+        # Initial state
+        state: LLDWorkflowState = {
+            "issue_number": 42,
+            "context_files": [],
+            "auto_mode": True,
+            "mock_mode": True,
+            "iteration_count": 0,
+        }
+
+        # N0: Fetch
+        result = fetch_issue(state)
+        state.update(result)
+        audit_dir = Path(state.get("audit_dir"))
+
+        # N1: First design
+        result = design(state)
+        state.update(result)
+
+        # Count draft files after first design
+        draft_files_1 = list(audit_dir.glob("*-draft.md"))
+        assert len(draft_files_1) == 1, "First design should create one draft"
+        first_draft_size = draft_files_1[0].stat().st_size
+        assert first_draft_size > 100, "First draft should have content"
+
+        # N2: Human edit (auto - no critique, goes to review)
+        result = human_edit(state)
+        state.update(result)
+        assert state.get("next_node") == "N3_review"
+
+        # N3: Review (mock rejects on first iteration)
+        result = review(state)
+        state.update(result)
+        assert state.get("lld_status") == "BLOCKED"
+        assert state.get("next_node") == "N2_human_edit"
+
+        # N2: Human edit again (auto - has critique, goes to design)
+        result = human_edit(state)
+        state.update(result)
+        assert state.get("next_node") == "N1_design", "Should return to design after BLOCKED"
+        assert state.get("user_feedback"), "Should have feedback for designer"
+
+        # N1: Second design (revision)
+        result = design(state)
+        state.update(result)
+
+        # Count draft files after second design
+        draft_files_2 = list(audit_dir.glob("*-draft.md"))
+        assert len(draft_files_2) == 2, f"Second design should create another draft, got {len(draft_files_2)}"
+
+        # Both drafts should have content
+        for draft in draft_files_2:
+            assert draft.stat().st_size > 100, f"Draft {draft.name} should have content"
 
 
 class TestSharedAuditHelpers:
