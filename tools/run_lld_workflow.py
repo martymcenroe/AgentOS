@@ -306,6 +306,12 @@ def run_workflow(
                 print("No checkpoint found. Starting fresh.")
                 input_state = initial_state
         else:
+            # Not resuming - check if old checkpoint exists and warn/clear
+            state = app.get_state(config)
+            if state.values:
+                old_iteration = state.values.get('iteration_count', 0)
+                print(f">>> Found existing checkpoint at iteration {old_iteration}")
+                print(f">>> Starting fresh (use --resume to continue from checkpoint)")
             input_state = initial_state
 
         # Stream workflow events with iteration extension support
