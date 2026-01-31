@@ -102,6 +102,25 @@ class RotationState:
     last_success_time: Optional[str] = None
 
 
+class CredentialPoolExhaustedException(Exception):
+    """Raised when all Gemini credentials are exhausted.
+
+    This exception signals that the workflow should pause (not fail)
+    and wait for quota to reset. The workflow can be resumed later.
+    """
+
+    def __init__(self, message: str, earliest_reset: str = "", exhausted_credentials: list = None):
+        super().__init__(message)
+        self.earliest_reset = earliest_reset  # ISO timestamp of earliest quota reset
+        self.exhausted_credentials = exhausted_credentials or []
+
+    def get_resume_message(self) -> str:
+        """Generate a user-friendly message about when to resume."""
+        if self.earliest_reset:
+            return f"Earliest quota reset: {self.earliest_reset}"
+        return "Check ~/.agentos/gemini-rotation-state.json for reset times"
+
+
 @dataclass
 class GeminiCallResult:
     """Result of a Gemini API call with full observability."""
@@ -116,6 +135,8 @@ class GeminiCallResult:
     attempts: int  # Total attempts made
     duration_ms: int  # Total time including retries
     model_verified: str  # Actual model used (for audit)
+    pool_exhausted: bool = False  # True if ALL credentials are exhausted
+    earliest_reset: str = ""  # ISO timestamp of earliest quota reset
 
 
 # =============================================================================
@@ -399,6 +420,12 @@ class GeminiClient:
 
         if not available:
             exhausted_names = [c.name for c in credentials if c.name in state.exhausted]
+            # Find earliest reset time
+            earliest_reset = ""
+            if state.exhausted:
+                reset_times = sorted(state.exhausted.values())
+                if reset_times:
+                    earliest_reset = reset_times[0]
             # Log: All credentials exhausted
             log_gemini_event(
                 event_type="all_exhausted",
@@ -407,6 +434,7 @@ class GeminiClient:
                 details={
                     "exhausted_credentials": exhausted_names,
                     "reset_times": {k: v for k, v in state.exhausted.items()},
+                    "earliest_reset": earliest_reset,
                 },
             )
             return GeminiCallResult(
@@ -420,6 +448,8 @@ class GeminiClient:
                 attempts=0,
                 duration_ms=0,
                 model_verified="",
+                pool_exhausted=True,
+                earliest_reset=earliest_reset,
             )
 
         initial_credential = available[0]
@@ -573,6 +603,15 @@ class GeminiClient:
 
         # All credentials failed
         duration_ms = int((time.time() - start_time) * 1000)
+        # Check if any are quota exhausted (vs other errors)
+        quota_errors = [e for e in errors if "Quota exhausted" in e]
+        is_pool_exhausted = len(quota_errors) == len(errors) and len(errors) > 0
+        # Find earliest reset time from state
+        earliest_reset = ""
+        if state.exhausted:
+            reset_times = sorted(state.exhausted.values())
+            if reset_times:
+                earliest_reset = reset_times[0]
         log_gemini_event(
             event_type="all_credentials_failed",
             model=self.model,
@@ -582,19 +621,23 @@ class GeminiClient:
                 "errors": errors,
                 "total_attempts": total_attempts,
                 "duration_ms": duration_ms,
+                "pool_exhausted": is_pool_exhausted,
+                "earliest_reset": earliest_reset,
             },
         )
         return GeminiCallResult(
             success=False,
             response=None,
             raw_response=None,
-            error_type=GeminiErrorType.UNKNOWN,
+            error_type=GeminiErrorType.QUOTA_EXHAUSTED if is_pool_exhausted else GeminiErrorType.UNKNOWN,
             error_message=f"All credentials failed:\n  - " + "\n  - ".join(errors),
             credential_used="",
             rotation_occurred=len(available) > 1,
             attempts=total_attempts,
             duration_ms=duration_ms,
             model_verified="",
+            pool_exhausted=is_pool_exhausted,
+            earliest_reset=earliest_reset,
         )
 
     def _load_credentials(self) -> list[Credential]:

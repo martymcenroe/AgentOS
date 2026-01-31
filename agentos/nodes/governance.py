@@ -11,7 +11,11 @@ from typing import Any
 
 from agentos.core.audit import GovernanceAuditLog, create_log_entry
 from agentos.core.config import GOVERNANCE_MODEL, LLD_REVIEW_PROMPT_PATH
-from agentos.core.gemini_client import GeminiClient, GeminiErrorType
+from agentos.core.gemini_client import (
+    CredentialPoolExhaustedException,
+    GeminiClient,
+    GeminiErrorType,
+)
 from agentos.core.state import AgentState
 
 
@@ -127,7 +131,15 @@ def review_lld_node(state: AgentState) -> dict[str, Any]:
             }
 
         else:
-            # API call failed - log and return BLOCK
+            # Check if ALL credentials are exhausted - pause workflow instead of blocking
+            if result.pool_exhausted:
+                raise CredentialPoolExhaustedException(
+                    message=f"All Gemini credentials exhausted during LLD review for #{issue_id}",
+                    earliest_reset=result.earliest_reset,
+                    exhausted_credentials=[],
+                )
+
+            # API call failed (not quota exhaustion) - log and return BLOCK
             error_msg = result.error_message or "Unknown error"
 
             entry = create_log_entry(

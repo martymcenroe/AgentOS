@@ -35,6 +35,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 
+from agentos.core.gemini_client import CredentialPoolExhaustedException
 from agentos.workflows.issue.audit import (
     AUDIT_ACTIVE_DIR,
     count_encrypted_ideas,
@@ -432,6 +433,24 @@ def run_new_workflow(
             print(f">>> Resume with: poetry run python tools/run_issue_workflow.py --resume {brief_file}")
             return 0
 
+        except CredentialPoolExhaustedException as e:
+            # All Gemini credentials exhausted - pause workflow, don't fail
+            print(f"\n{'=' * 60}")
+            print("PAUSED: All Gemini credentials exhausted")
+            print(f"{'=' * 60}")
+            print(f"\n{e}")
+            if e.earliest_reset:
+                print(f"\nEarliest quota reset: {e.earliest_reset}")
+            print("\nThe workflow has been checkpointed. You can resume later with:")
+            if repo_root:
+                print(f"  poetry run python tools/run_issue_workflow.py --resume {brief_file} --repo {repo_root}")
+            else:
+                print(f"  poetry run python tools/run_issue_workflow.py --resume {brief_file}")
+            print("\nTo check credential status:")
+            print("  cat ~/.agentos/gemini-rotation-state.json")
+            print("  cat ~/.agentos/gemini-api.jsonl | tail -10")
+            return 75  # EX_TEMPFAIL - temporary failure, retry later
+
     return 0
 
 
@@ -574,6 +593,21 @@ def run_resume_workflow(brief_file: str, repo_root: Path | None = None) -> int:
             print("\n\n>>> Interrupted by user. Workflow state saved.")
             print(f">>> Resume with: poetry run python tools/run_issue_workflow.py --resume {brief_file}")
             return 0
+
+        except CredentialPoolExhaustedException as e:
+            # All Gemini credentials exhausted - pause workflow, don't fail
+            print(f"\n{'=' * 60}")
+            print("PAUSED: All Gemini credentials exhausted")
+            print(f"{'=' * 60}")
+            print(f"\n{e}")
+            if e.earliest_reset:
+                print(f"\nEarliest quota reset: {e.earliest_reset}")
+            print("\nThe workflow has been checkpointed. You can resume later with:")
+            print(f"  poetry run python tools/run_issue_workflow.py --resume {brief_file}")
+            print("\nTo check credential status:")
+            print("  cat ~/.agentos/gemini-rotation-state.json")
+            print("  cat ~/.agentos/gemini-api.jsonl | tail -10")
+            return 75  # EX_TEMPFAIL - temporary failure, retry later
 
     return 0
 

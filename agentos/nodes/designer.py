@@ -24,7 +24,7 @@ from agentos.core.config import (
     LLD_DRAFTS_DIR,
     LLD_GENERATOR_PROMPT_PATH,
 )
-from agentos.core.gemini_client import GeminiClient
+from agentos.core.gemini_client import CredentialPoolExhaustedException, GeminiClient
 from agentos.core.state import AgentState
 
 
@@ -178,7 +178,15 @@ def design_lld_node(state: AgentState) -> dict[str, Any]:
         )
 
         if not result.success:
-            # Gemini call failed
+            # Check if ALL credentials are exhausted - pause workflow instead of failing
+            if result.pool_exhausted:
+                raise CredentialPoolExhaustedException(
+                    message=f"All Gemini credentials exhausted during LLD design for #{issue_id}",
+                    earliest_reset=result.earliest_reset,
+                    exhausted_credentials=[],  # Not easily available here
+                )
+
+            # Gemini call failed (not quota exhaustion)
             duration_ms = int((time.time() - start_time) * 1000)
             entry = create_log_entry(
                 node="design_lld",

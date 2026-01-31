@@ -55,6 +55,7 @@ from agentos.workflows.lld.audit import (
     load_lld_tracking,
     rebuild_lld_cache,
 )
+from agentos.core.gemini_client import CredentialPoolExhaustedException
 from agentos.workflows.lld.graph import build_lld_workflow
 from agentos.workflows.lld.state import LLDWorkflowState
 
@@ -491,6 +492,24 @@ def run_workflow(
             except KeyboardInterrupt:
                 print("\n\n[INTERRUPTED] Workflow interrupted. Use --resume to continue.")
                 return 130  # Standard exit code for SIGINT
+
+            except CredentialPoolExhaustedException as e:
+                # All Gemini credentials exhausted - pause workflow, don't fail
+                print(f"\n{'=' * 60}")
+                print("PAUSED: All Gemini credentials exhausted")
+                print(f"{'=' * 60}")
+                print(f"\n{e}")
+                if e.earliest_reset:
+                    print(f"\nEarliest quota reset: {e.earliest_reset}")
+                print("\nThe workflow has been checkpointed. You can resume later with:")
+                if repo_root:
+                    print(f"  python tools/run_lld_workflow.py --issue {issue_number} --resume --repo {repo_root}")
+                else:
+                    print(f"  python tools/run_lld_workflow.py --issue {issue_number} --resume")
+                print("\nTo check credential status:")
+                print("  cat ~/.agentos/gemini-rotation-state.json")
+                print("  cat ~/.agentos/gemini-api.jsonl | tail -10")
+                return 75  # EX_TEMPFAIL - temporary failure, retry later
 
             except GraphRecursionError:
                 # LangGraph recursion limit hit - this shouldn't happen with our settings
