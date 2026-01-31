@@ -368,7 +368,7 @@ def file_issue(state: IssueWorkflowState) -> dict[str, Any]:
     max_retries = 3
     for attempt in range(max_retries):
         success, issue_number, issue_url, error_msg = create_issue(
-            title, body_file_path, labels, repo
+            title, draft_path, labels, repo
         )
 
         if success:
