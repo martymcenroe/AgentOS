@@ -20,6 +20,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TypedDict
 
+from agentos.core.config import GOVERNANCE_MODEL
+
 # Module logger for GUARD messages
 logger = logging.getLogger(__name__)
 
@@ -733,17 +735,17 @@ def embed_review_evidence(
         r"(\*\s*\*\*Status:\*\*)\s*\w+(?:\s*\([^)]*\))?",
         re.IGNORECASE,
     )
-    new_status = f"\\1 {verdict.capitalize()} (Gemini Review, {review_date})"
+    new_status = f"\\1 {verdict.capitalize()} ({GOVERNANCE_MODEL}, {review_date})"
     lld_content = status_pattern.sub(new_status, lld_content, count=1)
 
     # Update or create Review Summary table in Appendix
-    review_entry = f"| Gemini #{review_count} | {review_date} | {verdict} |"
+    review_entry = f"| {review_count} | {review_date} | {verdict} | `{GOVERNANCE_MODEL}` |"
 
     # Check if Review Summary table exists
     if "### Review Summary" in lld_content:
-        # Find the table and add/update entry
+        # Find the table and add/update entry (supports both old 3-col and new 4-col format)
         table_pattern = re.compile(
-            r"(### Review Summary\s*\n\n\| Review \| Date \| Verdict \|\n\|[^\n]+\|)\n",
+            r"(### Review Summary\s*\n\n\| Review \| Date \| Verdict[^\n]*\|\n\|[^\n]+\|)\n",
             re.MULTILINE,
         )
         if table_pattern.search(lld_content):
@@ -758,8 +760,8 @@ def embed_review_evidence(
 
 ### Review Summary
 
-| Review | Date | Verdict |
-|--------|------|---------|
+| Review | Date | Verdict | Model |
+|--------|------|---------|-------|
 {review_entry}
 """
         # Add before Final Status or at end

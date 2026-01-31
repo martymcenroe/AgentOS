@@ -13,6 +13,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from agentos.core.config import GOVERNANCE_MODEL
 from agentos.workflows.issue.audit import (
     batch_commit,
     get_repo_root,
@@ -23,6 +24,26 @@ from agentos.workflows.issue.audit import (
     save_filed_metadata,
 )
 from agentos.workflows.issue.state import ErrorRecovery, IssueWorkflowState
+
+
+def add_approval_footer(content: str, verdict_count: int) -> str:
+    """Add Gemini approval footer to issue content.
+
+    Args:
+        content: The issue draft content.
+        verdict_count: Number of review cycles.
+
+    Returns:
+        Content with approval footer appended.
+    """
+    review_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    footer = f"""
+
+---
+
+<sub>**Gemini Review:** APPROVED | **Model:** `{GOVERNANCE_MODEL}` | **Date:** {review_date} | **Reviews:** {verdict_count}</sub>
+"""
+    return content + footer
 
 
 def open_vscode_folder(folder_path: str) -> tuple[bool, str]:
@@ -337,11 +358,17 @@ def file_issue(state: IssueWorkflowState) -> dict[str, Any]:
         if failed_labels:
             print(f"Warning: Failed to create labels: {failed_labels}")
 
+    # Add Gemini approval footer to draft before filing
+    draft_with_footer = add_approval_footer(current_draft, verdict_count)
+
+    # Update the draft file with footer (so audit trail has final version)
+    Path(draft_path).write_text(draft_with_footer, encoding='utf-8')
+
     # Attempt to create issue (with retry loop)
     max_retries = 3
     for attempt in range(max_retries):
         success, issue_number, issue_url, error_msg = create_issue(
-            title, draft_path, labels, repo
+            title, body_file_path, labels, repo
         )
 
         if success:
