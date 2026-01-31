@@ -1,0 +1,1 @@
+ACK. State determination complete. Please identify my model version.

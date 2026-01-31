@@ -49,12 +49,46 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.errors import GraphRecursionError
 
 from agentos.workflows.lld.audit import (
+    AUDIT_ACTIVE_DIR,
     check_lld_status,
+    get_repo_root,
     load_lld_tracking,
     rebuild_lld_cache,
 )
 from agentos.workflows.lld.graph import build_lld_workflow
 from agentos.workflows.lld.state import LLDWorkflowState
+
+
+def get_audit_dir(repo_root: Path, issue_number: int) -> Path:
+    """Get the audit directory path for an issue.
+
+    Args:
+        repo_root: Repository root path.
+        issue_number: GitHub issue number.
+
+    Returns:
+        Path to audit directory.
+    """
+    return repo_root / AUDIT_ACTIVE_DIR / f"{issue_number}-lld"
+
+
+def count_audit_files(audit_dir: Path) -> tuple[int, int]:
+    """Count draft and verdict files in audit directory.
+
+    Part 5.1 fix: Read counters from audit directory (ground truth).
+
+    Args:
+        audit_dir: Path to the audit directory.
+
+    Returns:
+        Tuple of (draft_count, verdict_count).
+    """
+    if not audit_dir.exists():
+        return 0, 0
+
+    draft_count = len(list(audit_dir.glob("*-draft.md")))
+    verdict_count = len(list(audit_dir.glob("*-verdict.md")))
+    return draft_count, verdict_count
 
 
 def select_issue_interactive(repo_root: Path | None = None) -> tuple[int, str] | None:
@@ -267,17 +301,43 @@ def run_workflow(
     print(f"Max iterations: {max_iterations} (recursion_limit: {max_iterations * 10})")
     print(f"{'=' * 60}\n")
 
-    # Initial state
+    # Part 6.2 fix: Initialize all TypedDict fields from LLDWorkflowState
     initial_state: LLDWorkflowState = {
+        # Input parameters
         "issue_number": issue_number,
         "context_files": context_files or [],
         "repo_root": str(repo_root) if repo_root else "",
         "auto_mode": auto_mode,
         "mock_mode": mock_mode,
+        # Iteration limits
         "iteration_count": 0,
         "max_iterations": max_iterations,
+        # Counters
         "draft_count": 0,
         "verdict_count": 0,
+        "file_counter": 0,
+        # Issue content (populated by N0)
+        "issue_id": 0,
+        "issue_title": "",
+        "issue_body": "",
+        "context_content": "",
+        # Audit trail (populated by N0)
+        "audit_dir": "",
+        # Design output (populated by N1)
+        "lld_draft_path": "",
+        "lld_content": "",
+        "design_status": "",
+        # Review output (populated by N3)
+        "lld_status": "",
+        "gemini_critique": "",
+        # Human input (populated by N2)
+        "user_feedback": "",
+        # Routing
+        "next_node": "",
+        # Final output (populated by N4)
+        "final_lld_path": "",
+        # Error handling
+        "error_message": "",
     }
 
     # Run with checkpointer
@@ -295,10 +355,36 @@ def run_workflow(
             state = app.get_state(config)
             if state.values:
                 print(f"Resuming from checkpoint...")
+
+                # Part 1.3 fix: Recalculate counters from audit directory (ground truth)
+                checkpoint_repo_root = state.values.get("repo_root", "")
+                actual_repo_root = Path(checkpoint_repo_root) if checkpoint_repo_root else (repo_root or get_repo_root())
+                audit_dir = get_audit_dir(actual_repo_root, issue_number)
+                actual_draft_count, actual_verdict_count = count_audit_files(audit_dir)
+
+                checkpoint_draft_count = state.values.get('draft_count', 0)
+                checkpoint_verdict_count = state.values.get('verdict_count', 0)
+
+                # Warn if counters don't match
+                if actual_draft_count != checkpoint_draft_count:
+                    print(f"  [WARN] Draft count mismatch: checkpoint={checkpoint_draft_count}, audit={actual_draft_count}")
+                if actual_verdict_count != checkpoint_verdict_count:
+                    print(f"  [WARN] Verdict count mismatch: checkpoint={checkpoint_verdict_count}, audit={actual_verdict_count}")
+
                 print(f"  Iteration: {state.values.get('iteration_count', 0)}")
-                print(f"  Drafts: {state.values.get('draft_count', 0)}")
-                print(f"  Verdicts: {state.values.get('verdict_count', 0)}")
+                print(f"  Drafts: {actual_draft_count} (from audit dir)")
+                print(f"  Verdicts: {actual_verdict_count} (from audit dir)")
                 print()
+
+                # Update state with accurate counters before resuming
+                if actual_draft_count != checkpoint_draft_count or actual_verdict_count != checkpoint_verdict_count:
+                    app.update_state(
+                        config,
+                        {
+                            "draft_count": actual_draft_count,
+                            "verdict_count": actual_verdict_count,
+                        },
+                    )
 
                 # Resume with None to continue from checkpoint
                 input_state = None
@@ -418,12 +504,17 @@ def run_workflow(
     if final_state:
         final_lld_path = final_state.get("final_lld_path", "")
         if final_lld_path:
+            # Part 5.1 fix: Read counters from audit directory (ground truth)
+            actual_repo_root = repo_root or get_repo_root()
+            audit_dir = get_audit_dir(actual_repo_root, issue_number)
+            actual_draft_count, actual_verdict_count = count_audit_files(audit_dir)
+
             print(f"\n{'=' * 60}")
             print(f"SUCCESS: LLD approved and saved!")
             print(f"  Path: {final_lld_path}")
             print(f"  Iterations: {final_state.get('iteration_count', 0)}")
-            print(f"  Drafts: {final_state.get('draft_count', 0)}")
-            print(f"  Verdicts: {final_state.get('verdict_count', 0)}")
+            print(f"  Drafts: {actual_draft_count}")
+            print(f"  Verdicts: {actual_verdict_count}")
             print(f"{'=' * 60}\n")
             return 0
 

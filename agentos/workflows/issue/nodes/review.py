@@ -79,6 +79,22 @@ def review(state: IssueWorkflowState) -> dict[str, Any]:
     if not current_draft:
         return {"error_message": "No draft content to review"}
 
+    # --------------------------------------------------------------------------
+    # GUARD: Pre-LLM content validation (Issue #101)
+    # --------------------------------------------------------------------------
+    if not current_draft.strip():
+        print("    [GUARD] BLOCKED: Draft is empty - cannot send to reviewer")
+        return {"error_message": "GUARD: Draft is empty - cannot send to reviewer"}
+
+    content_len = len(current_draft)
+    if content_len < 100:
+        print(f"    [GUARD] WARNING: Draft suspiciously short ({content_len} chars)")
+
+    if content_len > 100000:
+        print(f"    [GUARD] BLOCKED: Draft too large ({content_len} chars)")
+        return {"error_message": f"GUARD: Draft too large ({content_len} chars)"}
+    # --------------------------------------------------------------------------
+
     # Increment file counter
     file_counter = next_file_number(audit_dir)
 
@@ -125,6 +141,20 @@ def review(state: IssueWorkflowState) -> dict[str, Any]:
             }
 
         verdict_content = result.response or ""
+
+        # --------------------------------------------------------------------------
+        # GUARD: Post-LLM response validation (Issue #101)
+        # --------------------------------------------------------------------------
+        if not verdict_content or not verdict_content.strip():
+            print("    [GUARD] WARNING: Reviewer returned empty response")
+            # Don't fail, but log warning - empty response is unusual
+
+        # Check for valid verdict markers
+        verdict_upper = verdict_content.upper() if verdict_content else ""
+        if "APPROVED" not in verdict_upper and "BLOCKED" not in verdict_upper:
+            if "REVISE" not in verdict_upper:  # Also accept REVISE as a valid verdict
+                print("    [GUARD] WARNING: Verdict missing APPROVED/BLOCKED markers")
+        # --------------------------------------------------------------------------
 
         # Verify Pro-tier model was used
         if result.model_verified and "pro" not in result.model_verified.lower():

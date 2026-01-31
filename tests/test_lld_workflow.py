@@ -440,55 +440,70 @@ class TestProductionFetchIssue:
     (subprocess.run) rather than using mock_mode=True.
     """
 
-    @patch("agentos.workflows.lld.audit.get_repo_root")
-    @patch("agentos.workflows.lld.nodes.subprocess.run")
-    def test_fetch_issue_calls_gh_cli_correctly(self, mock_run, mock_root, tmp_path):
+    @patch("subprocess.run")
+    def test_fetch_issue_calls_gh_cli_correctly(self, mock_run, tmp_path):
         """Test that gh CLI is called with correct arguments."""
-        mock_root.return_value = tmp_path
-        (tmp_path / "docs" / "audit" / "active").mkdir(parents=True)
+        (tmp_path / "docs" / "lineage" / "active").mkdir(parents=True)
 
-        # Mock successful gh CLI response
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout='{"title": "Test Issue", "body": "Test body"}',
-            stderr="",
-        )
+        # Mock responses for multiple subprocess calls:
+        # 1. First call: GUARD repo verification (gh repo view)
+        # 2. Second call: Issue fetch (gh issue view)
+        mock_run.side_effect = [
+            MagicMock(
+                returncode=0,
+                stdout='{"nameWithOwner": "test/repo"}',
+                stderr="",
+            ),
+            MagicMock(
+                returncode=0,
+                stdout='{"title": "Test Issue", "body": "Test body"}',
+                stderr="",
+            ),
+        ]
 
         from agentos.workflows.lld.nodes import fetch_issue
 
+        # Provide repo_root in state to avoid get_repo_root() fallback calls
         state: LLDWorkflowState = {
             "issue_number": 123,
             "context_files": [],
             "mock_mode": False,  # Production mode!
+            "repo_root": str(tmp_path),  # Explicit repo root to avoid fallbacks
         }
 
         result = fetch_issue(state)
 
-        # Verify gh CLI was called correctly
-        mock_run.assert_called_once()
-        call_args = mock_run.call_args
-        assert call_args[0][0] == ["gh", "issue", "view", "123", "--json", "title,body"]
-        assert call_args[1]["capture_output"] is True
-        assert call_args[1]["text"] is True
-        assert call_args[1]["timeout"] == 30
+        # Verify gh CLI was called twice (GUARD + issue fetch)
+        assert mock_run.call_count == 2
+
+        # Check the issue fetch call (second call)
+        issue_call = mock_run.call_args_list[1]
+        assert issue_call[0][0] == ["gh", "issue", "view", "123", "--json", "title,body"]
+        assert issue_call[1]["capture_output"] is True
+        assert issue_call[1]["text"] is True
+        assert issue_call[1]["timeout"] == 30
 
         # Verify result
         assert result["issue_title"] == "Test Issue"
         assert result["issue_body"] == "Test body"
         assert result["error_message"] == ""
 
-    @patch("agentos.workflows.lld.audit.get_repo_root")
-    @patch("agentos.workflows.lld.nodes.subprocess.run")
-    def test_fetch_issue_handles_gh_cli_failure(self, mock_run, mock_root, tmp_path):
-        """Test error handling when gh CLI fails."""
-        mock_root.return_value = tmp_path
-
-        # Mock failed gh CLI response
-        mock_run.return_value = MagicMock(
-            returncode=1,
-            stdout="",
-            stderr="Could not resolve to an Issue with the number 999",
-        )
+    @patch("subprocess.run")
+    def test_fetch_issue_handles_gh_cli_failure(self, mock_run, tmp_path):
+        """Test error handling when gh CLI fails to find issue."""
+        # Mock responses: GUARD succeeds, issue fetch fails
+        mock_run.side_effect = [
+            MagicMock(
+                returncode=0,
+                stdout='{"nameWithOwner": "test/repo"}',
+                stderr="",
+            ),
+            MagicMock(
+                returncode=1,
+                stdout="",
+                stderr="Could not resolve to an Issue with the number 999",
+            ),
+        ]
 
         from agentos.workflows.lld.nodes import fetch_issue
 
@@ -496,20 +511,26 @@ class TestProductionFetchIssue:
             "issue_number": 999,
             "context_files": [],
             "mock_mode": False,
+            "repo_root": str(tmp_path),  # Explicit repo root to avoid fallbacks
         }
 
         result = fetch_issue(state)
 
         assert "Issue #999 not found" in result["error_message"]
 
-    @patch("agentos.workflows.lld.audit.get_repo_root")
-    @patch("agentos.workflows.lld.nodes.subprocess.run")
-    def test_fetch_issue_handles_timeout(self, mock_run, mock_root, tmp_path):
-        """Test error handling when gh CLI times out."""
-        mock_root.return_value = tmp_path
-
-        import subprocess
-        mock_run.side_effect = subprocess.TimeoutExpired(cmd="gh", timeout=30)
+    @patch("subprocess.run")
+    def test_fetch_issue_handles_timeout(self, mock_run, tmp_path):
+        """Test error handling when gh CLI times out on issue fetch."""
+        import subprocess as subprocess_module
+        # Mock: GUARD succeeds, issue fetch times out
+        mock_run.side_effect = [
+            MagicMock(
+                returncode=0,
+                stdout='{"nameWithOwner": "test/repo"}',
+                stderr="",
+            ),
+            subprocess_module.TimeoutExpired(cmd="gh", timeout=30),
+        ]
 
         from agentos.workflows.lld.nodes import fetch_issue
 
@@ -517,23 +538,29 @@ class TestProductionFetchIssue:
             "issue_number": 42,
             "context_files": [],
             "mock_mode": False,
+            "repo_root": str(tmp_path),  # Explicit repo root to avoid fallbacks
         }
 
         result = fetch_issue(state)
 
         assert "Timeout" in result["error_message"]
 
-    @patch("agentos.workflows.lld.audit.get_repo_root")
-    @patch("agentos.workflows.lld.nodes.subprocess.run")
-    def test_fetch_issue_handles_invalid_json(self, mock_run, mock_root, tmp_path):
-        """Test error handling when gh CLI returns invalid JSON."""
-        mock_root.return_value = tmp_path
-
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="not valid json",
-            stderr="",
-        )
+    @patch("subprocess.run")
+    def test_fetch_issue_handles_invalid_json(self, mock_run, tmp_path):
+        """Test error handling when gh CLI returns invalid JSON for issue."""
+        # Mock: GUARD succeeds, issue fetch returns invalid JSON
+        mock_run.side_effect = [
+            MagicMock(
+                returncode=0,
+                stdout='{"nameWithOwner": "test/repo"}',
+                stderr="",
+            ),
+            MagicMock(
+                returncode=0,
+                stdout="not valid json",
+                stderr="",
+            ),
+        ]
 
         from agentos.workflows.lld.nodes import fetch_issue
 
@@ -541,6 +568,7 @@ class TestProductionFetchIssue:
             "issue_number": 42,
             "context_files": [],
             "mock_mode": False,
+            "repo_root": str(tmp_path),  # Explicit repo root to avoid fallbacks
         }
 
         result = fetch_issue(state)

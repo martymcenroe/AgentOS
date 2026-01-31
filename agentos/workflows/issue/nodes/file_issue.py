@@ -16,6 +16,7 @@ from typing import Any
 from agentos.workflows.issue.audit import (
     batch_commit,
     get_repo_root,
+    log_workflow_execution,
     move_idea_to_done,
     move_to_done,
     next_file_number,
@@ -312,6 +313,11 @@ def file_issue(state: IssueWorkflowState) -> dict[str, Any]:
     repo_root = state.get("repo_root", "")
     try:
         repo = get_repo_name(repo_root if repo_root else None)
+        # --------------------------------------------------------------------------
+        # GUARD: Cross-repo verification - log which repo we're operating on (Issue #101)
+        # --------------------------------------------------------------------------
+        print(f"    [GUARD] Operating on repo: {repo}")
+        # --------------------------------------------------------------------------
     except RuntimeError as e:
         return {"error_message": str(e)}
 
@@ -340,6 +346,16 @@ def file_issue(state: IssueWorkflowState) -> dict[str, Any]:
 
         if success:
             print(f"\n>>> Issue created: {issue_url}")
+
+            # --------------------------------------------------------------------------
+            # GUARD: Output verification - verify issue was filed correctly (Issue #101)
+            # --------------------------------------------------------------------------
+            if issue_number == 0:
+                print("    [GUARD] WARNING: Issue created but number not parsed from URL")
+
+            if not issue_url or not issue_url.startswith("https://"):
+                print(f"    [GUARD] WARNING: Issue URL looks invalid: {issue_url}")
+            # --------------------------------------------------------------------------
 
             # Save filed.json
             file_counter = next_file_number(audit_dir)
@@ -384,6 +400,21 @@ def file_issue(state: IssueWorkflowState) -> dict[str, Any]:
                 success, error = open_vscode_folder(str(done_dir))
                 if not success:
                     print(f"Warning: Failed to open VS Code: {error}")
+
+            # Log workflow completion to audit trail
+            repo_root_path = Path(repo_root) if repo_root else get_repo_root()
+            log_workflow_execution(
+                target_repo=repo_root_path,
+                slug=slug,
+                workflow_type="issue",
+                event="complete",
+                details={
+                    "issue_number": issue_number,
+                    "issue_url": issue_url,
+                    "verdict_count": verdict_count,
+                    "draft_count": draft_count,
+                },
+            )
 
             return {
                 "issue_number": issue_number,

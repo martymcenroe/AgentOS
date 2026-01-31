@@ -20,6 +20,7 @@ from agentos.workflows.lld.audit import (
     create_lld_audit_dir,
     embed_review_evidence,
     get_repo_root,
+    log_workflow_execution,
     next_file_number,
     save_approved_metadata,
     save_audit_file,
@@ -54,14 +55,22 @@ def _save_draft_to_audit(
 
     Returns:
         Tuple of (file_num, draft_count).
+
+    Note:
+        Logs a warning if audit_dir doesn't exist (Part 4.2 fix).
     """
     draft_count = state.get("draft_count", 0) + 1
     file_num = state.get("file_counter", 0)
 
-    if audit_dir.exists():
-        file_num = next_file_number(audit_dir)
-        save_audit_file(audit_dir, file_num, "draft.md", lld_content)
-        print(f"    Draft saved to audit: {file_num:03d}-draft.md")
+    if not audit_dir.exists():
+        # Part 4.2 fix: Log warning instead of silent failure
+        print(f"    [WARN] Audit directory does not exist: {audit_dir}")
+        print(f"    [WARN] Draft NOT saved to audit trail!")
+        return file_num, draft_count
+
+    file_num = next_file_number(audit_dir)
+    save_audit_file(audit_dir, file_num, "draft.md", lld_content)
+    print(f"    Draft saved to audit: {file_num:03d}-draft.md")
 
     return file_num, draft_count
 
@@ -82,15 +91,23 @@ def _save_verdict_to_audit(
 
     Returns:
         Tuple of (file_num, verdict_count).
+
+    Note:
+        Logs a warning if audit_dir doesn't exist (Part 4.2 fix).
     """
     verdict_count = state.get("verdict_count", 0) + 1
     file_num = state.get("file_counter", 0)
 
-    if audit_dir.exists():
-        file_num = next_file_number(audit_dir)
-        verdict_content = f"# Governance Verdict: {lld_status}\n\n{critique}"
-        save_audit_file(audit_dir, file_num, "verdict.md", verdict_content)
-        print(f"    Verdict saved to audit: {file_num:03d}-verdict.md")
+    if not audit_dir.exists():
+        # Part 4.2 fix: Log warning instead of silent failure
+        print(f"    [WARN] Audit directory does not exist: {audit_dir}")
+        print(f"    [WARN] Verdict NOT saved to audit trail!")
+        return file_num, verdict_count
+
+    file_num = next_file_number(audit_dir)
+    verdict_content = f"# Governance Verdict: {lld_status}\n\n{critique}"
+    save_audit_file(audit_dir, file_num, "verdict.md", verdict_content)
+    print(f"    Verdict saved to audit: {file_num:03d}-verdict.md")
 
     return file_num, verdict_count
 
@@ -126,11 +143,35 @@ def fetch_issue(state: LLDWorkflowState) -> dict:
     repo_root = repo_root_str if repo_root_str else None
 
     try:
+        # --------------------------------------------------------------------------
+        # GUARD: Cross-repo verification - log which repo we're operating on (Issue #101)
+        # --------------------------------------------------------------------------
+        try:
+            repo_check = subprocess.run(
+                ["gh", "repo", "view", "--json", "nameWithOwner"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=GH_CLI_TIMEOUT_SECONDS,
+                cwd=repo_root,
+            )
+            if repo_check.returncode == 0 and repo_check.stdout:
+                repo_data = json.loads(repo_check.stdout)
+                actual_repo = repo_data.get("nameWithOwner", "unknown")
+                print(f"    [GUARD] Operating on repo: {actual_repo}")
+        except Exception as e:
+            print(f"    [GUARD] WARNING: Could not verify repo identity: {e}")
+        # --------------------------------------------------------------------------
+
         # Fetch issue via gh CLI (use cwd for cross-repo workflows)
+        # Use encoding='utf-8' to handle Unicode characters in issue bodies
         result = subprocess.run(
             ["gh", "issue", "view", str(issue_number), "--json", "title,body"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",  # Replace undecodable chars instead of crashing
             timeout=GH_CLI_TIMEOUT_SECONDS,
             cwd=repo_root,
         )
@@ -140,9 +181,24 @@ def fetch_issue(state: LLDWorkflowState) -> dict:
                 "error_message": f"Issue #{issue_number} not found: {result.stderr.strip()}"
             }
 
+        if not result.stdout:
+            return {
+                "error_message": f"Issue #{issue_number} returned empty response"
+            }
+
         issue_data = json.loads(result.stdout)
         issue_title = issue_data.get("title", "")
         issue_body = issue_data.get("body", "")
+
+        # --------------------------------------------------------------------------
+        # GUARD: Input validation - check issue content (Issue #101)
+        # --------------------------------------------------------------------------
+        if not issue_body or not issue_body.strip():
+            print(f"    [GUARD] WARNING: Issue #{issue_number} has empty body")
+
+        if issue_title and len(issue_title) < 5:
+            print(f"    [GUARD] WARNING: Issue #{issue_number} has very short title")
+        # --------------------------------------------------------------------------
 
         print(f"    Title: {issue_title}")
 
@@ -170,6 +226,16 @@ def fetch_issue(state: LLDWorkflowState) -> dict:
 
     file_num = next_file_number(audit_dir)
     save_audit_file(audit_dir, file_num, "issue.md", issue_content)
+
+    # Log workflow start to audit trail
+    repo_root_for_audit = Path(repo_root) if repo_root else get_repo_root()
+    log_workflow_execution(
+        target_repo=repo_root_for_audit,
+        issue_number=issue_number,
+        workflow_type="lld",
+        event="start",
+        details={"issue_title": issue_title},
+    )
 
     return {
         "issue_id": issue_number,  # Alias for existing nodes
@@ -230,6 +296,16 @@ def design(state: LLDWorkflowState) -> dict:
     if design_status == "FAILED":
         error_msg = result.get("error_message", "Unknown error")
         print(f"    [ERROR] Designer failed: {error_msg}")
+        # Log error to audit trail (Part 2.1 fix)
+        repo_root_str = state.get("repo_root", "")
+        repo_root_path = Path(repo_root_str) if repo_root_str else get_repo_root()
+        log_workflow_execution(
+            target_repo=repo_root_path,
+            issue_number=state.get("issue_id", state.get("issue_number", 0)),
+            workflow_type="lld",
+            event="error",
+            details={"node": "N1_design", "error": error_msg},
+        )
         return {
             "error_message": f"Designer node failed: {error_msg}",
             "design_status": "FAILED",
@@ -284,6 +360,10 @@ def human_edit(state: LLDWorkflowState) -> dict:
                 "iteration_count": iteration,
                 "next_node": "N1_design",
                 "user_feedback": f"Gemini review feedback:\n{gemini_critique}",
+                # Preserve counters on loop-back (Part 1.1 fix)
+                "draft_count": state.get("draft_count", 0),
+                "verdict_count": state.get("verdict_count", 0),
+                "file_counter": state.get("file_counter", 0),
             }
         else:
             # First iteration or just created - send to review
@@ -299,6 +379,10 @@ def human_edit(state: LLDWorkflowState) -> dict:
                 "next_node": "N3_review",
                 "lld_content": lld_content,
                 "user_feedback": "",
+                # Preserve counters through transitions (Part 1.1 fix)
+                "draft_count": state.get("draft_count", 0),
+                "verdict_count": state.get("verdict_count", 0),
+                "file_counter": state.get("file_counter", 0),
             }
 
     # Show critique if available
@@ -336,6 +420,10 @@ def human_edit(state: LLDWorkflowState) -> dict:
                 "next_node": "N3_review",
                 "lld_content": lld_content,
                 "user_feedback": "",
+                # Preserve counters through transitions (Part 1.1 fix)
+                "draft_count": state.get("draft_count", 0),
+                "verdict_count": state.get("verdict_count", 0),
+                "file_counter": state.get("file_counter", 0),
             }
 
         elif choice == "R":
@@ -344,13 +432,31 @@ def human_edit(state: LLDWorkflowState) -> dict:
                 "iteration_count": iteration,
                 "next_node": "N1_design",
                 "user_feedback": feedback,
+                # Preserve counters on loop-back (Part 1.1 fix)
+                "draft_count": state.get("draft_count", 0),
+                "verdict_count": state.get("verdict_count", 0),
+                "file_counter": state.get("file_counter", 0),
             }
 
         elif choice == "M":
+            # Log manual exit to audit trail (Part 2.1 fix)
+            repo_root_str = state.get("repo_root", "")
+            repo_root_path = Path(repo_root_str) if repo_root_str else get_repo_root()
+            log_workflow_execution(
+                target_repo=repo_root_path,
+                issue_number=state.get("issue_id", state.get("issue_number", 0)),
+                workflow_type="lld",
+                event="manual_exit",
+                details={"iteration_count": iteration},
+            )
             return {
                 "iteration_count": iteration,
                 "next_node": "END",
                 "error_message": "MANUAL: User chose manual exit",
+                # Preserve counters even on exit (for checkpoint/resume)
+                "draft_count": state.get("draft_count", 0),
+                "verdict_count": state.get("verdict_count", 0),
+                "file_counter": state.get("file_counter", 0),
             }
 
         else:
@@ -377,6 +483,49 @@ def review(state: LLDWorkflowState) -> dict:
     if state.get("mock_mode"):
         return _mock_review(state)
 
+    # --------------------------------------------------------------------------
+    # GUARD: Pre-LLM content validation (Issue #101)
+    # --------------------------------------------------------------------------
+    lld_content = state.get("lld_content", "")
+    lld_draft_path = state.get("lld_draft_path", "")
+
+    # If content empty, try reading from draft file
+    if not lld_content and lld_draft_path and Path(lld_draft_path).exists():
+        lld_content = Path(lld_draft_path).read_text(encoding="utf-8")
+
+    if not lld_content or not lld_content.strip():
+        print("    [GUARD] BLOCKED: Draft is empty - cannot send to reviewer")
+        # Log guard block to audit trail (Part 2.1 fix)
+        repo_root_str = state.get("repo_root", "")
+        repo_root_path = Path(repo_root_str) if repo_root_str else get_repo_root()
+        log_workflow_execution(
+            target_repo=repo_root_path,
+            issue_number=state.get("issue_id", state.get("issue_number", 0)),
+            workflow_type="lld",
+            event="guard_block",
+            details={"reason": "empty_draft", "node": "N3_review"},
+        )
+        return {"error_message": "GUARD: Draft is empty - cannot send to reviewer"}
+
+    content_len = len(lld_content)
+    if content_len < 100:
+        print(f"    [GUARD] WARNING: Draft suspiciously short ({content_len} chars)")
+
+    if content_len > 100000:
+        print(f"    [GUARD] BLOCKED: Draft too large ({content_len} chars)")
+        # Log guard block to audit trail (Part 2.1 fix)
+        repo_root_str = state.get("repo_root", "")
+        repo_root_path = Path(repo_root_str) if repo_root_str else get_repo_root()
+        log_workflow_execution(
+            target_repo=repo_root_path,
+            issue_number=state.get("issue_id", state.get("issue_number", 0)),
+            workflow_type="lld",
+            event="guard_block",
+            details={"reason": "draft_too_large", "chars": content_len, "node": "N3_review"},
+        )
+        return {"error_message": f"GUARD: Draft too large ({content_len} chars)"}
+    # --------------------------------------------------------------------------
+
     # Import governance node (reuse existing)
     from agentos.nodes.governance import review_lld_node
 
@@ -385,8 +534,8 @@ def review(state: LLDWorkflowState) -> dict:
     # It returns: lld_status, gemini_critique, iteration_count
     governance_state = {
         "issue_id": state.get("issue_id", state.get("issue_number")),
-        "lld_content": state.get("lld_content", ""),
-        "lld_draft_path": state.get("lld_draft_path", ""),
+        "lld_content": lld_content,  # Use validated content
+        "lld_draft_path": lld_draft_path,
         "iteration_count": state.get("iteration_count", 0),
     }
 
@@ -394,6 +543,20 @@ def review(state: LLDWorkflowState) -> dict:
 
     lld_status = result.get("lld_status", "BLOCKED")
     gemini_critique = result.get("gemini_critique", "")
+
+    # --------------------------------------------------------------------------
+    # GUARD: Post-LLM response validation (Issue #101)
+    # --------------------------------------------------------------------------
+    if not gemini_critique or not gemini_critique.strip():
+        print("    [GUARD] WARNING: Reviewer returned empty response")
+        # Don't fail, but log warning - empty critique is unusual but not fatal
+
+    # Check for valid verdict markers
+    critique_upper = gemini_critique.upper() if gemini_critique else ""
+    if "APPROVED" not in critique_upper and "BLOCKED" not in critique_upper:
+        if "REVISE" not in critique_upper:  # Also accept REVISE as a valid verdict
+            print("    [GUARD] WARNING: Verdict missing APPROVED/BLOCKED markers")
+    # --------------------------------------------------------------------------
 
     # Save verdict to audit trail using shared helper
     audit_dir = Path(state.get("audit_dir", ""))
@@ -407,6 +570,20 @@ def review(state: LLDWorkflowState) -> dict:
     iteration = state.get("iteration_count", 0)
     max_iterations = state.get("max_iterations", DEFAULT_MAX_ITERATIONS)
     if lld_status != "APPROVED" and iteration >= max_iterations:
+        # Log max iterations to audit trail (Part 2.1 fix)
+        repo_root_str = state.get("repo_root", "")
+        repo_root_path = Path(repo_root_str) if repo_root_str else get_repo_root()
+        log_workflow_execution(
+            target_repo=repo_root_path,
+            issue_number=state.get("issue_id", state.get("issue_number", 0)),
+            workflow_type="lld",
+            event="max_iterations",
+            details={
+                "iteration_count": iteration,
+                "max_iterations": max_iterations,
+                "last_status": lld_status,
+            },
+        )
         return {
             "lld_status": lld_status,
             "gemini_critique": gemini_critique,
@@ -457,17 +634,25 @@ def finalize(state: LLDWorkflowState) -> dict:
     lld_draft_path = state.get("lld_draft_path", "")
     verdict_count = state.get("verdict_count", 1)
 
+    # Get repo_root from state for cross-repo workflows (moved earlier for error logging)
+    repo_root_str = state.get("repo_root", "")
+    repo_root_path = Path(repo_root_str) if repo_root_str else None
+
     # Safety: if lld_content is empty, read from draft path
     if not lld_content and lld_draft_path and Path(lld_draft_path).exists():
         print(f"    Reading LLD from disk: {lld_draft_path}")
         lld_content = Path(lld_draft_path).read_text(encoding="utf-8")
 
     if not lld_content:
+        # Log error to audit trail (Part 2.1 fix)
+        log_workflow_execution(
+            target_repo=repo_root_path or get_repo_root(),
+            issue_number=issue_number,
+            workflow_type="lld",
+            event="error",
+            details={"node": "N4_finalize", "error": "empty_lld_content"},
+        )
         return {"error_message": "No LLD content to save - lld_content is empty and no draft file found"}
-
-    # Get repo_root from state for cross-repo workflows
-    repo_root_str = state.get("repo_root", "")
-    repo_root_path = Path(repo_root_str) if repo_root_str else None
 
     # Embed review evidence in LLD content before saving
     review_date = datetime.now().strftime("%Y-%m-%d")
@@ -482,6 +667,39 @@ def finalize(state: LLDWorkflowState) -> dict:
     # Save final LLD (use repo_root for cross-repo workflows)
     final_path = save_final_lld(issue_number, lld_content, repo_root_path)
     print(f"    Saved to: {final_path}")
+
+    # --------------------------------------------------------------------------
+    # GUARD: Output verification - verify file was written correctly (Issue #101)
+    # --------------------------------------------------------------------------
+    if not final_path.exists():
+        print(f"    [GUARD] ERROR: LLD file not created at {final_path}")
+        # Log guard error to audit trail (Part 2.1 fix)
+        log_workflow_execution(
+            target_repo=repo_root_path or get_repo_root(),
+            issue_number=issue_number,
+            workflow_type="lld",
+            event="guard_error",
+            details={"node": "N4_finalize", "error": "file_not_created", "path": str(final_path)},
+        )
+        return {"error_message": f"GUARD: LLD file not created at {final_path}"}
+
+    saved_content = final_path.read_text(encoding="utf-8")
+    saved_len = len(saved_content)
+    if saved_len < 200:
+        print(f"    [GUARD] WARNING: Saved LLD suspiciously small ({saved_len} chars)")
+
+    if saved_len == 0:
+        print(f"    [GUARD] ERROR: Saved LLD is empty!")
+        # Log guard error to audit trail (Part 2.1 fix)
+        log_workflow_execution(
+            target_repo=repo_root_path or get_repo_root(),
+            issue_number=issue_number,
+            workflow_type="lld",
+            event="guard_error",
+            details={"node": "N4_finalize", "error": "saved_file_empty", "path": str(final_path)},
+        )
+        return {"error_message": f"GUARD: Saved LLD is empty at {final_path}"}
+    # --------------------------------------------------------------------------
 
     # Update tracking cache (use repo_root for cross-repo workflows)
     update_lld_status(
@@ -514,6 +732,19 @@ def finalize(state: LLDWorkflowState) -> dict:
         print(f"    Metadata saved: {file_num:03d}-approved.json")
 
     print(f"\n    LLD #{issue_number} APPROVED and saved!")
+
+    # Log workflow completion to audit trail
+    log_workflow_execution(
+        target_repo=repo_root_path or get_repo_root(),
+        issue_number=issue_number,
+        workflow_type="lld",
+        event="complete",
+        details={
+            "final_lld_path": str(final_path),
+            "verdict_count": verdict_count,
+            "iteration_count": state.get("iteration_count", 0),
+        },
+    )
 
     return {
         "final_lld_path": str(final_path),

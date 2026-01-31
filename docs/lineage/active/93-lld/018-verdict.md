@@ -1,0 +1,3 @@
+# Governance Verdict: BLOCK
+
+The LLD provides a solid foundation for the "Scout" workflow, utilizing LangGraph and Gemini 1.5 Flash effectively. The architectural separation of concerns is clear, and the cost estimation strategy (Pre-flight check) is commendable. However, there is a critical Safety gap regarding output path validation for user-provided paths, and Observability requirements are not explicitly met. These must be addressed before implementation.

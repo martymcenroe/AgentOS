@@ -13,6 +13,7 @@ from agentos.workflows.issue.audit import (
     create_audit_dir,
     generate_slug,
     get_repo_root,
+    log_workflow_execution,
     next_file_number,
     save_audit_file,
     slug_exists,
@@ -58,6 +59,18 @@ def load_brief(state: IssueWorkflowState) -> dict[str, Any]:
     # Load brief content
     brief_content = brief_path.read_text(encoding="utf-8")
 
+    # --------------------------------------------------------------------------
+    # GUARD: Input validation - check brief content (Issue #101)
+    # --------------------------------------------------------------------------
+    if not brief_content or not brief_content.strip():
+        print(f"    [GUARD] WARNING: Brief file {brief_file} has empty content")
+        return {"error_message": f"GUARD: Brief file {brief_file} is empty"}
+
+    content_len = len(brief_content)
+    if content_len < 50:
+        print(f"    [GUARD] WARNING: Brief file suspiciously short ({content_len} chars)")
+    # --------------------------------------------------------------------------
+
     # Generate slug from filename
     slug = generate_slug(brief_file)
 
@@ -84,6 +97,15 @@ def load_brief(state: IssueWorkflowState) -> dict[str, Any]:
     # Save brief as 001-brief.md
     file_counter = 1
     save_audit_file(audit_dir, file_counter, "brief.md", brief_content)
+
+    # Log workflow start to audit trail
+    log_workflow_execution(
+        target_repo=repo_root,
+        slug=slug,
+        workflow_type="issue",
+        event="start",
+        details={"brief_file": brief_file},
+    )
 
     return {
         "brief_content": brief_content,

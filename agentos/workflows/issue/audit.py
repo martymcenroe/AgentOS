@@ -10,12 +10,16 @@ Provides functions for:
 """
 
 import json
+import logging
 import re
 import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TypedDict
+
+# Module logger for GUARD messages
+logger = logging.getLogger(__name__)
 
 
 class FiledMetadata(TypedDict):
@@ -418,3 +422,53 @@ def ensure_ideas_directories(repo_root: Path | None = None) -> None:
         gitkeep = dir_path / ".gitkeep"
         if not gitkeep.exists():
             gitkeep.touch()
+
+
+# ---------------------------------------------------------------------------
+# Workflow Audit Logging (Issue #101)
+# ---------------------------------------------------------------------------
+
+WORKFLOW_AUDIT_FILE = Path("docs/lineage/workflow-audit.jsonl")
+
+
+def log_workflow_execution(
+    target_repo: Path,
+    slug: str,
+    workflow_type: str,
+    event: str,
+    details: dict | None = None,
+) -> None:
+    """Log workflow execution to central audit file.
+
+    Creates a JSONL (JSON Lines) audit trail of all workflow executions.
+    This enables post-hoc analysis of workflow runs, failures, and patterns.
+
+    Args:
+        target_repo: Path to the target repository.
+        slug: Workflow slug (used instead of issue_number for issue workflow).
+        workflow_type: Type of workflow ("lld" or "issue").
+        event: Event type ("start", "guard_warning", "guard_error", "complete", "error").
+        details: Optional dict with additional event details.
+    """
+    log_file = target_repo / WORKFLOW_AUDIT_FILE
+
+    # Ensure directory exists
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "workflow_type": workflow_type,
+        "slug": slug,
+        "target_repo": str(target_repo),
+        "event": event,
+    }
+
+    if details:
+        entry["details"] = details
+
+    try:
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError as e:
+        # Don't fail the workflow if audit logging fails
+        logger.warning(f"Failed to write workflow audit log: {e}")

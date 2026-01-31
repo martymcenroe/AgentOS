@@ -1,0 +1,3 @@
+# Governance Verdict: BLOCK
+
+The proposal correctly addresses the need for workflow isolation by leveraging git repository boundaries. However, there is a critical **Privacy/Safety** risk regarding accidental data leakage: the design does not prevent the user from committing the generated `.agentos` directory. Additionally, the architectural decision to `EXIT(1)` inside a library function requires revision.

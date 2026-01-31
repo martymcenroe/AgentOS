@@ -12,12 +12,16 @@ Provides functions for:
 """
 
 import json
+import logging
 import re
 import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TypedDict
+
+# Module logger for GUARD messages
+logger = logging.getLogger(__name__)
 
 
 class ApprovedMetadata(TypedDict):
@@ -781,3 +785,89 @@ def embed_review_evidence(
         lld_content += f"\n\n**Final Status:** {verdict}\n"
 
     return lld_content
+
+
+# ---------------------------------------------------------------------------
+# Workflow Audit Logging (Issue #101)
+# ---------------------------------------------------------------------------
+
+WORKFLOW_AUDIT_FILE = Path("docs/lineage/workflow-audit.jsonl")
+
+
+def log_workflow_execution(
+    target_repo: Path,
+    issue_number: int,
+    workflow_type: str,
+    event: str,
+    details: dict | None = None,
+) -> None:
+    """Log workflow execution to central audit file.
+
+    Creates a JSONL (JSON Lines) audit trail of all workflow executions.
+    This enables post-hoc analysis of workflow runs, failures, and patterns.
+
+    Args:
+        target_repo: Path to the target repository.
+        issue_number: GitHub issue number being processed.
+        workflow_type: Type of workflow ("lld" or "issue").
+        event: Event type ("start", "guard_warning", "guard_error", "complete", "error").
+        details: Optional dict with additional event details.
+    """
+    log_file = target_repo / WORKFLOW_AUDIT_FILE
+
+    # Ensure directory exists
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "workflow_type": workflow_type,
+        "issue_number": issue_number,
+        "target_repo": str(target_repo),
+        "event": event,
+    }
+
+    if details:
+        entry["details"] = details
+
+    try:
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError as e:
+        # Don't fail the workflow if audit logging fails
+        logger.warning(f"Failed to write workflow audit log: {e}")
+
+
+def get_workflow_audit_summary(
+    target_repo: Path,
+    issue_number: int | None = None,
+) -> list[dict]:
+    """Read workflow audit entries, optionally filtered by issue.
+
+    Args:
+        target_repo: Path to the target repository.
+        issue_number: Optional filter by issue number.
+
+    Returns:
+        List of audit entries (most recent last).
+    """
+    log_file = target_repo / WORKFLOW_AUDIT_FILE
+
+    if not log_file.exists():
+        return []
+
+    entries = []
+    try:
+        with open(log_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        entry = json.loads(line)
+                        if issue_number is None or entry.get("issue_number") == issue_number:
+                            entries.append(entry)
+                    except json.JSONDecodeError:
+                        continue
+    except OSError:
+        return []
+
+    return entries
