@@ -116,6 +116,52 @@ def _save_draft_to_audit(
     return file_num, draft_count
 
 
+def _collect_previous_verdicts(audit_dir: Path) -> str:
+    """Collect all previous verdicts from audit directory into a formatted string.
+
+    This provides cumulative context to prevent regression on previously-identified issues.
+    Claude should address the NEW feedback AND ensure compliance with ALL previous feedback.
+
+    Args:
+        audit_dir: Path to the audit directory containing verdict files.
+
+    Returns:
+        Formatted string with all previous verdicts, or empty string if none found.
+    """
+    if not audit_dir.exists():
+        return ""
+
+    # Find all verdict files, sorted by number
+    verdict_files = sorted(audit_dir.glob("*-verdict.md"))
+
+    if not verdict_files:
+        return ""
+
+    # Build cumulative feedback string
+    sections = []
+    for verdict_file in verdict_files:
+        # Extract the file number from the filename (e.g., "004-verdict.md" -> 4)
+        file_num = verdict_file.name.split("-")[0]
+        try:
+            review_num = int(file_num)
+        except ValueError:
+            review_num = 0
+
+        # Read verdict content
+        try:
+            content = verdict_file.read_text(encoding="utf-8").strip()
+            # Skip empty verdicts
+            if content:
+                sections.append(f"### Review {review_num}:\n{content}")
+        except Exception:
+            continue
+
+    if not sections:
+        return ""
+
+    return "## PREVIOUS FEEDBACK (DO NOT REGRESS ON THESE ISSUES)\n\n" + "\n\n".join(sections)
+
+
 def _save_verdict_to_audit(
     audit_dir: Path,
     lld_status: str,
@@ -397,10 +443,25 @@ def human_edit(state: LLDWorkflowState) -> dict:
         if gemini_critique:
             # Previous review was BLOCKED - go back to design with critique as feedback
             print("    Auto mode: revision needed, returning to designer...")
+
+            # Collect cumulative feedback to prevent regression (Session 5 enhancement)
+            audit_dir = Path(state.get("audit_dir", ""))
+            previous_verdicts = _collect_previous_verdicts(audit_dir)
+
+            # Build comprehensive feedback: new critique + all previous verdicts
+            if previous_verdicts:
+                user_feedback = (
+                    f"## NEW FEEDBACK (Address these issues)\n\n{gemini_critique}\n\n"
+                    f"{previous_verdicts}"
+                )
+                print(f"    Including {len(list(audit_dir.glob('*-verdict.md')))} previous verdicts for context")
+            else:
+                user_feedback = f"Gemini review feedback:\n{gemini_critique}"
+
             return {
                 "iteration_count": iteration,
                 "next_node": "N1_design",
-                "user_feedback": f"Gemini review feedback:\n{gemini_critique}",
+                "user_feedback": user_feedback,
                 # Preserve counters on loop-back (Part 1.1 fix)
                 "draft_count": state.get("draft_count", 0),
                 "verdict_count": state.get("verdict_count", 0),
@@ -469,10 +530,25 @@ def human_edit(state: LLDWorkflowState) -> dict:
 
         elif choice == "R":
             feedback = input("    Enter feedback for revision: ").strip()
+
+            # Collect cumulative feedback to prevent regression (Session 5 enhancement)
+            audit_dir = Path(state.get("audit_dir", ""))
+            previous_verdicts = _collect_previous_verdicts(audit_dir)
+
+            # Build comprehensive feedback: user feedback + all previous verdicts
+            if previous_verdicts:
+                user_feedback = (
+                    f"## NEW FEEDBACK (Address these issues)\n\n{feedback}\n\n"
+                    f"{previous_verdicts}"
+                )
+                print(f"    Including {len(list(audit_dir.glob('*-verdict.md')))} previous verdicts for context")
+            else:
+                user_feedback = feedback
+
             return {
                 "iteration_count": iteration,
                 "next_node": "N1_design",
-                "user_feedback": feedback,
+                "user_feedback": user_feedback,
                 # Preserve counters on loop-back (Part 1.1 fix)
                 "draft_count": state.get("draft_count", 0),
                 "verdict_count": state.get("verdict_count", 0),

@@ -162,7 +162,12 @@ def design_lld_node(state: AgentState) -> dict[str, Any]:
         if user_feedback and previous_draft:
             # Revision mode: include previous draft and feedback
             content += f"\n\n## Previous LLD Draft (REVISE THIS)\n{previous_draft}"
-            content += f"\n\n## Reviewer Feedback (ADDRESS THESE ISSUES)\n{user_feedback}"
+            content += f"\n\n## Reviewer Feedback\n{user_feedback}"
+            content += "\n\n## CRITICAL REVISION INSTRUCTIONS"
+            content += "\n1. Address ALL issues in the NEW FEEDBACK section above"
+            content += "\n2. Self-audit against PREVIOUS FEEDBACK to ensure you have not regressed on any previously-fixed issues"
+            content += "\n3. If previous feedback mentioned scope confinement, observability, or safety - verify these are STILL correct"
+            content += "\n4. Do NOT remove sections that were already correct"
             print("    Revision mode: incorporating reviewer feedback...")
         elif user_feedback:
             # Feedback but no draft - include feedback only
