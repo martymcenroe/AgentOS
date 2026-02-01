@@ -1,0 +1,3 @@
+# Governance Verdict: BLOCK
+
+The LLD presents a well-structured design for an external research agent. The explicit inclusion of an "Offline Mode", dynamic budgeting, and path safety validation is excellent and adheres to high engineering standards. However, the design lacks specific observability configurations (Tracing) and carries a technical risk regarding tokenizer mismatch that requires a stronger mitigation strategy before implementation.

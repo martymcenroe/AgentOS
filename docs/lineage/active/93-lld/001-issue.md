@@ -106,7 +106,7 @@ Create a proactive research workflow that searches GitHub/Web for solutions to a
 
 ## Technical Approach
 
-- **State Graph (`agentos/workflows/scout/graph.py`):** LangGraph-based workflow with 4 nodes (Explorer â†’ Extractor â†’ Gap Analyst â†’ Innovation Scribe) managing research state transitions
+- **State Graph (`agentos/workflows/scout/graph.py`):** LangGraph-based workflow with 4 nodes (Explorer → Extractor → Gap Analyst → Innovation Scribe) managing research state transitions
 - **N0_Explorer Node:** Uses GitHub Search API and optional Google Search MCP tool to identify top repositories
 - **N1_Extractor Node:** Fetches raw content via GitHub API, parses Markdown/code files, generates structured summaries, **captures repository license metadata**
 - **N2_Gap_Analyst Node:** LLM-powered comparison engine that diffs external patterns against internal code
@@ -126,22 +126,22 @@ Create a proactive research workflow that searches GitHub/Web for solutions to a
 ## Files to Create/Modify
 
 ### New Files
-- `agentos/workflows/scout/__init__.py` â€” Package initialization
-- `agentos/workflows/scout/graph.py` â€” LangGraph state machine definition
-- `agentos/workflows/scout/nodes.py` â€” Node implementations (Explorer, Extractor, Gap Analyst, Scribe)
-- `agentos/workflows/scout/prompts.py` â€” LLM prompts for analysis nodes
-- `agentos/workflows/scout/templates.py` â€” Innovation Brief Markdown templates
-- `agentos/workflows/scout/token_estimator.py` â€” Token counting and budget enforcement
-- `tools/run_scout_workflow.py` â€” CLI entry point
-- `tests/workflows/scout/test_graph.py` â€” Unit tests for state transitions
-- `tests/workflows/scout/test_nodes.py` â€” Unit tests for individual nodes
-- `tests/workflows/scout/test_token_estimator.py` â€” Unit tests for token budget enforcement
-- `tests/fixtures/golden-brief-summary.md` â€” Golden fixture for similarity testing
-- `ideas/active/.gitkeep` â€” Ensure output directory exists
+- `agentos/workflows/scout/__init__.py` — Package initialization
+- `agentos/workflows/scout/graph.py` — LangGraph state machine definition
+- `agentos/workflows/scout/nodes.py` — Node implementations (Explorer, Extractor, Gap Analyst, Scribe)
+- `agentos/workflows/scout/prompts.py` — LLM prompts for analysis nodes
+- `agentos/workflows/scout/templates.py` — Innovation Brief Markdown templates
+- `agentos/workflows/scout/token_estimator.py` — Token counting and budget enforcement
+- `tools/run_scout_workflow.py` — CLI entry point
+- `tests/workflows/scout/test_graph.py` — Unit tests for state transitions
+- `tests/workflows/scout/test_nodes.py` — Unit tests for individual nodes
+- `tests/workflows/scout/test_token_estimator.py` — Unit tests for token budget enforcement
+- `tests/fixtures/golden-brief-summary.md` — Golden fixture for similarity testing
+- `ideas/active/.gitkeep` — Ensure output directory exists
 
 ### Modified Files
-- `agentos/workflows/__init__.py` â€” Register scout workflow
-- `docs/0003-file-inventory.md` â€” Add new files to inventory
+- `agentos/workflows/__init__.py` — Register scout workflow
+- `docs/0003-file-inventory.md` — Add new files to inventory
 
 ## Dependencies
 - GitHub API access (via `PyGithub` or direct REST calls)
@@ -150,12 +150,12 @@ Create a proactive research workflow that searches GitHub/Web for solutions to a
 - Token counting library (`tiktoken` or equivalent for estimation)
 
 ## Out of Scope (Future)
-- **Automatic PR creation** â€” Brief is decision artifact only, human decides action
-- **Continuous monitoring** â€” No scheduled/recurring scans (future cron job)
-- **Multi-language support** â€” Focus on Python repositories initially
-- **Code modification** â€” Scout reports gaps but never changes code
-- **Competitive analysis** â€” No tracking of specific competitor projects over time
-- **License compliance enforcement** â€” Scout reports licenses but does not block based on them
+- **Automatic PR creation** — Brief is decision artifact only, human decides action
+- **Continuous monitoring** — No scheduled/recurring scans (future cron job)
+- **Multi-language support** — Focus on Python repositories initially
+- **Code modification** — Scout reports gaps but never changes code
+- **Competitive analysis** — No tracking of specific competitor projects over time
+- **License compliance enforcement** — Scout reports licenses but does not block based on them
 
 ## Acceptance Criteria
 - [ ] `python tools/run_scout_workflow.py --topic "python state persistence" --internal agentos/core/state.py --yes` completes without error
@@ -262,12 +262,12 @@ pytest tests/workflows/scout/test_brief_similarity.py -v
 `feature`, `agent`, `langgraph`, `research`
 
 ## Effort Estimate
-**Large (L)** â€” 4 distinct graph nodes + CLI wrapper + token estimation + confirmation flow
+**Large (L)** — 4 distinct graph nodes + CLI wrapper + token estimation + confirmation flow
 
 ## Original Brief
 # Innovation Workflow: The Scout (External Intelligence)
 
-**Context:** We have successfully implemented internal governance (Issue/LLD/Implementation workflows). However, our current "Audit" system (`08xx`) is purely reactive and insularâ€”it only checks what we have *already written*. It fails to bring in new knowledge from the outside world.
+**Context:** We have successfully implemented internal governance (Issue/LLD/Implementation workflows). However, our current "Audit" system (`08xx`) is purely reactive and insular—it only checks what we have *already written*. It fails to bring in new knowledge from the outside world.
 
 ## Problem
 

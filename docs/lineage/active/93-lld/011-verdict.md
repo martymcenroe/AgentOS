@@ -1,0 +1,3 @@
+# Governance Verdict: BLOCK
+
+The LLD proposes a robust "Scout" workflow with excellent attention to the specific risks of LLM integration (Context Window limits, Tokenizer mismatches). The "Pessimistic Estimation + Adaptive Fallback" strategy is a high-quality pattern. However, there are blocking concerns regarding the bounding of the search loop and the architectural placement of the tracing module that require revision before implementation.

@@ -1,0 +1,3 @@
+# Governance Verdict: BLOCK
+
+The LLD provides a robust foundation for the "Scout" workflow, particularly in its security approach to file system boundaries and privacy confirmation. However, it lacks specific bounds on the *volume* of external data processed, creating a significant cost/token risk. Additionally, the handling of untrusted external content (READMEs) requires specific security safeguards against Indirect Prompt Injection.

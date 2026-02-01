@@ -1,3 +1,0 @@
-# Governance Verdict: BLOCK
-
-The design for the "Scout" workflow is well-structured, leveraging `gemini-1.5-flash` for cost efficiency and LangGraph for state management. The privacy gates and output confinement are well thought out. However, the design explicitly allows **input** reading from outside the worktree, which violates Tier 1 Safety protocols regarding scope confinement and data exfiltration risks.

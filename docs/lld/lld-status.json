@@ -1,14 +1,182 @@
 {
   "version": "1.0",
-  "last_updated": "2026-01-31T04:18:24.252591+00:00",
+  "last_updated": "2026-02-01T01:07:46.091222+00:00",
   "issues": {
+    "15": {
+      "lld_path": "docs\\lld\\done\\15-path-parameterization.md",
+      "status": "draft",
+      "has_gemini_review": false,
+      "final_verdict": null,
+      "last_review_date": null,
+      "review_count": 0
+    },
+    "18": {
+      "lld_path": "docs\\lld\\done\\18-ideas-folder-encryption.md",
+      "status": "draft",
+      "has_gemini_review": false,
+      "final_verdict": null,
+      "last_review_date": null,
+      "review_count": 0
+    },
+    "25": {
+      "lld_path": "docs\\lld\\done\\25-encrypt-gemini-keys.md",
+      "status": "draft",
+      "has_gemini_review": false,
+      "final_verdict": null,
+      "last_review_date": null,
+      "review_count": 0
+    },
+    "27": {
+      "lld_path": "docs\\lld\\done\\27-lld-review-gate.md",
+      "status": "draft",
+      "has_gemini_review": false,
+      "final_verdict": null,
+      "last_review_date": null,
+      "review_count": 0
+    },
+    "28": {
+      "lld_path": "docs\\lld\\done\\28-implementation-review-gate.md",
+      "status": "draft",
+      "has_gemini_review": false,
+      "final_verdict": null,
+      "last_review_date": null,
+      "review_count": 0
+    },
+    "29": {
+      "lld_path": "docs\\lld\\done\\29-report-generation-gate.md",
+      "status": "draft",
+      "has_gemini_review": false,
+      "final_verdict": null,
+      "last_review_date": null,
+      "review_count": 0
+    },
+    "30": {
+      "lld_path": "docs\\lld\\done\\30-gemini-submission-gate.md",
+      "status": "draft",
+      "has_gemini_review": false,
+      "final_verdict": null,
+      "last_review_date": null,
+      "review_count": 0
+    },
+    "48": {
+      "lld_path": "docs\\lld\\done\\48-v2-foundation.md",
+      "status": "approved",
+      "has_gemini_review": true,
+      "final_verdict": "APPROVED",
+      "last_review_date": "2026-01-22",
+      "review_count": 1
+    },
+    "50": {
+      "lld_path": "docs\\lld\\done\\50-governance-node-audit-logger.md",
+      "status": "blocked",
+      "has_gemini_review": true,
+      "final_verdict": "REJECTED",
+      "last_review_date": "2026-01-23",
+      "review_count": 1
+    },
+    "56": {
+      "lld_path": "docs\\lld\\done\\56-designer-node.md",
+      "status": "draft",
+      "has_gemini_review": false,
+      "final_verdict": null,
+      "last_review_date": null,
+      "review_count": 0
+    },
+    "57": {
+      "lld_path": "docs\\lld\\done\\57-distributed-logging.md",
+      "status": "approved",
+      "has_gemini_review": true,
+      "final_verdict": "APPROVED",
+      "last_review_date": "2026-01-24",
+      "review_count": 1
+    },
+    "62": {
+      "lld_path": "docs\\lld\\done\\62-governance-workflow-stategraph.md",
+      "status": "approved",
+      "has_gemini_review": true,
+      "final_verdict": "APPROVED",
+      "last_review_date": "2026-01-26",
+      "review_count": 1
+    },
+    "86": {
+      "lld_path": "docs\\lld\\done\\LLD-086-lld-governance-workflow.md",
+      "status": "draft",
+      "has_gemini_review": false,
+      "final_verdict": "PENDING",
+      "last_review_date": null,
+      "review_count": 0
+    },
+    "12": {
+      "lld_path": "docs\\lld\\active\\00012-add-ideas-directory-to-canonical-structure.md",
+      "status": "draft",
+      "has_gemini_review": false,
+      "final_verdict": null,
+      "last_review_date": null,
+      "review_count": 0
+    },
+    "78": {
+      "lld_path": "docs\\lld\\active\\LLD-078.md",
+      "status": "approved",
+      "has_gemini_review": true,
+      "final_verdict": "APPROVED",
+      "last_review_date": "2026-01-31",
+      "review_count": 1
+    },
+    "87": {
+      "lld_path": "docs\\lld\\active\\LLD-087.md",
+      "status": "approved",
+      "has_gemini_review": true,
+      "final_verdict": "APPROVED",
+      "last_review_date": "2026-01-31",
+      "review_count": 1
+    },
+    "93": {
+      "lld_path": "docs\\lld\\active\\LLD-093.md",
+      "status": "approved",
+      "has_gemini_review": true,
+      "final_verdict": "APPROVED",
+      "last_review_date": "2026-01-31",
+      "review_count": 1
+    },
+    "94": {
+      "lld_path": "docs\\lld\\active\\LLD-094.md",
+      "status": "approved",
+      "has_gemini_review": true,
+      "final_verdict": "APPROVED",
+      "last_review_date": "2026-01-31",
+      "review_count": 1
+    },
     "98": {
       "lld_path": "docs\\lld\\active\\LLD-098.md",
       "status": "approved",
       "has_gemini_review": true,
       "final_verdict": "APPROVED",
-      "last_review_date": "2026-01-31T04:18:24.245582+00:00",
+      "last_review_date": "2026-01-31",
       "review_count": 1
+    },
+    "99": {
+      "lld_path": "docs\\lld\\active\\LLD-099.md",
+      "status": "approved",
+      "has_gemini_review": true,
+      "final_verdict": "APPROVED",
+      "last_review_date": "2026-01-31",
+      "review_count": 1
+    },
+    "100": {
+      "lld_path": "docs\\lld\\active\\LLD-100.md",
+      "status": "approved",
+      "has_gemini_review": true,
+      "final_verdict": "APPROVED",
+      "last_review_date": "2026-01-31",
+      "review_count": 1
+    },
+    "101": {
+      "lld_path": "docs\\lld\\active\\LLD-101.md",
+      "status": "draft",
+      "has_gemini_review": false,
+      "final_verdict": "PENDING",
+      "last_review_date": null,
+      "review_count": 0
     }
   }
 }
