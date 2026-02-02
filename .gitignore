@@ -33,3 +33,6 @@ docs/blog/
 # Verdict analyzer database (generated locally)
 .agentos/verdicts.db
 verdicts.db
+
+# Per-repo workflow database (Issue #78)
+.agentos/issue_workflow.db
