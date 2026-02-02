@@ -14,6 +14,7 @@
 
 ### Architecture
 
+- [Workflow Personas](Workflow-Personas)
 - [Governance Pipeline](Governance-Pipeline)
 - [Multi-Agent Orchestration](Multi-Agent-Orchestration)
 - [Gemini Verification](Gemini-Verification)
