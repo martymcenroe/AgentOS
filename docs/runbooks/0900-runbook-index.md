@@ -29,6 +29,8 @@ Quick reference for the orchestrator (Marty) on how to run tools, commands, agen
 | 0908 | [The Scout](0908-the-scout-external-intelligence-gathering-workflow.md) | Manual | Research | Sonnet |
 | 0909 | [TDD Implementation Workflow](0909-tdd-implementation-workflow.md) | Manual | Per approved LLD | Claude + Gemini |
 | 0910 | [Verdict Analyzer](0910-verdict-analyzer---template-improvement-from-gemini-verdicts.md) | Manual | Weekly/ad-hoc | - |
+| 0911 | [Dependabot PR Audit](0911-dependabot-pr-audit.md) | Manual | On Dependabot PRs | Sonnet |
+| 0912 | [GitHub Projects](0912-github-projects.md) | Reference | - | - |
 
 ## Model Selection Guide
 
