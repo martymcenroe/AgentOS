@@ -128,14 +128,9 @@ def extract_requirements(lld_content: str) -> list[str]:
             if text and f"REQ-{num}" not in [r.split(":")[0] for r in requirements]:
                 requirements.append(f"REQ-{num}: {text}")
 
-    # Pattern 3: Checkbox items
-    checkbox_pattern = re.compile(r"^\s*-\s*\[[x ]\]\s*(.+)$", re.MULTILINE | re.IGNORECASE)
-    for match in checkbox_pattern.finditer(lld_content):
-        text = match.group(1).strip()
-        if text and len(text) > 10:  # Filter out short items
-            # Check if already captured
-            if not any(text in r for r in requirements):
-                requirements.append(f"REQ-C: {text}")
+    # Pattern 3: Checkbox items - ONLY from Section 3 (Requirements)
+    # Don't extract checkboxes from the entire document (Quality Gate, Compliance, etc.)
+    # The numbered requirements in Section 3 are already captured by Pattern 2
 
     return requirements
 

@@ -284,6 +284,19 @@ def verify_green_phase(state: TestingWorkflowState) -> dict[str, Any]:
 
     # Check for failures
     if failed_count > 0 or error_count > 0:
+        # Check if we've exhausted iterations
+        max_iterations = state.get("max_iterations", 10)
+        if iteration_count + 1 >= max_iterations:
+            print(f"    [ERROR] Max iterations ({max_iterations}) reached with {failed_count} failures")
+            return {
+                "green_phase_output": output,
+                "coverage_achieved": coverage_achieved,
+                "file_counter": file_num,
+                "iteration_count": iteration_count + 1,
+                "next_node": "end",
+                "error_message": f"Green phase failed after {max_iterations} iterations: {failed_count} tests still failing",
+            }
+
         print(f"    [ITERATE] {failed_count} failures, {error_count} errors - needs revision")
 
         log_workflow_execution(
@@ -311,6 +324,19 @@ def verify_green_phase(state: TestingWorkflowState) -> dict[str, Any]:
 
     # Check coverage
     if coverage_achieved < coverage_target:
+        # Check if we've exhausted iterations
+        max_iterations = state.get("max_iterations", 10)
+        if iteration_count + 1 >= max_iterations:
+            print(f"    [ERROR] Max iterations ({max_iterations}) reached with {coverage_achieved:.1f}% coverage")
+            return {
+                "green_phase_output": output,
+                "coverage_achieved": coverage_achieved,
+                "file_counter": file_num,
+                "iteration_count": iteration_count + 1,
+                "next_node": "end",
+                "error_message": f"Green phase failed after {max_iterations} iterations: coverage {coverage_achieved:.1f}% < target {coverage_target}%",
+            }
+
         print(f"    [ITERATE] Coverage {coverage_achieved:.1f}% < target {coverage_target}%")
 
         log_workflow_execution(
