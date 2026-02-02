@@ -170,13 +170,42 @@ def call_claude_headless(prompt: str) -> tuple[str, str]:
 
     if claude_cli:
         try:
+            # System prompt to enforce strict output format
+            system_prompt = """You are a code generator. You MUST output code in EXACTLY this format:
+
+For EACH file, output a fenced code block where the FIRST LINE inside the block is a # File: comment:
+
+```python
+# File: path/to/file.py
+
+def example():
+    pass
+```
+
+CRITICAL RULES:
+1. The `# File: path` comment MUST be the FIRST line inside the code block
+2. Use the appropriate language fence (```python, ```yaml, ```gitignore, etc.)
+3. Output ONLY code blocks - no explanations, no summaries, no markdown headers
+4. Each file gets its own code block with its own # File: header
+5. Paths are relative to repo root (e.g., src/module/file.py)
+
+DO NOT:
+- Add explanatory text before or after code blocks
+- Use markdown headers like "### 1. filename"
+- Skip the # File: comment
+- Combine multiple files in one block"""
+
             # Use text output mode (default) - simpler and more reliable
             # --print (-p): non-interactive mode, prints response to stdout
             # --dangerously-skip-permissions: required for non-interactive file writes
+            # --system-prompt: enforce strict output format
+            # --model sonnet: use Claude Sonnet for faster implementation
             cmd = [
                 claude_cli,
                 "--print",
                 "--dangerously-skip-permissions",
+                "--model", "sonnet",
+                "--system-prompt", system_prompt,
             ]
 
             result = subprocess.run(
@@ -235,8 +264,9 @@ def parse_implementation_response(response: str) -> list[dict]:
     """Parse Claude's response to extract implementation files.
 
     Handles multiple code block formats:
-    - ```python with # File: header
+    - ```python with # File: header (preferred)
     - ```gitignore, ```markdown, etc. with # File: header
+    - Markdown header followed by code block (e.g., ### 1. `path`)
     - Plain ```python blocks (fallback)
 
     Args:
@@ -248,36 +278,97 @@ def parse_implementation_response(response: str) -> list[dict]:
     import re
 
     files = []
+    seen_paths = set()
 
-    # Primary pattern: any code block with # File: header
-    # Matches: ```python, ```gitignore, ```markdown, ```yaml, etc.
-    # The # File: comment must be on the first line after the fence
-    pattern = re.compile(
-        r"```\w*\s*\n#\s*File:\s*([^\n\(]+)(?:\s*\([^\)]*\))?\s*\n(.*?)```",
+    # Pattern 1 (preferred): code block with # File: header on first line
+    # Matches: ```python\n# File: path\n...```
+    pattern1 = re.compile(
+        r"```(\w*)\s*\n#\s*File:\s*([^\n\(]+)(?:\s*\([^\)]*\))?\s*\n(.*?)```",
         re.DOTALL,
     )
 
-    for match in pattern.finditer(response):
-        path = match.group(1).strip()
-        content = match.group(2).strip()
+    for match in pattern1.finditer(response):
+        path = match.group(2).strip()
+        content = match.group(3).strip()
 
-        # Skip invalid paths
-        if not path or path.startswith("("):
+        if not path or path.startswith("(") or path in seen_paths:
             continue
 
         files.append({"path": path, "content": content})
+        seen_paths.add(path)
 
-    # Fallback: look for python blocks without explicit # File: header
+    # Pattern 2: markdown header with backtick filename, followed by code block
+    # Matches: ### 1. `path/to/file.py`\n```python\n...```
+    # Also handles: **`path/to/file.py`**\n```python\n...```
     if not files:
-        code_pattern = re.compile(r"```python\s*\n(.*?)```", re.DOTALL)
-        for i, match in enumerate(code_pattern.finditer(response)):
-            content = match.group(1).strip()
-            # Try to infer filename from content
-            if "def " in content or "class " in content:
-                files.append({
-                    "path": f"implementation_{i}.py",
-                    "content": content,
-                })
+        pattern2 = re.compile(
+            r"(?:#{1,4}\s*\d*\.?\s*)?[`*]+([^`*\n]+)[`*]+\s*\n+```(\w*)\s*\n(.*?)```",
+            re.DOTALL,
+        )
+
+        for match in pattern2.finditer(response):
+            path = match.group(1).strip()
+            content = match.group(3).strip()
+
+            # Clean up path (remove leading/trailing punctuation)
+            path = path.strip("`*: ")
+
+            if not path or path in seen_paths:
+                continue
+
+            # Validate it looks like a file path
+            if "/" in path or path.endswith((".py", ".md", ".yaml", ".yml", ".json", ".txt", ".gitignore")):
+                files.append({"path": path, "content": content})
+                seen_paths.add(path)
+
+    # Pattern 3: code block with path in a comment at start (various styles)
+    # Matches: ```python\n# path/to/file.py\n...``` or ```python\n// path/to/file.js\n...```
+    if not files:
+        pattern3 = re.compile(
+            r"```(\w+)\s*\n(?:#|//)\s*([^\n]+\.(?:py|js|ts|yaml|yml|json|md|txt))\s*\n(.*?)```",
+            re.DOTALL,
+        )
+
+        for match in pattern3.finditer(response):
+            path = match.group(2).strip()
+            content = match.group(3).strip()
+
+            if not path or path in seen_paths:
+                continue
+
+            files.append({"path": path, "content": content})
+            seen_paths.add(path)
+
+    # Pattern 4 (fallback): any code block, try to extract path from first line or infer
+    if not files:
+        pattern4 = re.compile(r"```(\w*)\s*\n(.*?)```", re.DOTALL)
+
+        for i, match in enumerate(pattern4.finditer(response)):
+            lang = match.group(1) or "python"
+            content = match.group(2).strip()
+
+            # Skip empty or very short blocks
+            if not content or len(content) < 20:
+                continue
+
+            # Try to find a path-like first line
+            first_line = content.split("\n")[0].strip()
+            path = None
+
+            # Check if first line is a file path comment
+            if first_line.startswith(("#", "//", "<!--")):
+                potential_path = first_line.lstrip("#/<!- ").rstrip(" ->")
+                if "/" in potential_path or "." in potential_path:
+                    path = potential_path
+                    content = "\n".join(content.split("\n")[1:]).strip()
+
+            # If no path found but has Python code, generate a name
+            if not path and lang == "python" and ("def " in content or "class " in content):
+                path = f"implementation_{i}.py"
+
+            if path and path not in seen_paths:
+                files.append({"path": path, "content": content})
+                seen_paths.add(path)
 
     return files
 
@@ -369,7 +460,18 @@ def implement_code(state: TestingWorkflowState) -> dict[str, Any]:
 
     if not files:
         print("    [WARN] No implementation files extracted from response")
-        print("    Response preview:", response[:200])
+        print("    Response length:", len(response))
+        print("    Response preview (first 500 chars):")
+        print("    " + response[:500].replace("\n", "\n    "))
+        print("    ...")
+        print("    Response preview (last 500 chars):")
+        print("    " + response[-500:].replace("\n", "\n    "))
+
+        # Save full response for debugging
+        if audit_dir.exists():
+            file_num = next_file_number(audit_dir)
+            save_audit_file(audit_dir, file_num, "failed-response-full.md", response)
+            print(f"    Full response saved to audit trail")
 
         return {
             "error_message": "No implementation files extracted from Claude response",
