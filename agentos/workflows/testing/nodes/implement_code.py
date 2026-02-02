@@ -461,11 +461,13 @@ def implement_code(state: TestingWorkflowState) -> dict[str, Any]:
     if not files:
         print("    [WARN] No implementation files extracted from response")
         print("    Response length:", len(response))
+        # Sanitize for Windows console (remove non-ASCII)
+        sanitized = response.encode("ascii", errors="replace").decode("ascii")
         print("    Response preview (first 500 chars):")
-        print("    " + response[:500].replace("\n", "\n    "))
+        print("    " + sanitized[:500].replace("\n", "\n    "))
         print("    ...")
         print("    Response preview (last 500 chars):")
-        print("    " + response[-500:].replace("\n", "\n    "))
+        print("    " + sanitized[-500:].replace("\n", "\n    "))
 
         # Save full response for debugging
         if audit_dir.exists():
