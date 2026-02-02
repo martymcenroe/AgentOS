@@ -1,3 +1,0 @@
-# Governance Verdict: BLOCK
-
-The LLD proposes a robust sanitization and file organization strategy, but contains a critical architectural flaw regarding the "Wordlist" capacity. The requirement to ensure word uniqueness across both `active` and `done` directories, combined with a small list (~80 words), imposes a hard limit on the tool's lifespan (approx. 80 audits total). This must be addressed before implementation.

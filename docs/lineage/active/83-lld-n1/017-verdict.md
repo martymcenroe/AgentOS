@@ -1,3 +1,0 @@
-# Governance Verdict: BLOCK
-
-The LLD proposes a robust, deterministic naming convention that solves the collision and readability problems inherent in multi-repo setups. The hash-based word selection is a clever addition for memorability. However, the design lacks atomic write safety, creating a risk of data loss via silent overwrites during race conditions, and misses observability details regarding file creation events.
