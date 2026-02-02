@@ -361,9 +361,10 @@ def extract_files_to_modify(lld_content: str) -> list[dict]:
     # Rows: | `path/to/file.py` | Modify | Description text |
     table_pattern = re.compile(
         r"###?\s*2\.1[^\n]*Files Changed[^\n]*\n"  # Section header
-        r"[^\n]*\n"  # Table header row
-        r"[^\n]*-+[^\n]*\n"  # Separator row (---)
-        r"((?:\|[^\n]+\n)+)",  # Table rows
+        r"\n*"  # Optional blank lines
+        r"\|[^\n]+\n"  # Table header row (starts with |)
+        r"\|[-|\s]+\n"  # Separator row (|---|---|---|)
+        r"((?:\|[^\n]+\n)+)",  # Table rows (start with |)
         re.IGNORECASE,
     )
 
