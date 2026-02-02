@@ -1,5 +1,12 @@
 # 1{IssueID} - Feature: {Title}
 
+<!-- Template Metadata
+Last Updated: 2026-02-01
+Updated By: Verdict Analyzer (tools/verdict-analyzer.py)
+Update Reason: Added sections based on 80 blocking issues from 164 governance verdicts
+Categories addressed: architecture (23), safety (9), legal (8), cost (6)
+-->
+
 ## 1. Context & Goal
 * **Issue:** #{IssueID}
 * **Objective:** {One sentence}
@@ -65,6 +72,19 @@ def function_name(param: Type) -> ReturnType:
 * **Module:** `src/...`
 * **Pattern:** {Design pattern if applicable}
 * **Key Decisions:** {Brief rationale for approach}
+
+### 2.7 Architecture Decisions
+
+*Document key architectural decisions that affect the design. This section addresses the most common category of governance feedback (23 patterns).*
+
+| Decision | Options Considered | Choice | Rationale |
+|----------|-------------------|--------|-----------|
+| {e.g., State management} | {Option A, Option B} | {Chosen option} | {Why this choice} |
+| {e.g., Data flow pattern} | {Sync, Async, Event-driven} | {Chosen option} | {Why this choice} |
+
+**Architectural Constraints:**
+- {Constraint 1: e.g., Must integrate with existing X system}
+- {Constraint 2: e.g., Cannot introduce new external dependencies}
 
 ## 3. Requirements
 
@@ -160,16 +180,36 @@ sequenceDiagram
 
 ```
 
-## 7. Security Considerations
+## 7. Security & Safety Considerations
+
+*This section addresses security (10 patterns) and safety (9 patterns) concerns from governance feedback.*
+
+### 7.1 Security
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
 | {e.g., Input injection} | {e.g., Sanitize all inputs} | Addressed / TODO |
 | {e.g., Auth bypass} | {e.g., Validate tokens} | Addressed / TODO |
 
+### 7.2 Safety
+
+*Safety concerns focus on preventing data loss, ensuring fail-safe behavior, and protecting system integrity.*
+
+| Concern | Mitigation | Status |
+|---------|------------|--------|
+| {e.g., Data loss on failure} | {e.g., Transaction rollback, backup before modify} | Addressed / TODO |
+| {e.g., Runaway process} | {e.g., Timeout limits, circuit breakers} | Addressed / TODO |
+| {e.g., Resource exhaustion} | {e.g., Rate limiting, queue bounds} | Addressed / TODO |
+
 **Fail Mode:** {Fail Open / Fail Closed} - {Justification}
 
-## 8. Performance Considerations
+**Recovery Strategy:** {How to recover from partial failures}
+
+## 8. Performance & Cost Considerations
+
+*This section addresses performance and cost concerns (6 patterns) from governance feedback.*
+
+### 8.1 Performance
 
 | Metric | Budget | Approach |
 |--------|--------|----------|
@@ -179,19 +219,54 @@ sequenceDiagram
 
 **Bottlenecks:** {Known performance concerns}
 
-## 9. Risks & Mitigations
+### 8.2 Cost Analysis
+
+| Resource | Unit Cost | Estimated Usage | Monthly Cost |
+|----------|-----------|-----------------|--------------|
+| {e.g., LLM API calls} | {$X per 1K tokens} | {N calls/day} | {$X} |
+| {e.g., Cloud compute} | {$X per hour} | {N hours} | {$X} |
+| {e.g., Storage} | {$X per GB} | {N GB} | {$X} |
+
+**Cost Controls:**
+- [ ] Budget alerts configured at {$X threshold}
+- [ ] Rate limiting prevents runaway costs
+- [ ] Fallback to cheaper alternatives when appropriate
+
+**Worst-Case Scenario:** {What happens if usage spikes 10x? 100x?}
+
+## 9. Legal & Compliance
+
+*This section addresses legal concerns (8 patterns) from governance feedback.*
+
+| Concern | Applies? | Mitigation |
+|---------|----------|------------|
+| PII/Personal Data | Yes / No / N/A | {e.g., Data anonymization, consent collection} |
+| Third-Party Licenses | Yes / No / N/A | {e.g., License compatibility verified} |
+| Terms of Service | Yes / No / N/A | {e.g., API usage within ToS limits} |
+| Data Retention | Yes / No / N/A | {e.g., Auto-delete after X days} |
+| Export Controls | Yes / No / N/A | {e.g., No restricted data/algorithms} |
+
+**Data Classification:** {Public / Internal / Confidential / Restricted}
+
+**Compliance Checklist:**
+- [ ] No PII stored without consent
+- [ ] All third-party licenses compatible with project license
+- [ ] External API usage compliant with provider ToS
+- [ ] Data retention policy documented
+
+## 10. Risks & Mitigations
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
 | {Risk description} | High/Med/Low | High/Med/Low | {How addressed} |
 
-## 10. Verification & Testing
+## 11. Verification & Testing
 
 *Ref: [0005-testing-strategy-and-protocols.md](0005-testing-strategy-and-protocols.md)*
 
 **Testing Philosophy:** Strive for 100% automated test coverage. Manual tests are a last resort for scenarios that genuinely cannot be automated (e.g., visual inspection, hardware interaction). Every scenario marked "Manual" requires justification.
 
-### 10.1 Test Scenarios
+### 11.1 Test Scenarios
 
 | ID | Scenario | Type | Input | Expected Output | Pass Criteria |
 |----|----------|------|-------|-----------------|---------------|
@@ -206,7 +281,7 @@ sequenceDiagram
 - `Auto-Live` - Automated but hits real external services (may be slow/flaky)
 - `Manual` - Requires human execution (MUST include justification why automation is impossible)
 
-### 10.2 Test Commands
+### 11.2 Test Commands
 
 ```bash
 # Run all automated tests
@@ -219,7 +294,7 @@ poetry run pytest tests/test_{module}.py -v -m "not live"
 poetry run pytest tests/test_{module}.py -v -m live
 ```
 
-### 10.3 Manual Tests (Only If Unavoidable)
+### 11.3 Manual Tests (Only If Unavoidable)
 
 **If no manual tests required:** Write "N/A - All scenarios automated."
 
@@ -231,7 +306,7 @@ poetry run pytest tests/test_{module}.py -v -m live
 
 *Full test results recorded in Implementation Report (0103) or Test Report (0113).*
 
-## 11. Definition of Done
+## 12. Definition of Done
 
 ### Code
 - [ ] Implementation complete and linted
