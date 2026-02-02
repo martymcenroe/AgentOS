@@ -162,7 +162,7 @@ def route_after_implement(
 
 def route_after_green(
     state: TestingWorkflowState,
-) -> Literal["N6_e2e_validation", "N4_implement_code", "end"]:
+) -> Literal["N6_e2e_validation", "N7_finalize", "N4_implement_code", "end"]:
     """Route after N5 (verify_green_phase).
 
     Args:
@@ -188,6 +188,10 @@ def route_after_green(
 
     if next_node == "N6_e2e_validation":
         return "N6_e2e_validation"
+
+    # Skip E2E - go directly to finalize
+    if next_node == "N7_finalize":
+        return "N7_finalize"
 
     return "end"
 
@@ -315,12 +319,13 @@ def build_testing_workflow() -> StateGraph:
         },
     )
 
-    # N5 -> N6 or N4 (iteration loop)
+    # N5 -> N6 or N7 (skip E2E) or N4 (iteration loop)
     workflow.add_conditional_edges(
         "N5_verify_green",
         route_after_green,
         {
             "N6_e2e_validation": "N6_e2e_validation",
+            "N7_finalize": "N7_finalize",
             "N4_implement_code": "N4_implement_code",
             "end": END,
         },
