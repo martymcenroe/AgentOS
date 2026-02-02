@@ -1,27 +1,36 @@
 #!/usr/bin/env python3
-"""CLI entry point for TDD Testing Workflow.
+"""CLI entry point for LLD Implementation Workflow (TDD).
+
+Takes an approved LLD and implements it using Test-Driven Development:
+1. Load LLD
+2. Review test plan (Gemini)
+3. Scaffold tests (red phase)
+4. Implement code (Claude)
+5. Verify tests pass (green phase)
+6. E2E validation
+7. Generate documentation
 
 Issue #101: Test Plan Reviewer
 Issue #102: TDD Initialization
 
 Usage:
     # Full TDD workflow
-    python tools/run_testing_workflow.py --issue 42
+    python tools/run_implement_from_lld.py --issue 42
 
     # Fast mode (skip E2E)
-    python tools/run_testing_workflow.py --issue 42 --skip-e2e
+    python tools/run_implement_from_lld.py --issue 42 --skip-e2e
 
     # Just scaffold tests
-    python tools/run_testing_workflow.py --issue 42 --scaffold-only
+    python tools/run_implement_from_lld.py --issue 42 --scaffold-only
 
     # Auto mode (no human gates)
-    python tools/run_testing_workflow.py --issue 42 --auto
+    python tools/run_implement_from_lld.py --issue 42 --auto
 
     # With sandbox repo for E2E
-    python tools/run_testing_workflow.py --issue 42 --sandbox-repo mcwiz/agentos-e2e-sandbox
+    python tools/run_implement_from_lld.py --issue 42 --sandbox-repo mcwiz/agentos-e2e-sandbox
 
     # Cross-repo (test another project)
-    python tools/run_testing_workflow.py --issue 42 --repo /path/to/other/repo
+    python tools/run_implement_from_lld.py --issue 42 --repo /path/to/other/repo
 """
 
 import argparse

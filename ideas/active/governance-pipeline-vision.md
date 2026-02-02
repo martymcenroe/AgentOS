@@ -100,7 +100,7 @@ python tools/run_lld_workflow.py --issue <issue_number>
 
 **How to Start Stage 3:**
 ```bash
-python tools/run_testing_workflow.py --issue <issue_number>
+python tools/run_implement_from_lld.py --issue <issue_number>
 ```
 
 ### Stage 3 → Stage 4
@@ -148,7 +148,7 @@ python tools/run_issue_workflow.py --brief my-idea.md
 # Wait, review, approve...
 python tools/run_lld_workflow.py --issue 42
 # Wait, review, approve...
-python tools/run_testing_workflow.py --issue 42
+python tools/run_implement_from_lld.py --issue 42
 
 # Future: Single command
 python tools/run_governance_pipeline.py --brief my-idea.md
@@ -181,7 +181,7 @@ agentos/workflows/
 tools/
 ├── run_issue_workflow.py      # Stage 1
 ├── run_lld_workflow.py        # Stage 2
-└── run_testing_workflow.py    # Stage 3
+└── run_implement_from_lld.py    # Stage 3
 ```
 
 ### Audit Directories

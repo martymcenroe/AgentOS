@@ -80,25 +80,25 @@ stateDiagram-v2
 ### Standard Implementation
 
 ```bash
-poetry run python tools/run_testing_workflow.py --issue 104
+poetry run python tools/run_implement_from_lld.py --issue 104
 ```
 
 ### Fully Automated
 
 ```bash
-poetry run python tools/run_testing_workflow.py --issue 104 --auto
+poetry run python tools/run_implement_from_lld.py --issue 104 --auto
 ```
 
 ### Fast Mode (Skip E2E)
 
 ```bash
-poetry run python tools/run_testing_workflow.py --issue 104 --skip-e2e
+poetry run python tools/run_implement_from_lld.py --issue 104 --skip-e2e
 ```
 
 ### Scaffold Tests Only
 
 ```bash
-poetry run python tools/run_testing_workflow.py --issue 104 --scaffold-only
+poetry run python tools/run_implement_from_lld.py --issue 104 --scaffold-only
 ```
 
 ---
@@ -197,7 +197,7 @@ So when you run this workflow for a CLI tool like Verdict Analyzer, N8 will auto
 
 ```bash
 # After LLD is approved via governance workflow
-poetry run python tools/run_testing_workflow.py --issue 104
+poetry run python tools/run_implement_from_lld.py --issue 104
 ```
 
 Flow:
@@ -215,18 +215,18 @@ If tests keep failing after max iterations:
 
 ```bash
 # Resume where you left off
-poetry run python tools/run_testing_workflow.py --issue 104 --resume
+poetry run python tools/run_implement_from_lld.py --issue 104 --resume
 
 # Or reset and try again
 rm ~/.agentos/testing_workflow.db
-poetry run python tools/run_testing_workflow.py --issue 104
+poetry run python tools/run_implement_from_lld.py --issue 104
 ```
 
 ### 3. Cross-Repo Implementation
 
 ```bash
 poetry run --directory /c/Users/mcwiz/Projects/AgentOS python \
-  /c/Users/mcwiz/Projects/AgentOS/tools/run_testing_workflow.py \
+  /c/Users/mcwiz/Projects/AgentOS/tools/run_implement_from_lld.py \
   --issue 42 --repo /c/Users/mcwiz/Projects/OtherProject
 ```
 
