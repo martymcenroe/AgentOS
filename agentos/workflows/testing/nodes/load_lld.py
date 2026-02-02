@@ -61,7 +61,7 @@ def find_lld_path(issue_number: int, repo_root: Path) -> Path | None:
 
 
 def extract_test_plan_section(lld_content: str) -> str:
-    """Extract Section 10 (Test Plan) from LLD content.
+    """Extract Section 10 (Test Plan/Verification) from LLD content.
 
     Args:
         lld_content: Full LLD markdown content.
@@ -69,20 +69,21 @@ def extract_test_plan_section(lld_content: str) -> str:
     Returns:
         Test plan section content, or empty string if not found.
     """
-    # Pattern: ## 10. Test Plan or ## 10 Test Plan
+    # Pattern variations for Section 10:
+    # - ## 10. Test Plan
+    # - ## 10. Verification & Testing
+    # - ## 10. Testing
     # Capture until next ## heading or end of document
-    pattern = r"##\s*10\.?\s*Test\s*Plan\s*\n(.*?)(?=\n##\s*\d|\Z)"
-    match = re.search(pattern, lld_content, re.DOTALL | re.IGNORECASE)
+    patterns = [
+        r"##\s*10\.?\s*(?:Test\s*Plan|Verification\s*(?:&|and)?\s*Testing|Testing)\s*\n(.*?)(?=\n##\s*\d|\Z)",
+        r"##\s*Test\s*Plan\s*\n(.*?)(?=\n##|\Z)",
+        r"##\s*(?:Verification|Testing)\s*\n(.*?)(?=\n##|\Z)",
+    ]
 
-    if match:
-        return match.group(1).strip()
-
-    # Fallback: look for just "## Test Plan" without number
-    pattern = r"##\s*Test\s*Plan\s*\n(.*?)(?=\n##|\Z)"
-    match = re.search(pattern, lld_content, re.DOTALL | re.IGNORECASE)
-
-    if match:
-        return match.group(1).strip()
+    for pattern in patterns:
+        match = re.search(pattern, lld_content, re.DOTALL | re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
 
     return ""
 
@@ -175,30 +176,65 @@ def parse_test_scenarios(test_plan: str) -> list[TestScenario]:
         }
         scenarios.append(scenario)
 
-    # Pattern 2: Table format
-    # | Test Name | Description | Type | Requirement |
-    table_pattern = re.compile(
-        r"\|\s*(\w+)\s*\|\s*([^|]+)\s*\|\s*(\w+)\s*\|(?:\s*([^|]+)\s*\|)?",
-    )
-    for match in table_pattern.finditer(test_plan):
-        name = match.group(1).strip()
-        desc = match.group(2).strip()
-        test_type = match.group(3).strip().lower()
-        req_ref = match.group(4).strip() if match.group(4) else ""
+    # Pattern 2: Table format - flexible to handle multiple formats:
+    # Format A: | Test Name | Description | Type | Requirement |
+    # Format B: | ID | Scenario | Type | Input | Expected Output | Pass Criteria |
+    # We extract all rows and parse based on column count
+    table_row_pattern = re.compile(r"^\|(.+)\|$", re.MULTILINE)
+    rows = table_row_pattern.findall(test_plan)
 
-        # Skip header row
-        if name.lower() in ("test", "test name", "name"):
+    header_row = None
+    for row in rows:
+        cols = [c.strip() for c in row.split("|")]
+
+        # Detect header row (contains common header words)
+        header_words = {"id", "test", "name", "scenario", "type", "description", "input", "output", "criteria"}
+        if any(c.lower() in header_words for c in cols[:3]):
+            # Skip separator rows (----)
+            if all("-" in c or not c for c in cols):
+                continue
+            header_row = cols
             continue
 
-        scenario: TestScenario = {
-            "name": name,
-            "description": desc,
-            "requirement_ref": req_ref,
-            "test_type": test_type if test_type in ("unit", "integration", "e2e") else "unit",
-            "mock_needed": _needs_mock(desc),
-            "assertions": [],
-        }
-        scenarios.append(scenario)
+        # Skip separator rows
+        if all("-" in c or not c for c in cols):
+            continue
+
+        # Parse data row based on header or position
+        if len(cols) >= 3:
+            # First non-empty column is typically ID/Name
+            name_col = cols[0] if cols[0] else cols[1] if len(cols) > 1 else "unknown"
+            # Second column is typically Description/Scenario
+            desc_col = cols[1] if len(cols) > 1 else ""
+            # Third column is typically Type
+            type_col = cols[2] if len(cols) > 2 else ""
+
+            # Skip if name looks like a header
+            if name_col.lower() in ("id", "test", "name", "scenario", "test name"):
+                continue
+
+            # Clean up the name to be a valid test function name
+            test_name = re.sub(r"[^\w]+", "_", name_col).strip("_").lower()
+            if not test_name:
+                continue
+
+            # Detect test type from type column or infer
+            test_type_val = type_col.lower() if type_col else "unit"
+            if test_type_val not in ("unit", "integration", "e2e"):
+                test_type_val = _infer_test_type(test_name, desc_col)
+
+            # Build full description from all remaining columns
+            full_desc = " | ".join(c for c in cols[1:] if c and "-" not in c[:3])
+
+            scenario: TestScenario = {
+                "name": f"test_{test_name}" if not test_name.startswith("test_") else test_name,
+                "description": full_desc[:200],
+                "requirement_ref": "",
+                "test_type": test_type_val,
+                "mock_needed": _needs_mock(full_desc),
+                "assertions": [],
+            }
+            scenarios.append(scenario)
 
     # Pattern 3: Bold name with description
     bold_pattern = re.compile(r"\*\*(\w+)\*\*:\s*(.+?)(?=\n\*\*|\n\n|\Z)", re.DOTALL)

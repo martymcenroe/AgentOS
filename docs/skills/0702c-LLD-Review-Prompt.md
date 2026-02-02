@@ -114,6 +114,7 @@ These issues require fixes but don't block implementation. Be thorough.
 
 | Check | Question |
 |-------|----------|
+| **Section 10 Test Scenarios (CRITICAL)** | Does Section 10 contain a structured table of test scenarios with columns for: ID/Name, Scenario/Description, Type (unit/integration/e2e), and Expected behavior? LLDs without parseable test scenarios BLOCK the TDD workflow. |
 | **Test Strategy (CRITICAL)** | Is the test strategy defined? Does it rely on automated assertions, NOT manual "vibes" verification? |
 | **Willison Protocol** | Will tests fail if the implementation is reverted? (Tests must prove the feature works, not just that it doesn't crash.) |
 | **Test Data Hygiene** | Are test fixtures defined? No real PII or slurs in test data? |
