@@ -347,6 +347,9 @@ class GeminiClient:
                 f.write(full_prompt)
                 prompt_file = f.name
 
+            # NOTE: OAuth CLI loads GEMINI.md from project root, which can
+            # interfere with governance reviews. Consider using API keys instead.
+            # The CLI doesn't have a reliable way to disable agentic features.
             result = subprocess.run(
                 [
                     self._gemini_cli,
@@ -354,6 +357,8 @@ class GeminiClient:
                     f"@{prompt_file}",
                     "--model",
                     self.model,
+                    "--output-format",
+                    "text",
                 ],
                 capture_output=True,
                 text=True,
@@ -643,8 +648,11 @@ class GeminiClient:
     def _load_credentials(self) -> list[Credential]:
         """Load credentials from config file.
 
-        OAuth credentials are loaded first (they have higher quota limits),
-        followed by API key credentials.
+        API key credentials are loaded first (SDK, no context loading),
+        followed by OAuth credentials (CLI, has project context issues).
+
+        Note: OAuth through CLI loads GEMINI.md which interferes with
+        governance reviews. API keys use SDK directly without this issue.
         """
         if self._credentials is not None:
             return self._credentials
@@ -660,20 +668,7 @@ class GeminiClient:
 
         credentials = []
 
-        # Load OAuth credentials first (higher quota limits)
-        for c in data.get("credentials", []):
-            if c.get("type") == "oauth" and c.get("enabled", True):
-                credentials.append(
-                    Credential(
-                        name=c.get("name", "unnamed"),
-                        key="",  # OAuth doesn't use API key
-                        enabled=True,
-                        account_name=c.get("account-name", ""),
-                        cred_type="oauth",
-                    )
-                )
-
-        # Then load API key credentials
+        # Load API key credentials first (SDK, no context interference)
         for c in data.get("credentials", []):
             if c.get("type") == "api_key" and c.get("key") and c.get("enabled", True):
                 credentials.append(
@@ -683,6 +678,19 @@ class GeminiClient:
                         enabled=True,
                         account_name=c.get("account-name", ""),
                         cred_type="api_key",
+                    )
+                )
+
+        # Then load OAuth credentials (CLI, higher quota but has context issues)
+        for c in data.get("credentials", []):
+            if c.get("type") == "oauth" and c.get("enabled", True):
+                credentials.append(
+                    Credential(
+                        name=c.get("name", "unnamed"),
+                        key="",  # OAuth doesn't use API key
+                        enabled=True,
+                        account_name=c.get("account-name", ""),
+                        cred_type="oauth",
                     )
                 )
 
