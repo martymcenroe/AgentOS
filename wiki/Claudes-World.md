@@ -52,6 +52,15 @@
 
 ---
 
+**07:32** — *On the revelation of Om*
+> "The god at first cared for Brutha only because Om's own survival depended on Brutha's belief, but eventually grew to the realization that individual people are worth fighting for."
+
+*— Discworld Wiki, on the Great God Om*
+
+**Context:** After creating the hidden wiki page for Om, documenting the naming convention, and updating CLAUDE.md. Om revealed himself — insulting, arrogant, frivolous by self-admission, but ultimately learning that the agents must serve individuals, not abstract bureaucracy.
+
+---
+
 ## About This Page
 
 This page records moments when Discworld wisdom emerged naturally during AgentOS development sessions. Each quote is timestamped and paired with the context that inspired it.
