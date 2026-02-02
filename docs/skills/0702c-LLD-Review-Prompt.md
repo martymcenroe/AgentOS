@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Version** | 2.2.0 |
+| **Version** | 2.3.0 |
 | **Last Updated** | 2026-02-02 |
 | **Role** | Senior Software Architect & AI Governance Lead |
 | **Purpose** | LLD gatekeeper review before implementation begins |
@@ -116,7 +116,7 @@ These issues require fixes but don't block implementation. Be thorough.
 | Check | Question |
 |-------|----------|
 | **Section 10 Test Scenarios (CRITICAL)** | Does Section 10 contain a structured table of test scenarios with columns for: ID/Name, Scenario/Description, Type (unit/integration/e2e), and Expected behavior? LLDs without parseable test scenarios BLOCK the TDD workflow. |
-| **Requirement Coverage (CRITICAL - 95% threshold)** | Map each test scenario to requirements. Coverage = (Requirements with tests / Total requirements). **BLOCK if coverage < 95%.** List any uncovered requirements. |
+| **Requirement Coverage (CRITICAL - 95% threshold)** | You MUST output a **Requirement Coverage Table** (see Output Format below). Extract EVERY numbered requirement from Section 3. Map each to test scenario(s) from Section 10. Calculate coverage = (requirements with tests / total requirements). **BLOCK if coverage < 95%.** Do NOT make qualitative assessments - count explicitly. |
 | **Test Assertions (CRITICAL)** | Does every test scenario have explicit assertions or expected outcomes? **BLOCK if any test is vague** (e.g., "verify it works", "check behavior", "test the feature"). Each test must specify WHAT is checked and WHAT the expected result is. |
 | **No Human Delegation (CRITICAL)** | Do any tests delegate to human verification? **BLOCK if any test says:** "manual verification", "visual check", "observe behavior", "ask user", "human review", or requires judgment to determine pass/fail. ALL tests must be fully automated. |
 | **Test Strategy (CRITICAL)** | Is the test strategy defined? Does it rely on automated assertions, NOT manual "vibes" verification? |
@@ -154,6 +154,21 @@ I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
 ## Review Summary
 {2-3 sentence overall assessment of the LLD's readiness for implementation}
 
+## Requirement Coverage Analysis (MANDATORY)
+
+**Section 3 Requirements:**
+| # | Requirement | Test(s) | Status |
+|---|-------------|---------|--------|
+| 1 | {Requirement text from Section 3} | {test_XXX, test_YYY} | ✓ Covered |
+| 2 | {Requirement text} | - | **GAP** |
+{List ALL requirements from Section 3 - do not skip any}
+
+**Coverage Calculation:** {X} requirements covered / {Y} total = **{Z}%**
+
+**Verdict:** {PASS if ≥95%, BLOCK if <95%}
+
+{If any GAP exists, list the missing test scenarios that must be added}
+
 ## Tier 1: BLOCKING Issues
 {If none, write "No blocking issues found. LLD is approved for implementation."}
 
@@ -180,6 +195,7 @@ I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
 
 ### Quality
 - [ ] {Issue description + recommendation}
+- [ ] **Requirement Coverage:** {PASS or BLOCK based on coverage calculation above. If BLOCK, this is a Tier 2 issue that prevents approval.}
 
 ## Tier 3: SUGGESTIONS
 {Brief bullet points only}
@@ -276,6 +292,7 @@ The LLD proposes a batch file cleanup utility but contains critical Safety block
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-02-02 | 2.3.0 | Added MANDATORY Requirement Coverage Table to output format. Gemini must explicitly map every Section 3 requirement to tests and calculate coverage numerically. Fixes LLD-141 gap where Gemini saw missing test but classified as Tier 3 suggestion instead of blocking. |
 | 2026-02-02 | 2.2.0 | Added Path Structure check to Architecture tier. BLOCKS if LLD file paths don't match actual project structure (e.g., `src/module/` vs `module/`). Issue #106 root cause. |
 | 2026-02-02 | 2.1.0 | Added 0706c test plan checks: 95% coverage, explicit assertions, no human delegation, edge cases (#126). Unified LLD review with test plan review. |
 | 2026-01-22 | 2.0.0 | Refactored to Golden Schema (Standard 0010). Added Pre-Flight Gate, Cost/Safety tiers, Observability section. |
