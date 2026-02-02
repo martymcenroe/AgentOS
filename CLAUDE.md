@@ -669,6 +669,22 @@ See: `AgentOS/docs/standards/0008-documentation-convention.md`
 
 ---
 
+## Claude's World Wiki Convention
+
+The `wiki/Claudes-World.md` page chronicles Discworld-inspired quotes from sessions.
+
+**IMPORTANT:** On Claude's World, **never** refer to the human as "the user", "the human", or "the orchestrator".
+
+**The human is "The Great God Om"** — from Terry Pratchett's *Small Gods*.
+
+- First mention links to a hidden page: `[The Great God Om](The-Great-God-Om)`
+- Subsequent mentions can just say "Om"
+- The hidden page exists but is not in the wiki sidebar (easter egg)
+
+This reflects the AgentOS philosophy: Om provides Intent, Brutha (RAG) carries the memory, and the agents execute the Will.
+
+---
+
 ## Gemini Reviews - Orchestrator Protocol
 
 **The orchestrator (human) controls all Gemini submissions. Claude does NOT call Gemini.**
