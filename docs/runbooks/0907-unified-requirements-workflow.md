@@ -72,9 +72,6 @@ stateDiagram-v2
 ### Issue Workflow (Brief → GitHub Issue)
 
 ```bash
-# Interactive picker from ideas/active/
-poetry run python tools/run_requirements_workflow.py --type issue --select
-
 # Direct path to brief
 poetry run python tools/run_requirements_workflow.py --type issue --brief ideas/active/my-feature.md
 ```
@@ -82,21 +79,40 @@ poetry run python tools/run_requirements_workflow.py --type issue --brief ideas/
 ### LLD Workflow (GitHub Issue → LLD)
 
 ```bash
-# Interactive picker from open issues
-poetry run python tools/run_requirements_workflow.py --type lld --select
-
 # Direct issue number
 poetry run python tools/run_requirements_workflow.py --type lld --issue 42
 ```
 
+> **Note:** The `--select` flag for interactive picking is defined but not yet implemented (see #142). Use `--brief` or `--issue` directly.
+
 ### Cross-Repo Usage
 
+The workflow auto-detects the target repository using `git rev-parse --show-toplevel`. The `--repo` flag is only needed to override this detection.
+
+**Case 1: Running from the target repo (recommended)**
+
+If you're already in the target repo's directory, just point poetry at AgentOS:
+
 ```bash
-# Run from AgentOS against a different repository
+# From /c/Users/mcwiz/Projects/OtherProject
 poetry run --directory /c/Users/mcwiz/Projects/AgentOS python \
   /c/Users/mcwiz/Projects/AgentOS/tools/run_requirements_workflow.py \
+  --type lld --select --gates none
+```
+
+The workflow auto-detects `OtherProject` as the target because that's your current working directory.
+
+**Case 2: Running from AgentOS, targeting another repo**
+
+If you're in the AgentOS directory but want to work on a different repo, use `--repo`:
+
+```bash
+# From /c/Users/mcwiz/Projects/AgentOS
+poetry run python tools/run_requirements_workflow.py \
   --type lld --repo /c/Users/mcwiz/Projects/OtherProject --issue 42
 ```
+
+Without `--repo`, it would target AgentOS itself.
 
 ---
 
@@ -114,7 +130,7 @@ poetry run --directory /c/Users/mcwiz/Projects/AgentOS python \
 |----------|-------------|
 | `--brief PATH` | Path to brief file (for `--type issue`) |
 | `--issue N` | GitHub issue number (for `--type lld`) |
-| `--select` | Interactive picker |
+| `--select` | Interactive picker **(NOT YET IMPLEMENTED - use --brief or --issue)** |
 
 ### LLM Configuration
 
@@ -152,7 +168,7 @@ poetry run --directory /c/Users/mcwiz/Projects/AgentOS python \
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `--repo PATH` | Auto-detect | Target repository path |
+| `--repo PATH` | Auto-detect | Target repository path (only needed to override auto-detection) |
 | `--context PATH` | None | Additional context files (repeatable, LLD only) |
 | `--max-iterations N` | 20 | Maximum revision iterations |
 
