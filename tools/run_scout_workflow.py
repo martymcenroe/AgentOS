@@ -128,15 +128,15 @@ def main():
         try:
             validated_path = validate_read_path(args.internal)
             internal_code = Path(validated_path).read_text(encoding="utf-8")
-            print(f"✓ Internal file loaded ({len(internal_code)} chars)")
+            print(f"[OK] Internal file loaded ({len(internal_code)} chars)")
         except (ValueError, FileNotFoundError) as e:
-            print(f"✗ Error loading internal file: {e}")
+            print(f"[ERROR] Error loading internal file: {e}")
             return 1
 
     # Check confirmation for internal code
     if internal_code and not args.yes:
         print()
-        print("⚠️  DATA PRIVACY WARNING")
+        print("[WARNING]  DATA PRIVACY WARNING")
         print("The internal code will be sent to an external LLM for analysis.")
         print("This may expose sensitive information.")
         print()
@@ -163,33 +163,33 @@ def main():
     print("\n[1/5] Checking confirmation...")
     result = confirmation_node(state)
     if result.get("errors"):
-        print(f"✗ {result['errors'][0]}")
+        print(f"[ERROR] {result['errors'][0]}")
         return 1
-    print("✓ Confirmed")
+    print("[OK] Confirmed")
 
     print("\n[2/5] Searching repositories...")
     result = explorer_node(state)
     state["found_repos"] = result["found_repos"]
-    print(f"✓ Found {len(state['found_repos'])} repositories (limited to top {args.max_repos})")
+    print(f"[OK] Found {len(state['found_repos'])} repositories (limited to top {args.max_repos})")
 
     if args.verbose:
         for repo in state["found_repos"]:
-            print(f"    - {repo['name']} (⭐ {repo['stars']})")
+            print(f"    - {repo['name']} (* {repo['stars']})")
 
     if not state["found_repos"]:
-        print("⚠️  No repositories found. Try adjusting search parameters.")
+        print("[WARNING]  No repositories found. Try adjusting search parameters.")
         return 0
 
     print("\n[3/5] Extracting content...")
     result = extractor_node(state)
     state.update(result)
-    print(f"✓ Extracted content from {len(state['found_repos'])} repositories")
+    print(f"[OK] Extracted content from {len(state['found_repos'])} repositories")
     print(f"    Token usage: {state.get('current_token_usage', 0)}/{args.max_tokens}")
 
     print("\n[4/5] Analyzing gaps...")
     result = gap_analyst_node(state)
     state.update(result)
-    print("✓ Gap analysis complete")
+    print("[OK] Gap analysis complete")
 
     print("\n[5/5] Generating Innovation Brief...")
     result = scribe_node(state)
@@ -226,7 +226,7 @@ def main():
 
     # Write output
     Path(output_path).write_text(content, encoding="utf-8")
-    print(f"✓ Innovation Brief saved to: {output_path}")
+    print(f"[OK] Innovation Brief saved to: {output_path}")
 
     print()
     print("=" * 50)

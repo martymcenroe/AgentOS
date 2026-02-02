@@ -4,12 +4,40 @@ Implements Explorer, Extractor, Analyst, and Scribe nodes.
 """
 
 import json
+import os
+import subprocess
 from pathlib import Path
 from typing import Any
+
+from github import Github
 
 from agentos.workflows.scout.budget import adaptive_truncate, check_and_update_budget
 from agentos.workflows.scout.graph import ExternalRepo, ScoutState
 from agentos.workflows.scout.security import sanitize_external_content
+
+
+def _get_github_client() -> Github:
+    """Get authenticated GitHub client using gh CLI token.
+
+    Returns:
+        Authenticated Github client.
+    """
+    # Try to get token from gh CLI
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "token"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            token = result.stdout.strip()
+            return Github(token)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    # Fall back to anonymous access (limited rate)
+    return Github()
 
 
 def load_fixture(filename: str) -> Any:
@@ -49,28 +77,50 @@ def explorer_node(state: ScoutState) -> dict[str, Any]:
     offline_mode = state.get("offline_mode", False)
     repo_limit = state.get("repo_limit", 3)
 
+    repos: list[ExternalRepo] = []
+
     if offline_mode:
         # Load fixture data
         raw_repos = load_fixture("github_search_response.json")
-    else:
-        # TODO: Implement real GitHub API search
-        # For now, return empty list
-        raw_repos = []
-
-    # Convert to ExternalRepo format
-    repos: list[ExternalRepo] = []
-    for repo in raw_repos:
-        repos.append(
-            ExternalRepo(
-                name=repo.get("full_name", ""),
-                url=repo.get("html_url", ""),
-                stars=repo.get("stargazers_count", 0),
-                description=repo.get("description", ""),
-                license_type="Unknown",
-                readme_summary="",
-                code_snippets="",
+        for repo in raw_repos:
+            repos.append(
+                ExternalRepo(
+                    name=repo.get("full_name", ""),
+                    url=repo.get("html_url", ""),
+                    stars=repo.get("stargazers_count", 0),
+                    description=repo.get("description", ""),
+                    license_type="Unknown",
+                    readme_summary="",
+                    code_snippets="",
+                )
             )
-        )
+    else:
+        # Real GitHub API search
+        try:
+            g = _get_github_client()
+            query = f"{topic} stars:>={min_stars}"
+            search_results = g.search_repositories(query, sort="stars", order="desc")
+
+            # Limit iteration to avoid exhausting API calls
+            count = 0
+            for repo in search_results:
+                if count >= repo_limit * 2:  # Get extra to filter
+                    break
+                repos.append(
+                    ExternalRepo(
+                        name=repo.full_name,
+                        url=repo.html_url,
+                        stars=repo.stargazers_count,
+                        description=repo.description or "",
+                        license_type=repo.license.name if repo.license else "Unknown",
+                        readme_summary="",
+                        code_snippets="",
+                    )
+                )
+                count += 1
+        except Exception as e:
+            # Return empty list on error, let downstream handle it
+            repos = []
 
     # CRITICAL: Bound the results immediately
     # Sort by stars descending and take top N
@@ -107,9 +157,23 @@ def extractor_node(state: ScoutState) -> dict[str, Any]:
             readme = content.get("readme", "") if isinstance(content, dict) else ""
             license_type = content.get("license", "Unknown") if isinstance(content, dict) else "Unknown"
         else:
-            # TODO: Implement real GitHub API content fetch
-            readme = ""
-            license_type = "Unknown"
+            # Real GitHub API content fetch
+            try:
+                g = _get_github_client()
+                gh_repo = g.get_repo(repo["name"])
+
+                # Get README
+                try:
+                    readme_content = gh_repo.get_readme()
+                    readme = readme_content.decoded_content.decode("utf-8", errors="replace")
+                except Exception:
+                    readme = ""
+
+                # Get license
+                license_type = gh_repo.license.name if gh_repo.license else "Unknown"
+            except Exception:
+                readme = ""
+                license_type = repo.get("license_type", "Unknown")
 
         # Sanitize content
         clean_readme = sanitize_external_content(readme)
@@ -144,9 +208,12 @@ def gap_analyst_node(state: ScoutState) -> dict[str, Any]:
     Returns:
         State updates with gap analysis.
     """
+    import google.generativeai as genai
+
     internal_code = state.get("internal_code_content", "")
     found_repos = state.get("found_repos", [])
     offline_mode = state.get("offline_mode", False)
+    topic = state.get("topic", "")
 
     if offline_mode:
         # Return mock analysis for offline mode
@@ -155,9 +222,69 @@ def gap_analyst_node(state: ScoutState) -> dict[str, Any]:
         analysis += f"Analyzed {len(found_repos)} repositories.\n"
         return {"gap_analysis": analysis}
 
-    # TODO: Implement real LLM analysis with retry logic
-    # For now, return placeholder
-    analysis = f"Gap analysis for {len(found_repos)} repositories."
+    # Build context from repos
+    external_context = ""
+    for repo in found_repos:
+        external_context += f"\n### {repo['name']} ({repo['stars']} stars)\n"
+        external_context += f"License: {repo['license_type']}\n"
+        external_context += f"Description: {repo['description']}\n"
+        if repo.get("readme_summary"):
+            # Truncate to avoid context overflow
+            readme = repo["readme_summary"][:3000]
+            external_context += f"\nREADME:\n{readme}\n"
+
+    # Build prompt
+    prompt = f"""Analyze the following repositories related to "{topic}" and provide:
+
+1. **Key Patterns**: What common patterns do these top repositories use?
+2. **Best Practices**: What best practices can be learned?
+3. **Innovations**: What innovative approaches are being used?
+4. **Recommendations**: What should we consider adopting?
+
+## External Repositories:
+{external_context}
+"""
+
+    if internal_code:
+        prompt += f"""
+## Our Internal Implementation:
+```
+{internal_code[:2000]}
+```
+
+Please also identify GAPS between our implementation and the external best practices.
+"""
+
+    # Call Gemini using core client with credential rotation
+    try:
+        from agentos.core.gemini_client import GeminiClient
+
+        client = GeminiClient()
+        system_instruction = "You are a technical analyst reviewing open source repositories to identify best practices and innovation opportunities."
+        result = client.invoke(system_instruction, prompt)
+
+        if result.success:
+            analysis = result.response or "No response received."
+        else:
+            raise Exception(result.error or "Unknown error")
+    except ImportError:
+        # Fallback to direct API if client not available
+        try:
+            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+            if api_key:
+                genai.configure(api_key=api_key)
+
+            model = genai.GenerativeModel("gemini-2.0-flash")
+            response = model.generate_content(prompt)
+            analysis = response.text
+        except Exception as e2:
+            raise Exception(f"Fallback also failed: {e2}")
+    except Exception as e:
+        # Return error info but don't fail
+        analysis = f"## Analysis Error\n\nCould not complete analysis: {e}\n\n"
+        analysis += "## Repositories Found\n\n"
+        for repo in found_repos:
+            analysis += f"- **{repo['name']}** ({repo['stars']} stars): {repo['description']}\n"
 
     return {"gap_analysis": analysis}
 
@@ -182,7 +309,7 @@ def scribe_node(state: ScoutState) -> dict[str, Any]:
     brief += "## Repositories Analyzed\n\n"
     for repo in found_repos:
         brief += f"- [{repo['name']}]({repo['url']}) "
-        brief += f"(⭐ {repo['stars']}, License: {repo['license_type']})\n"
+        brief += f"(* {repo['stars']}, License: {repo['license_type']})\n"
 
     brief += "\n## Gap Analysis\n\n"
     brief += gap_analysis or "No analysis available."
