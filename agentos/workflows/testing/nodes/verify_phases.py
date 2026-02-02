@@ -231,11 +231,29 @@ def verify_green_phase(state: TestingWorkflowState) -> dict[str, Any]:
 
     print(f"    Running pytest with coverage target: {coverage_target}%")
 
-    # Run pytest with coverage
-    # For now, use "agentos" as the coverage module - this should be configurable
+    # Determine coverage module from implementation files
+    impl_files = state.get("implementation_files", [])
+    coverage_module = None
+
+    if impl_files:
+        # Extract the first directory from implementation paths
+        for impl_path in impl_files:
+            rel_path = Path(impl_path).relative_to(repo_root) if repo_root else Path(impl_path)
+            parts = rel_path.parts
+            if parts:
+                # Use first directory (e.g., "tools" or "agentos")
+                coverage_module = str(rel_path.parent) if len(parts) > 1 else parts[0]
+                break
+
+    # Default to agentos if no implementation files
+    if not coverage_module:
+        coverage_module = "agentos"
+
+    print(f"    Coverage module: {coverage_module}")
+
     result = run_pytest(
         test_files,
-        coverage_module="agentos",
+        coverage_module=coverage_module,
         coverage_target=coverage_target,
         repo_root=repo_root,
     )
