@@ -631,7 +631,7 @@ class TestReviewNodeAdditional:
         mock_provider = Mock()
         mock_provider.invoke.return_value = Mock(
             success=True,
-            response="APPROVED: Issue looks good.",
+            response="[x] **APPROVED** - Issue looks good.",
             error_message=None,
         )
         mock_get_provider.return_value = mock_provider

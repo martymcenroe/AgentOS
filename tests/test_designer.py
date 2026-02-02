@@ -28,7 +28,7 @@ from agentos.nodes.designer import (
     _write_draft,
     design_lld_node,
 )
-from agentos.nodes.governance import review_lld_node
+from agentos.nodes.lld_reviewer import review_lld_node
 
 
 @pytest.fixture
@@ -230,7 +230,7 @@ class TestDesignLldNode:
 
         assert result["design_status"] == "DRAFTED"
         assert result["lld_draft_path"] != ""
-        assert result["lld_content"] == ""  # Empty - governance reads from disk
+        assert result["lld_content"] != ""  # Issue #86: returns actual content for audit trail
         assert result["iteration_count"] == 1
 
     def test_020_issue_not_found(self, mock_state):
@@ -485,15 +485,15 @@ class TestGovernanceReadsFromDisk:
             model_verified="gemini-3-pro-preview",
         )
 
-        with patch("agentos.nodes.governance.GeminiClient") as mock_client_class:
+        with patch("agentos.nodes.lld_reviewer.GeminiClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.invoke.return_value = mock_result
             mock_client_class.return_value = mock_client
 
-            with patch("agentos.nodes.governance._load_system_instruction") as mock_load:
+            with patch("agentos.nodes.lld_reviewer._load_system_instruction") as mock_load:
                 mock_load.return_value = "System instruction"
 
-                with patch("agentos.nodes.governance.ReviewAuditLog") as mock_log_class:
+                with patch("agentos.nodes.lld_reviewer.ReviewAuditLog") as mock_log_class:
                     mock_log = MagicMock()
                     mock_log_class.return_value = mock_log
 

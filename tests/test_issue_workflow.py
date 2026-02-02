@@ -507,6 +507,7 @@ class TestDraftNode:
             "brief_content": "Original brief",
             "current_draft": "# Original Draft",
             "user_feedback": "Please add more detail",
+            "verdict_history": ["## Previous Verdict\nNeeds work"],  # Required for revision mode
             "file_counter": 1,
             "draft_count": 1,
         }
@@ -1015,8 +1016,8 @@ class TestBriefIdeaDetection:
 
         main()
 
-        # Verify source_idea was passed
-        mock_run_new.assert_called_once_with(str(idea_file), source_idea=str(idea_file.resolve()))
+        # Verify source_idea was passed (repo_root is also passed, defaulting to None)
+        mock_run_new.assert_called_once_with(str(idea_file), source_idea=str(idea_file.resolve()), repo_root=None)
 
     @patch("tools.run_issue_workflow.run_new_workflow")
     @patch("tools.run_issue_workflow.get_repo_root")
@@ -1041,5 +1042,5 @@ class TestBriefIdeaDetection:
 
         main()
 
-        # Verify source_idea was NOT passed
-        mock_run_new.assert_called_once_with(str(brief_file))
+        # Verify source_idea was NOT passed (repo_root is also passed, defaulting to None)
+        mock_run_new.assert_called_once_with(str(brief_file), repo_root=None)

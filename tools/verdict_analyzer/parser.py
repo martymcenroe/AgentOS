@@ -53,7 +53,8 @@ def parse_verdict(filepath: Path) -> VerdictRecord:
     # Determine verdict type (LLD vs Issue)
     # Detection methods (in priority order):
     # 1. Header: "# Issue Review:" vs "# Governance Verdict:" / "# LLD Review:"
-    # 2. Path: contains "-lld" → LLD, otherwise → issue
+    # 2. Content markers: "## User Story" typically indicates issue review
+    # 3. Filename: contains "lld" or "issue"
     verdict_type = "lld"  # default
 
     # Check header first (most reliable)
@@ -61,11 +62,15 @@ def parse_verdict(filepath: Path) -> VerdictRecord:
         verdict_type = "issue"
     elif re.search(r"^#\s*(Governance\s+Verdict|LLD\s+Review):", content, re.MULTILINE | re.IGNORECASE):
         verdict_type = "lld"
-    # Fallback to path-based detection
-    elif "-lld" in str(filepath).lower():
-        verdict_type = "lld"
-    elif "-issue" in str(filepath).lower() or "test-" in str(filepath).lower():
+    # Check content markers
+    elif re.search(r"^##\s*User\s+Story", content, re.MULTILINE | re.IGNORECASE):
         verdict_type = "issue"
+    # Fallback to filename-based detection (not full path to avoid pytest temp dirs)
+    else:
+        filename = filepath.name.lower()
+        if "issue" in filename:
+            verdict_type = "issue"
+        # else keep default "lld"
 
     # Extract decision from multiple possible formats:
     # Format 1: # Governance Verdict: APPROVED

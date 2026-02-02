@@ -250,7 +250,7 @@ class TestMainFunction:
     """Tests for main function."""
 
     @patch("tools.run_requirements_workflow.resolve_roots")
-    @patch("tools.run_requirements_workflow.create_governance_graph")
+    @patch("tools.run_requirements_workflow.create_requirements_graph")
     def test_main_creates_and_runs_graph(self, mock_graph, mock_roots, tmp_path):
         """Test that main creates and runs the graph."""
         from tools.run_requirements_workflow import main

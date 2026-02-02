@@ -657,7 +657,7 @@ class TestProductionReview:
     """
 
     @patch("agentos.workflows.lld.audit.get_repo_root")
-    @patch("agentos.nodes.governance.review_lld_node")
+    @patch("agentos.nodes.lld_reviewer.review_lld_node")
     def test_review_calls_governance_node(self, mock_governance, mock_root, tmp_path):
         """Test that governance node is called with correct state."""
         mock_root.return_value = tmp_path
@@ -695,7 +695,7 @@ class TestProductionReview:
         assert result["error_message"] == ""
 
     @patch("agentos.workflows.lld.audit.get_repo_root")
-    @patch("agentos.nodes.governance.review_lld_node")
+    @patch("agentos.nodes.lld_reviewer.review_lld_node")
     def test_review_routes_to_human_edit_on_block(self, mock_governance, mock_root, tmp_path):
         """Test routing to human_edit when review blocks."""
         mock_root.return_value = tmp_path
@@ -724,7 +724,7 @@ class TestProductionReview:
         assert result["gemini_critique"] == "Missing section 5"
 
     @patch("agentos.workflows.lld.audit.get_repo_root")
-    @patch("agentos.nodes.governance.review_lld_node")
+    @patch("agentos.nodes.lld_reviewer.review_lld_node")
     def test_review_enforces_max_iterations_production(self, mock_governance, mock_root, tmp_path):
         """Test max iterations enforcement in production mode."""
         mock_root.return_value = tmp_path

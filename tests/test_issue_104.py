@@ -711,19 +711,19 @@ class TestScanner:
     def test_discover_verdicts_with_subdirs(self, tmp_path: Path) -> None:
         """Test verdict discovery handles subdirectories."""
         repo = tmp_path / "repo"
-        
+
         # Create verdict in standard location
         std_verdicts = repo / "docs" / "verdicts"
         std_verdicts.mkdir(parents=True)
-        (std_verdicts / "v1.md").write_text("# Verdict: APPROVED")
-        
+        (std_verdicts / "verdict-1.md").write_text("# Verdict: APPROVED")
+
         # Create verdict in nested location
         nested = std_verdicts / "archive" / "2024"
         nested.mkdir(parents=True)
-        (nested / "v2.md").write_text("# Verdict: BLOCKED")
-        
+        (nested / "verdict-2.md").write_text("# Verdict: BLOCKED")
+
         verdicts = list(discover_verdicts(repo))
-        
+
         # Should find both
         assert len(verdicts) >= 2
 

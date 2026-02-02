@@ -643,8 +643,8 @@ def review(state: LLDWorkflowState) -> dict:
         return {"error_message": f"GUARD: Draft too large ({content_len} chars)"}
     # --------------------------------------------------------------------------
 
-    # Import governance node (reuse existing)
-    from agentos.nodes.governance import review_lld_node
+    # Import LLD reviewer node (reuse existing)
+    from agentos.nodes.lld_reviewer import review_lld_node
 
     # Call existing governance node
     # It expects: lld_content or lld_draft_path, issue_id, iteration_count

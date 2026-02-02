@@ -6,6 +6,7 @@ Submits the test plan to Gemini for coverage analysis:
 - Validates test types match LLD content
 """
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,104 @@ from agentos.workflows.testing.state import TestingWorkflowState
 
 # Path to the review prompt template
 REVIEW_PROMPT_PATH = Path("docs/skills/0706c-Test-Plan-Review-Prompt.md")
+
+
+# =============================================================================
+# Requirement Coverage Utilities (ADR 0207)
+# =============================================================================
+
+
+def extract_requirement_ids(requirements: list[str]) -> set[str]:
+    """Extract requirement IDs from a list of requirement strings.
+
+    Handles formats:
+    - "REQ-1: Description" -> REQ-1
+    - "req-2: Description" -> REQ-2 (normalized)
+    - "1. Description" -> REQ-1 (numbered list)
+
+    Args:
+        requirements: List of requirement strings.
+
+    Returns:
+        Set of normalized requirement IDs (uppercase REQ-X format).
+    """
+    result = set()
+
+    for req in requirements:
+        # Try to match REQ-X pattern (case insensitive)
+        req_match = re.match(r"(req-[\w.]+)", req.strip(), re.IGNORECASE)
+        if req_match:
+            result.add(req_match.group(1).upper())
+            continue
+
+        # Try to match numbered list format (1., 2., etc.)
+        num_match = re.match(r"(\d+)\.\s", req.strip())
+        if num_match:
+            result.add(f"REQ-{num_match.group(1)}")
+
+    return result
+
+
+def extract_covered_requirements(scenarios: list[dict]) -> set[str]:
+    """Extract requirement refs from test scenarios.
+
+    Args:
+        scenarios: List of test scenario dicts with optional 'requirement_ref' key.
+
+    Returns:
+        Set of normalized requirement IDs that have test coverage.
+    """
+    result = set()
+
+    for scenario in scenarios:
+        ref = scenario.get("requirement_ref", "")
+        if ref:
+            # Normalize to uppercase
+            result.add(ref.upper())
+
+    return result
+
+
+def check_requirement_coverage(
+    requirements: list[str], scenarios: list[dict]
+) -> dict[str, Any]:
+    """Check if all requirements have test coverage.
+
+    Per ADR 0207, LLM-driven development requires 100% requirement coverage.
+
+    Args:
+        requirements: List of requirement strings.
+        scenarios: List of test scenario dicts.
+
+    Returns:
+        Dict with keys: passed, total, covered, coverage_pct, missing
+    """
+    all_ids = extract_requirement_ids(requirements)
+    covered_ids = extract_covered_requirements(scenarios)
+
+    total = len(all_ids)
+
+    if total == 0:
+        return {
+            "passed": False,
+            "total": 0,
+            "covered": 0,
+            "coverage_pct": 0.0,
+            "missing": [],
+        }
+
+    # Find which requirements have coverage
+    covered = len(all_ids & covered_ids)
+    missing = sorted(all_ids - covered_ids)
+    coverage_pct = (covered / total) * 100
+
+    return {
+        "passed": coverage_pct >= 100.0,
+        "total": total,
+        "covered": covered,
+        "coverage_pct": round(coverage_pct, 2),
+        "missing": missing,
+    }
 
 
 def load_review_prompt(repo_root: Path) -> str:
@@ -343,31 +442,20 @@ def _extract_feedback(verdict_content: str) -> str:
 
 
 def _mock_review_test_plan(state: TestingWorkflowState) -> dict[str, Any]:
-    """Mock implementation for testing."""
-    iteration = state.get("iteration_count", 0)
+    """Mock implementation for testing.
+
+    Actually checks requirement coverage to generate realistic mock responses.
+    """
     audit_dir = Path(state.get("audit_dir", ""))
+    requirements = state.get("requirements", [])
+    test_scenarios = state.get("test_scenarios", [])
 
-    # First iteration: reject, second: approve
-    if iteration <= 0:
-        verdict_content = """## Coverage Analysis
-- Requirements covered: 2/3 (66%)
-- Missing coverage: REQ-3 (Error logging)
+    # Actually check requirement coverage
+    coverage = check_requirement_coverage(requirements, test_scenarios)
 
-## Test Reality Issues
-- None found
-
-## Verdict
-[x] **BLOCKED** - Test plan needs revision
-
-## Required Changes
-1. Add test for REQ-3: Error logging functionality
-2. Ensure all error paths are covered
-"""
-        test_plan_status = "BLOCKED"
-        gemini_feedback = "Add test for REQ-3: Error logging functionality"
-    else:
-        verdict_content = """## Coverage Analysis
-- Requirements covered: 3/3 (100%)
+    if coverage["passed"]:
+        verdict_content = f"""## Coverage Analysis
+- Requirements covered: {coverage['covered']}/{coverage['total']} ({coverage['coverage_pct']}%)
 - Missing coverage: None
 
 ## Test Reality Issues
@@ -378,6 +466,23 @@ def _mock_review_test_plan(state: TestingWorkflowState) -> dict[str, Any]:
 """
         test_plan_status = "APPROVED"
         gemini_feedback = ""
+    else:
+        missing_str = ", ".join(coverage["missing"])
+        verdict_content = f"""## Coverage Analysis
+- Requirements covered: {coverage['covered']}/{coverage['total']} ({coverage['coverage_pct']}%)
+- Missing coverage: {missing_str}
+
+## Test Reality Issues
+- None found
+
+## Verdict
+[x] **BLOCKED** - Test plan needs revision
+
+## Required Changes
+1. Add tests for missing requirements: {missing_str}
+"""
+        test_plan_status = "BLOCKED"
+        gemini_feedback = f"Add tests for missing requirements: {missing_str}"
 
     # Save to audit
     if audit_dir.exists():

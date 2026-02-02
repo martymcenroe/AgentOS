@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 # Define PARSER_VERSION here first, before any imports
-PARSER_VERSION = "1.0.0"
+PARSER_VERSION = "1.4.0"
 
 from tools.verdict_analyzer.parser import (
     BlockingIssue,

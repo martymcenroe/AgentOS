@@ -1,12 +1,14 @@
-"""Pytest configuration for AgentOS tests.
-
-This file adds the project root to sys.path so that the agentos package
-can be imported in tests without requiring package installation.
-"""
+"""Pytest configuration for test suite."""
 
 import sys
 from pathlib import Path
 
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+# Ensure tools directory is importable
+tools_dir = Path(__file__).parent.parent / "tools"
+if str(tools_dir.parent) not in sys.path:
+    sys.path.insert(0, str(tools_dir.parent))
+
+
+def pytest_configure(config):
+    """Configure pytest."""
+    pass
