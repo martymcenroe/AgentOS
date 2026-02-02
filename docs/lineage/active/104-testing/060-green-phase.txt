@@ -1,0 +1,215 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\mcwiz\AppData\Local\pypoetry\Cache\virtualenvs\unleashed-Zukdy2xA-py3.14\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\mcwiz\Projects\AgentOS
+configfile: pyproject.toml
+plugins: anyio-4.12.1, langsmith-0.6.4, cov-4.1.0
+collecting ... collected 61 items
+
+tests/test_issue_104.py::TestParser::test_010_parse_lld_verdict PASSED   [  1%]
+tests/test_issue_104.py::TestParser::test_020_parse_issue_verdict PASSED [  3%]
+tests/test_issue_104.py::TestParser::test_030_extract_blocking_issues PASSED [  4%]
+tests/test_issue_104.py::TestParser::test_040_content_hash_change_detection PASSED [  6%]
+tests/test_issue_104.py::TestParser::test_parse_verdict_no_blocking_issues PASSED [  8%]
+tests/test_issue_104.py::TestParser::test_parse_verdict_conditional FAILED [  9%]
+tests/test_issue_104.py::TestParser::test_parse_verdict_all_tiers PASSED [ 11%]
+tests/test_issue_104.py::TestParser::test_content_hash_empty_string PASSED [ 13%]
+tests/test_issue_104.py::TestParser::test_content_hash_unicode PASSED    [ 14%]
+tests/test_issue_104.py::TestParser::test_blocking_issue_dataclass PASSED [ 16%]
+tests/test_issue_104.py::TestParser::test_verdict_record_dataclass PASSED [ 18%]
+tests/test_issue_104.py::TestPatterns::test_050_pattern_normalization PASSED [ 19%]
+tests/test_issue_104.py::TestPatterns::test_060_category_mapping PASSED  [ 21%]
+tests/test_issue_104.py::TestPatterns::test_normalize_pattern_various_inputs FAILED [ 22%]
+tests/test_issue_104.py::TestPatterns::test_map_category_all_categories PASSED [ 24%]
+tests/test_issue_104.py::TestPatterns::test_extract_patterns_from_issues PASSED [ 26%]
+tests/test_issue_104.py::TestPatterns::test_extract_patterns_empty_list PASSED [ 27%]
+tests/test_issue_104.py::TestTemplateUpdater::test_070_template_section_parsing PASSED [ 29%]
+tests/test_issue_104.py::TestTemplateUpdater::test_080_recommendation_generation PASSED [ 31%]
+tests/test_issue_104.py::TestTemplateUpdater::test_090_atomic_write_with_backup PASSED [ 32%]
+tests/test_issue_104.py::TestTemplateUpdater::test_130_dry_run_mode PASSED [ 34%]
+tests/test_issue_104.py::TestTemplateUpdater::test_140_stats_output_formatting PASSED [ 36%]
+tests/test_issue_104.py::TestTemplateUpdater::test_parse_template_sections_empty PASSED [ 37%]
+tests/test_issue_104.py::TestTemplateUpdater::test_parse_template_sections_no_headers PASSED [ 39%]
+tests/test_issue_104.py::TestTemplateUpdater::test_generate_recommendations_empty_stats PASSED [ 40%]
+tests/test_issue_104.py::TestTemplateUpdater::test_validate_template_path_valid PASSED [ 42%]
+tests/test_issue_104.py::TestTemplateUpdater::test_format_stats_empty PASSED [ 44%]
+tests/test_issue_104.py::TestTemplateUpdater::test_recommendation_dataclass FAILED [ 45%]
+tests/test_issue_104.py::TestTemplateUpdater::test_atomic_write_creates_backup_suffix PASSED [ 47%]
+tests/test_issue_104.py::TestTemplateUpdater::test_generate_recommendations_with_thresholds PASSED [ 49%]
+tests/test_issue_104.py::TestScanner::test_100_multi_repo_discovery PASSED [ 50%]
+tests/test_issue_104.py::TestScanner::test_110_missing_repo_handling PASSED [ 52%]
+tests/test_issue_104.py::TestScanner::test_150_find_registry_parent_dir PASSED [ 54%]
+tests/test_issue_104.py::TestScanner::test_160_find_registry_explicit_path PASSED [ 55%]
+tests/test_issue_104.py::TestScanner::test_discover_verdicts_nested PASSED [ 57%]
+tests/test_issue_104.py::TestScanner::test_discover_verdicts_no_verdicts_dir PASSED [ 59%]
+tests/test_issue_104.py::TestScanner::test_scan_repos_with_database FAILED [ 60%]
+tests/test_issue_104.py::TestScanner::test_scan_repos_force_reparse FAILED [ 62%]
+tests/test_issue_104.py::TestScanner::test_find_registry_not_found PASSED [ 63%]
+tests/test_issue_104.py::TestScanner::test_validate_verdict_path_valid PASSED [ 65%]
+tests/test_issue_104.py::TestScanner::test_validate_verdict_path_absolute_outside PASSED [ 67%]
+tests/test_issue_104.py::TestScanner::test_discover_verdicts_with_subdirs PASSED [ 68%]
+tests/test_issue_104.py::TestScanner::test_scan_repos_multiple_repos FAILED [ 70%]
+tests/test_issue_104.py::TestDatabase::test_120_database_migration PASSED [ 72%]
+tests/test_issue_104.py::TestDatabase::test_170_force_reparse PASSED     [ 73%]
+tests/test_issue_104.py::TestDatabase::test_200_parser_version_reparse PASSED [ 75%]
+tests/test_issue_104.py::TestDatabase::test_220_database_directory_creation PASSED [ 77%]
+tests/test_issue_104.py::TestDatabase::test_get_all_verdicts PASSED      [ 78%]
+tests/test_issue_104.py::TestDatabase::test_get_stats FAILED             [ 80%]
+tests/test_issue_104.py::TestDatabase::test_delete_verdict FAILED        [ 81%]
+tests/test_issue_104.py::TestDatabase::test_upsert_verdict_with_issues PASSED [ 83%]
+tests/test_issue_104.py::TestDatabase::test_get_patterns_by_category FAILED [ 85%]
+tests/test_issue_104.py::TestDatabase::test_database_context_manager FAILED [ 86%]
+tests/test_issue_104.py::TestDatabase::test_upsert_updates_existing PASSED [ 88%]
+tests/test_issue_104.py::TestDatabase::test_get_verdict_by_path FAILED   [ 90%]
+tests/test_issue_104.py::TestDatabase::test_get_verdict_not_found FAILED [ 91%]
+tests/test_issue_104.py::TestSecurity::test_190_path_traversal_verdict PASSED [ 93%]
+tests/test_issue_104.py::TestSecurity::test_195_path_traversal_template PASSED [ 95%]
+tests/test_issue_104.py::TestSecurity::test_210_symlink_loop_handling SKIPPED [ 96%]
+tests/test_issue_104.py::TestLogging::test_180_verbose_logging PASSED    [ 98%]
+tests/test_issue_104.py::test_module_imports PASSED                      [100%]
+
+================================== FAILURES ===================================
+__________________ TestParser.test_parse_verdict_conditional __________________
+tests\test_issue_104.py:193: in test_parse_verdict_conditional
+    assert record.decision == "CONDITIONAL"
+E   AssertionError: assert 'BLOCKED' == 'CONDITIONAL'
+E     
+E     - CONDITIONAL
+E     + BLOCKED
+_____________ TestPatterns.test_normalize_pattern_various_inputs ______________
+tests\test_issue_104.py:304: in test_normalize_pattern_various_inputs
+    assert "<file>" in pattern or "<path>" in pattern
+E   AssertionError: assert ('<file>' in 'issue in /usr/local/bin/script.sh' or '<path>' in 'issue in /usr/local/bin/script.sh')
+______________ TestTemplateUpdater.test_recommendation_dataclass ______________
+tests\test_issue_104.py:493: in test_recommendation_dataclass
+    rec = Recommendation(
+E   TypeError: Recommendation.__init__() missing 1 required positional argument: 'reason'
+__________________ TestScanner.test_scan_repos_with_database __________________
+tests\test_issue_104.py:647: in test_scan_repos_with_database
+    assert count >= 1
+           ^^^^^^^^^^
+E   TypeError: '>=' not supported between instances of 'generator' and 'int'
+__________________ TestScanner.test_scan_repos_force_reparse __________________
+tests\test_issue_104.py:673: in test_scan_repos_force_reparse
+    count2 = scan_repos(registry, db_path, force=False)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: scan_repos() got an unexpected keyword argument 'force'
+_________________ TestScanner.test_scan_repos_multiple_repos __________________
+tests\test_issue_104.py:754: in test_scan_repos_multiple_repos
+    assert count == 3
+E   assert <generator object scan_repos at 0x000001C7F8CAF2E0> == 3
+_________________________ TestDatabase.test_get_stats _________________________
+tests\test_issue_104.py:875: in test_get_stats
+    stats = db.get_stats()
+            ^^^^^^^^^^^^
+E   AttributeError: 'VerdictDatabase' object has no attribute 'get_stats'
+______________________ TestDatabase.test_delete_verdict _______________________
+tests\test_issue_104.py:903: in test_delete_verdict
+    db.delete_verdict(filepath)
+    ^^^^^^^^^^^^^^^^^
+E   AttributeError: 'VerdictDatabase' object has no attribute 'delete_verdict'. Did you mean: 'upsert_verdict'?
+_________________ TestDatabase.test_get_patterns_by_category __________________
+tests\test_issue_104.py:959: in test_get_patterns_by_category
+    patterns = db.get_patterns_by_category()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'VerdictDatabase' object has no attribute 'get_patterns_by_category'
+_________________ TestDatabase.test_database_context_manager __________________
+tests\test_issue_104.py:971: in test_database_context_manager
+    with VerdictDatabase(db_path) as db:
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: 'tools.verdict_analyzer.database.VerdictDatabase' object does not support the context manager protocol (missed __exit__ method)
+____________________ TestDatabase.test_get_verdict_by_path ____________________
+tests\test_issue_104.py:1036: in test_get_verdict_by_path
+    retrieved = db.get_verdict(filepath)
+                ^^^^^^^^^^^^^^
+E   AttributeError: 'VerdictDatabase' object has no attribute 'get_verdict'. Did you mean: 'upsert_verdict'?
+___________________ TestDatabase.test_get_verdict_not_found ___________________
+tests\test_issue_104.py:1049: in test_get_verdict_not_found
+    retrieved = db.get_verdict("/nonexistent.md")
+                ^^^^^^^^^^^^^^
+E   AttributeError: 'VerdictDatabase' object has no attribute 'get_verdict'. Did you mean: 'upsert_verdict'?
+
+---------- coverage: platform win32, python 3.14.0-final-0 -----------
+Name                                                   Stmts   Miss  Cover   Missing
+------------------------------------------------------------------------------------
+agentos\__init__.py                                        1      1     0%   3
+agentos\core\__init__.py                                   5      5     0%   3-30
+agentos\core\audit.py                                    102    102     0%   12-328
+agentos\core\config.py                                    16     16     0%   7-66
+agentos\core\gemini_client.py                            281    281     0%   12-802
+agentos\core\llm_provider.py                             147    147     0%   14-543
+agentos\core\state.py                                      4      4     0%   7-13
+agentos\graphs\__init__.py                                 0      0   100%
+agentos\nodes\__init__.py                                  3      3     0%   3-6
+agentos\nodes\designer.py                                134    134     0%   15-501
+agentos\nodes\governance.py                               90     90     0%   7-335
+agentos\workflows\__init__.py                              0      0   100%
+agentos\workflows\governance\__init__.py                   4      4     0%   17-31
+agentos\workflows\governance\audit.py                    130    130     0%   20-501
+agentos\workflows\governance\config.py                    68     68     0%   11-240
+agentos\workflows\governance\graph.py                     65     65     0%   26-298
+agentos\workflows\governance\nodes\__init__.py             6      6     0%   14-23
+agentos\workflows\governance\nodes\finalize.py            71     71     0%   10-207
+agentos\workflows\governance\nodes\generate_draft.py      65     65     0%   12-205
+agentos\workflows\governance\nodes\human_gate.py          32     32     0%   12-132
+agentos\workflows\governance\nodes\load_input.py          93     93     0%   12-252
+agentos\workflows\governance\nodes\review.py              52     52     0%   9-134
+agentos\workflows\governance\state.py                     43     43     0%   16-314
+agentos\workflows\issue\__init__.py                        3      3     0%   10-13
+agentos\workflows\issue\audit.py                         138    138     0%   12-474
+agentos\workflows\issue\graph.py                          59     59     0%   11-249
+agentos\workflows\issue\nodes\__init__.py                  8      8     0%   15-23
+agentos\workflows\issue\nodes\draft.py                    94     94     0%   10-294
+agentos\workflows\issue\nodes\file_issue.py              185    185     0%   9-472
+agentos\workflows\issue\nodes\human_edit_draft.py        131    131     0%   9-252
+agentos\workflows\issue\nodes\human_edit_verdict.py      140    140     0%   10-278
+agentos\workflows\issue\nodes\load_brief.py               49     49     0%   9-184
+agentos\workflows\issue\nodes\review.py                   77     77     0%   9-193
+agentos\workflows\issue\nodes\sandbox.py                  30     30     0%   11-104
+agentos\workflows\issue\state.py                          18     18     0%   9-40
+agentos\workflows\lld\__init__.py                          3      3     0%   17-20
+agentos\workflows\lld\audit.py                           291    291     0%   14-875
+agentos\workflows\lld\graph.py                            49     49     0%   12-195
+agentos\workflows\lld\nodes.py                           347    347     0%   14-1040
+agentos\workflows\lld\state.py                             7      7     0%   10-22
+agentos\workflows\testing\__init__.py                      3      3     0%   18-21
+agentos\workflows\testing\audit.py                        82     82     0%   13-307
+agentos\workflows\testing\graph.py                        94     94     0%   41-358
+agentos\workflows\testing\knowledge\__init__.py            2      2     0%   8-10
+agentos\workflows\testing\knowledge\patterns.py           60     60     0%   7-193
+agentos\workflows\testing\nodes\__init__.py                9      9     0%   19-31
+agentos\workflows\testing\nodes\document.py              140    140     0%   13-360
+agentos\workflows\testing\nodes\e2e_validation.py         84     84     0%   9-280
+agentos\workflows\testing\nodes\finalize.py               46     46     0%   9-140
+agentos\workflows\testing\nodes\implement_code.py        143    143     0%   7-450
+agentos\workflows\testing\nodes\load_lld.py              192    192     0%   10-548
+agentos\workflows\testing\nodes\review_test_plan.py      107    107     0%   9-391
+agentos\workflows\testing\nodes\scaffold_tests.py        157    157     0%   9-372
+agentos\workflows\testing\nodes\verify_phases.py         139    139     0%   7-455
+agentos\workflows\testing\state.py                         9      9     0%   12-36
+agentos\workflows\testing\templates\__init__.py            5      5     0%   12-23
+agentos\workflows\testing\templates\cp_docs.py            73     73     0%   9-296
+agentos\workflows\testing\templates\lessons.py           115    115     0%   8-304
+agentos\workflows\testing\templates\runbook.py            94     94     0%   8-259
+agentos\workflows\testing\templates\wiki_page.py          74     74     0%   8-207
+------------------------------------------------------------------------------------
+TOTAL                                                   4669   4669     0%
+
+FAIL Required test coverage of 95% not reached. Total coverage: 0.00%
+=========================== short test summary info ===========================
+FAILED tests/test_issue_104.py::TestParser::test_parse_verdict_conditional - ...
+FAILED tests/test_issue_104.py::TestPatterns::test_normalize_pattern_various_inputs
+FAILED tests/test_issue_104.py::TestTemplateUpdater::test_recommendation_dataclass
+FAILED tests/test_issue_104.py::TestScanner::test_scan_repos_with_database - ...
+FAILED tests/test_issue_104.py::TestScanner::test_scan_repos_force_reparse - ...
+FAILED tests/test_issue_104.py::TestScanner::test_scan_repos_multiple_repos
+FAILED tests/test_issue_104.py::TestDatabase::test_get_stats - AttributeError...
+FAILED tests/test_issue_104.py::TestDatabase::test_delete_verdict - Attribute...
+FAILED tests/test_issue_104.py::TestDatabase::test_get_patterns_by_category
+FAILED tests/test_issue_104.py::TestDatabase::test_database_context_manager
+FAILED tests/test_issue_104.py::TestDatabase::test_get_verdict_by_path - Attr...
+FAILED tests/test_issue_104.py::TestDatabase::test_get_verdict_not_found - At...
+================== 12 failed, 48 passed, 1 skipped in 1.56s ===================
+
+C:\Users\mcwiz\AppData\Local\pypoetry\Cache\virtualenvs\unleashed-Zukdy2xA-py3.14\Lib\site-packages\coverage\control.py:958: CoverageWarning: No data was collected. (no-data-collected); see https://coverage.readthedocs.io/en/7.13.2/messages.html#warning-no-data-collected
+  self._warn("No data was collected.", slug="no-data-collected")

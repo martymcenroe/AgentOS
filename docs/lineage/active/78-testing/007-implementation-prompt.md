@@ -1,0 +1,364 @@
+# Implementation Request
+
+## Context
+
+You are implementing code for Issue #78 using TDD.
+This is iteration 0 of the implementation.
+
+## Requirements
+
+The tests have been scaffolded and need implementation code to pass.
+
+### LLD Summary
+
+# 0178 - Feature: Per-Repo Workflow Database
+
+## 1. Context & Goal
+* **Issue:** #78
+* **Objective:** Change the default workflow checkpoint database location from global (`~/.agentos/issue_workflow.db`) to per-repo (`.agentos/issue_workflow.db` in repo root) to enable safe concurrent workflow execution across multiple repositories and worktrees.
+* **Status:** Draft
+* **Related Issues:** None
+
+### Open Questions
+*No open questions - requirements are clear from issue specification.*
+
+## 2. Proposed Changes
+
+*This section is the **source of truth** for implementation. Describes exactly what will be built.*
+
+### 2.1 Files Changed
+
+| File | Change Type | Description |
+|------|-------------|-------------|
+| `src/agentos/workflow/checkpoint.py` | Modify | Update `get_checkpoint_db_path()` with per-repo logic and fail-closed behavior |
+| `.gitignore` | Modify | Add `.agentos/` pattern to ignore per-repo workflow directories |
+| `docs/workflow.md` | Modify | Document new default behavior, fail-closed behavior, and migration path |
+
+### 2.2 Dependencies
+
+*No new packages, APIs, or services required.*
+
+```toml
+# pyproject.toml additions
+# None - using existing standard library and git subprocess
+```
+
+### 2.3 Data Structures
+
+```python
+# Pseudocode - NOT implementation
+# No new data structures required
+# Database schema unchanged - only location changes
+```
+
+### 2.4 Function Signatures
+
+```python
+# Signatures only - implementation in source files
+def get_checkpoint_db_path() -> Path:
+    """
+    Determine the checkpoint database path.
+    
+    Priority:
+    1. AGENTOS_WORKFLOW_DB environment variable (if set and non-empty)
+    2. Per-repo: {repo_root}/.agentos/issue_workflow.db
+    3. Fail closed with descriptive error if outside git repo
+    
+    Returns:
+        Path to the checkpoint database file.
+    
+    Raises:
+        SystemExit: If not in a git repo and no env var set (fail closed).
+    """
+    ...
+
+def get_repo_root() -> Path | None:
+    """
+    Get the root directory...
+
+### Test Scenarios
+
+- **test_010**: Per-repo database creation | Auto | Run workflow in git repo | `.agentos/issue_workflow.db` created in repo root | File exists at expected path
+  - Requirement: 
+  - Type: unit
+
+- **test_020**: Different repos get different databases | Auto | Run workflow in repo1, then repo2 | Two separate database files | `repo1/.agentos/issue_workflow.db` != `repo2/.agentos/issue_workflow.db`
+  - Requirement: 
+  - Type: unit
+
+- **test_030**: Environment variable override | Auto | Set `AGENTOS_WORKFLOW_DB=/tmp/custom.db` | Database at `/tmp/custom.db` | File created at env var path, not in repo
+  - Requirement: 
+  - Type: unit
+
+- **test_040**: Fail closed outside repo | Auto | Run workflow in non-git directory | Exit code 1, error message | Exit code 1; stderr contains "AGENTOS_WORKFLOW_DB"
+  - Requirement: 
+  - Type: unit
+
+- **test_050**: Worktree isolation | Auto | Create worktree, run workflow | Worktree gets own `.agentos/` | `worktree/.agentos/issue_workflow.db` exists
+  - Requirement: 
+  - Type: unit
+
+- **test_060**: Global database untouched | Auto | Run workflow in repo | `~/.agentos/issue_workflow.db` unchanged | Global DB not modified (timestamp unchanged)
+  - Requirement: 
+  - Type: unit
+
+- **test_070**: Nested repo detection (deep subdirectory) | Auto | Run in `repo/src/lib/` subdirectory | Database in repo root, not subdirectory | `repo_root/.agentos/` not `repo_root/src/lib/.agentos/`
+  - Requirement: 
+  - Type: unit
+
+- **test_080**: .agentos directory creation | Auto | Run in repo without .agentos | Directory created with proper permissions | Directory exists with user read/write
+  - Requirement: 
+  - Type: unit
+
+- **test_090**: Env var with ~ expansion | Auto | Set `AGENTOS_WORKFLOW_DB=~/custom.db` | Path expanded correctly | File at `$HOME/custom.db`
+  - Requirement: 
+  - Type: unit
+
+- **test_100**: Empty env var treated as unset | Auto | Set `AGENTOS_WORKFLOW_DB=""` | Falls back to per-repo | Uses repo path, not empty string
+  - Requirement: 
+  - Type: unit
+
+- **test_110**: .gitignore contains .agentos/ pattern | Auto | Check `.gitignore` after workflow run | `.agentos/` entry exists | Parse `.gitignore`, assert pattern present
+  - Requirement: 
+  - Type: unit
+
+- **test_120**: Concurrent execution (3 repos) | Auto | Spawn 3 subprocess workflows in parallel | Each repo has independent database, no errors | All 3 processes exit 0; 3 distinct `.agentos/issue_workflow.db` files
+  - Requirement: 
+  - Type: unit
+
+### Test File: C:\Users\mcwiz\Projects\AgentOS\tests\test_issue_78.py
+
+```python
+"""Test file for Issue #78.
+
+Generated by AgentOS TDD Testing Workflow.
+Each test starts with `assert False` - implementation will make them pass.
+"""
+
+import pytest
+
+
+# Fixtures for mocking
+@pytest.fixture
+def mock_external_service():
+    """Mock external service for isolation."""
+    # TODO: Implement mock
+    yield None
+
+
+# Unit Tests
+# -----------
+
+def test_010(mock_external_service):
+    """
+    Per-repo database creation | Auto | Run workflow in git repo |
+    `.agentos/issue_workflow.db` created in repo root | File exists at
+    expected path
+    """
+    # TDD: Arrange
+    # TODO: Set up test data and mocks
+
+    # TDD: Act
+    # TODO: Call the function/method under test
+
+    # TDD: Assert
+    assert False, "TDD: Implementation pending for test_010"
+
+
+def test_020(mock_external_service):
+    """
+    Different repos get different databases | Auto | Run workflow in
+    repo1, then repo2 | Two separate database files |
+    `repo1/.agentos/issue_workflow.db` !=
+    `repo2/.agentos/issue_workflow.db`
+    """
+    # TDD: Arrange
+    # TODO: Set up test data and mocks
+
+    # TDD: Act
+    # TODO: Call the function/method under test
+
+    # TDD: Assert
+    assert False, "TDD: Implementation pending for test_020"
+
+
+def test_030(mock_external_service):
+    """
+    Environment variable override | Auto | Set
+    `AGENTOS_WORKFLOW_DB=/tmp/custom.db` | Database at `/tmp/custom.db` |
+    File created at env var path, not in repo
+    """
+    # TDD: Arrange
+    # TODO: Set up test data and mocks
+
+    # TDD: Act
+    # TODO: Call the function/method under test
+
+    # TDD: Assert
+    assert False, "TDD: Implementation pending for test_030"
+
+
+def test_040():
+    """
+    Fail closed outside repo | Auto | Run workflow in non-git directory |
+    Exit code 1, error message | Exit code 1; stderr contains
+    "AGENTOS_WORKFLOW_DB"
+    """
+    # TDD: Arrange
+    # TODO: Set up test data and mocks
+
+    # TDD: Act
+    # TODO: Call the function/method under test
+
+    # TDD: Assert
+    assert False, "TDD: Implementation pending for test_040"
+
+
+def test_050():
+    """
+    Worktree isolation | Auto | Create worktree, run workflow | Worktree
+    gets own `.agentos/` | `worktree/.agentos/issue_workflow.db` exists
+    """
+    # TDD: Arrange
+    # TODO: Set up test data and mocks
+
+    # TDD: Act
+    # TODO: Call the function/method under test
+
+    # TDD: Assert
+    assert False, "TDD: Implementation pending for test_050"
+
+
+def test_060(mock_external_service):
+    """
+    Global database untouched | Auto | Run workflow in repo |
+    `~/.agentos/issue_workflow.db` unchanged | Global DB not modified
+    (timestamp unchanged)
+    """
+    # TDD: Arrange
+    # TODO: Set up test data and mocks
+
+    # TDD: Act
+    # TODO: Call the function/method under test
+
+    # TDD: Assert
+    assert False, "TDD: Implementation pending for test_060"
+
+
+def test_070(mock_external_service):
+    """
+    Nested repo detection (deep subdirectory) | Auto | Run in
+    `repo/src/lib/` subdirectory | Database in repo root, not subdirectory
+    | `repo_root/.agentos/` not `repo_root/src/lib/.agentos/`
+    """
+    # TDD: Arrange
+    # TODO: Set up test data and mocks
+
+    # TDD: Act
+    # TODO: Call the function/method under test
+
+    # TDD: Assert
+    assert False, "TDD: Implementation pending for test_070"
+
+
+def test_080():
+    """
+    .agentos directory creation | Auto | Run in repo without .agentos |
+    Directory created with proper permissions | Directory exists with user
+    read/write
+    """
+    # TDD: Arrange
+    # TODO: Set up test data and mocks
+
+    # TDD: Act
+    # TODO: Call the function/method under test
+
+    # TDD: Assert
+    assert False, "TDD: Implementation pending for test_080"
+
+
+def test_090():
+    """
+    Env var with ~ expansion | Auto | Set
+    `AGENTOS_WORKFLOW_DB=~/custom.db` | Path expanded correctly | File at
+    `$HOME/custom.db`
+    """
+    # TDD: Arrange
+    # TODO: Set up test data and mocks
+
+    # TDD: Act
+    # TODO: Call the function/method under test
+
+    # TDD: Assert
+    assert False, "TDD: Implementation pending for test_090"
+
+
+def test_100():
+    """
+    Empty env var treated as unset | Auto | Set `AGENTOS_WORKFLOW_DB=""`
+    | Falls back to per-repo | Uses repo path, not empty string
+    """
+    # TDD: Arrange
+    # TODO: Set up test data and mocks
+
+    # TDD: Act
+    # TODO: Call the function/method under test
+
+    # TDD: Assert
+    assert False, "TDD: Implementation pending for test_100"
+
+
+def test_110():
+    """
+    .gitignore contains .agentos/ pattern | Auto | Check `.gitignore`
+    after workflow run | `.agentos/` entry exists | Parse `.gitignore`,
+    assert pattern present
+    """
+    # TDD: Arrange
+    # TODO: Set up test data and mocks
+
+    # TDD: Act
+    # TODO: Call the function/method under test
+
+    # TDD: Assert
+    assert False, "TDD: Implementation pending for test_110"
+
+
+def test_120(mock_external_service):
+    """
+    Concurrent execution (3 repos) | Auto | Spawn 3 subprocess workflows
+    in parallel | Each repo has independent database, no errors | All 3
+    processes exit 0; 3 distinct `.agentos/issue_workflow.db` files
+    """
+    # TDD: Arrange
+    # TODO: Set up test data and mocks
+
+    # TDD: Act
+    # TODO: Call the function/method under test
+
+    # TDD: Assert
+    assert False, "TDD: Implementation pending for test_120"
+
+
+```
+
+## Instructions
+
+1. Generate implementation code that makes all tests pass
+2. Follow the patterns established in the codebase
+3. Ensure proper error handling
+4. Add type hints where appropriate
+5. Keep the implementation minimal - only what's needed to pass tests
+
+## Output Format
+
+Provide the implementation in a code block with the file path:
+
+```python
+# File: path/to/implementation.py
+
+def function_name():
+    ...
+```
+
+If multiple files are needed, provide each in a separate code block.

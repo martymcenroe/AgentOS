@@ -1,0 +1,174 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\mcwiz\AppData\Local\pypoetry\Cache\virtualenvs\unleashed-Zukdy2xA-py3.14\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\mcwiz\Projects\AgentOS
+configfile: pyproject.toml
+plugins: anyio-4.12.1, langsmith-0.6.4, cov-4.1.0
+collecting ... collected 23 items
+
+tests/test_issue_104.py::test_010 FAILED                                 [  4%]
+tests/test_issue_104.py::test_020 FAILED                                 [  8%]
+tests/test_issue_104.py::test_030 FAILED                                 [ 13%]
+tests/test_issue_104.py::test_040 FAILED                                 [ 17%]
+tests/test_issue_104.py::test_050 FAILED                                 [ 21%]
+tests/test_issue_104.py::test_060 FAILED                                 [ 26%]
+tests/test_issue_104.py::test_070 FAILED                                 [ 30%]
+tests/test_issue_104.py::test_080 FAILED                                 [ 34%]
+tests/test_issue_104.py::test_090 FAILED                                 [ 39%]
+tests/test_issue_104.py::test_100 FAILED                                 [ 43%]
+tests/test_issue_104.py::test_110 FAILED                                 [ 47%]
+tests/test_issue_104.py::test_120 FAILED                                 [ 52%]
+tests/test_issue_104.py::test_130 FAILED                                 [ 56%]
+tests/test_issue_104.py::test_140 FAILED                                 [ 60%]
+tests/test_issue_104.py::test_150 FAILED                                 [ 65%]
+tests/test_issue_104.py::test_160 FAILED                                 [ 69%]
+tests/test_issue_104.py::test_170 FAILED                                 [ 73%]
+tests/test_issue_104.py::test_180 FAILED                                 [ 78%]
+tests/test_issue_104.py::test_190 FAILED                                 [ 82%]
+tests/test_issue_104.py::test_195 FAILED                                 [ 86%]
+tests/test_issue_104.py::test_200 FAILED                                 [ 91%]
+tests/test_issue_104.py::test_210 FAILED                                 [ 95%]
+tests/test_issue_104.py::test_220 FAILED                                 [100%]
+
+================================== FAILURES ===================================
+__________________________________ test_010 ___________________________________
+tests\test_issue_104.py:33: in test_010
+    assert False, "TDD: Implementation pending for test_010"
+E   AssertionError: TDD: Implementation pending for test_010
+E   assert False
+__________________________________ test_020 ___________________________________
+tests\test_issue_104.py:48: in test_020
+    assert False, "TDD: Implementation pending for test_020"
+E   AssertionError: TDD: Implementation pending for test_020
+E   assert False
+__________________________________ test_030 ___________________________________
+tests\test_issue_104.py:63: in test_030
+    assert False, "TDD: Implementation pending for test_030"
+E   AssertionError: TDD: Implementation pending for test_030
+E   assert False
+__________________________________ test_040 ___________________________________
+tests\test_issue_104.py:78: in test_040
+    assert False, "TDD: Implementation pending for test_040"
+E   AssertionError: TDD: Implementation pending for test_040
+E   assert False
+__________________________________ test_050 ___________________________________
+tests\test_issue_104.py:93: in test_050
+    assert False, "TDD: Implementation pending for test_050"
+E   AssertionError: TDD: Implementation pending for test_050
+E   assert False
+__________________________________ test_060 ___________________________________
+tests\test_issue_104.py:108: in test_060
+    assert False, "TDD: Implementation pending for test_060"
+E   AssertionError: TDD: Implementation pending for test_060
+E   assert False
+__________________________________ test_070 ___________________________________
+tests\test_issue_104.py:123: in test_070
+    assert False, "TDD: Implementation pending for test_070"
+E   AssertionError: TDD: Implementation pending for test_070
+E   assert False
+__________________________________ test_080 ___________________________________
+tests\test_issue_104.py:138: in test_080
+    assert False, "TDD: Implementation pending for test_080"
+E   AssertionError: TDD: Implementation pending for test_080
+E   assert False
+__________________________________ test_090 ___________________________________
+tests\test_issue_104.py:153: in test_090
+    assert False, "TDD: Implementation pending for test_090"
+E   AssertionError: TDD: Implementation pending for test_090
+E   assert False
+__________________________________ test_100 ___________________________________
+tests\test_issue_104.py:168: in test_100
+    assert False, "TDD: Implementation pending for test_100"
+E   AssertionError: TDD: Implementation pending for test_100
+E   assert False
+__________________________________ test_110 ___________________________________
+tests\test_issue_104.py:183: in test_110
+    assert False, "TDD: Implementation pending for test_110"
+E   AssertionError: TDD: Implementation pending for test_110
+E   assert False
+__________________________________ test_120 ___________________________________
+tests\test_issue_104.py:198: in test_120
+    assert False, "TDD: Implementation pending for test_120"
+E   AssertionError: TDD: Implementation pending for test_120
+E   assert False
+__________________________________ test_130 ___________________________________
+tests\test_issue_104.py:213: in test_130
+    assert False, "TDD: Implementation pending for test_130"
+E   AssertionError: TDD: Implementation pending for test_130
+E   assert False
+__________________________________ test_140 ___________________________________
+tests\test_issue_104.py:228: in test_140
+    assert False, "TDD: Implementation pending for test_140"
+E   AssertionError: TDD: Implementation pending for test_140
+E   assert False
+__________________________________ test_150 ___________________________________
+tests\test_issue_104.py:243: in test_150
+    assert False, "TDD: Implementation pending for test_150"
+E   AssertionError: TDD: Implementation pending for test_150
+E   assert False
+__________________________________ test_160 ___________________________________
+tests\test_issue_104.py:257: in test_160
+    assert False, "TDD: Implementation pending for test_160"
+E   AssertionError: TDD: Implementation pending for test_160
+E   assert False
+__________________________________ test_170 ___________________________________
+tests\test_issue_104.py:272: in test_170
+    assert False, "TDD: Implementation pending for test_170"
+E   AssertionError: TDD: Implementation pending for test_170
+E   assert False
+__________________________________ test_180 ___________________________________
+tests\test_issue_104.py:287: in test_180
+    assert False, "TDD: Implementation pending for test_180"
+E   AssertionError: TDD: Implementation pending for test_180
+E   assert False
+__________________________________ test_190 ___________________________________
+tests\test_issue_104.py:303: in test_190
+    assert False, "TDD: Implementation pending for test_190"
+E   AssertionError: TDD: Implementation pending for test_190
+E   assert False
+__________________________________ test_195 ___________________________________
+tests\test_issue_104.py:318: in test_195
+    assert False, "TDD: Implementation pending for test_195"
+E   AssertionError: TDD: Implementation pending for test_195
+E   assert False
+__________________________________ test_200 ___________________________________
+tests\test_issue_104.py:334: in test_200
+    assert False, "TDD: Implementation pending for test_200"
+E   AssertionError: TDD: Implementation pending for test_200
+E   assert False
+__________________________________ test_210 ___________________________________
+tests\test_issue_104.py:350: in test_210
+    assert False, "TDD: Implementation pending for test_210"
+E   AssertionError: TDD: Implementation pending for test_210
+E   assert False
+__________________________________ test_220 ___________________________________
+tests\test_issue_104.py:365: in test_220
+    assert False, "TDD: Implementation pending for test_220"
+E   AssertionError: TDD: Implementation pending for test_220
+E   assert False
+=========================== short test summary info ===========================
+FAILED tests/test_issue_104.py::test_010 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_020 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_030 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_040 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_050 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_060 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_070 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_080 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_090 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_100 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_110 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_120 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_130 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_140 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_150 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_160 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_170 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_180 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_190 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_195 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_200 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_210 - AssertionError: TDD: Implementatio...
+FAILED tests/test_issue_104.py::test_220 - AssertionError: TDD: Implementatio...
+============================= 23 failed in 0.14s ==============================
+

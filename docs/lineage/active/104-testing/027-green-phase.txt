@@ -1,0 +1,194 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\mcwiz\AppData\Local\pypoetry\Cache\virtualenvs\unleashed-Zukdy2xA-py3.14\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\mcwiz\Projects\AgentOS
+configfile: pyproject.toml
+plugins: anyio-4.12.1, langsmith-0.6.4, cov-4.1.0
+collecting ... collected 23 items
+
+tests/test_issue_104.py::test_010 PASSED                                 [  4%]
+tests/test_issue_104.py::test_020 PASSED                                 [  8%]
+tests/test_issue_104.py::test_030 PASSED                                 [ 13%]
+tests/test_issue_104.py::test_040 PASSED                                 [ 17%]
+tests/test_issue_104.py::test_040 ERROR                                  [ 17%]
+tests/test_issue_104.py::test_050 PASSED                                 [ 21%]
+tests/test_issue_104.py::test_060 PASSED                                 [ 26%]
+tests/test_issue_104.py::test_070 PASSED                                 [ 30%]
+tests/test_issue_104.py::test_080 PASSED                                 [ 34%]
+tests/test_issue_104.py::test_090 PASSED                                 [ 39%]
+tests/test_issue_104.py::test_100 PASSED                                 [ 43%]
+tests/test_issue_104.py::test_110 PASSED                                 [ 47%]
+tests/test_issue_104.py::test_120 PASSED                                 [ 52%]
+tests/test_issue_104.py::test_120 ERROR                                  [ 52%]
+tests/test_issue_104.py::test_130 PASSED                                 [ 56%]
+tests/test_issue_104.py::test_140 PASSED                                 [ 60%]
+tests/test_issue_104.py::test_140 ERROR                                  [ 60%]
+tests/test_issue_104.py::test_150 PASSED                                 [ 65%]
+tests/test_issue_104.py::test_160 PASSED                                 [ 69%]
+tests/test_issue_104.py::test_170 PASSED                                 [ 73%]
+tests/test_issue_104.py::test_170 ERROR                                  [ 73%]
+tests/test_issue_104.py::test_180 PASSED                                 [ 78%]
+tests/test_issue_104.py::test_190 PASSED                                 [ 82%]
+tests/test_issue_104.py::test_195 PASSED                                 [ 86%]
+tests/test_issue_104.py::test_200 PASSED                                 [ 91%]
+tests/test_issue_104.py::test_200 ERROR                                  [ 91%]
+tests/test_issue_104.py::test_210 SKIPPED (Symlinks not supported on...) [ 95%]
+tests/test_issue_104.py::test_220 PASSED                                 [100%]
+tests/test_issue_104.py::test_220 ERROR                                  [100%]
+
+=================================== ERRORS ====================================
+________________________ ERROR at teardown of test_040 ________________________
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:701: in _rmtree_unsafe
+    os.unlink(fullname)
+E   PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcwiz\\AppData\\Local\\Temp\\tmp5qihsw8e\\.agentos\\verdicts.db'
+
+During handling of the above exception, another exception occurred:
+tests\test_issue_104.py:89: in temp_dir
+    with tempfile.TemporaryDirectory() as tmpdir:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:971: in __exit__
+    self.cleanup()
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:975: in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:955: in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:852: in rmtree
+    _rmtree_impl(path, dir_fd, onexc)
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:705: in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:930: in onexc
+    _os.unlink(path)
+E   PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcwiz\\AppData\\Local\\Temp\\tmp5qihsw8e\\.agentos\\verdicts.db'
+________________________ ERROR at teardown of test_120 ________________________
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:701: in _rmtree_unsafe
+    os.unlink(fullname)
+E   PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcwiz\\AppData\\Local\\Temp\\tmptqhtusac\\.agentos\\verdicts.db'
+
+During handling of the above exception, another exception occurred:
+tests\test_issue_104.py:89: in temp_dir
+    with tempfile.TemporaryDirectory() as tmpdir:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:971: in __exit__
+    self.cleanup()
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:975: in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:955: in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:852: in rmtree
+    _rmtree_impl(path, dir_fd, onexc)
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:705: in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:930: in onexc
+    _os.unlink(path)
+E   PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcwiz\\AppData\\Local\\Temp\\tmptqhtusac\\.agentos\\verdicts.db'
+________________________ ERROR at teardown of test_140 ________________________
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:701: in _rmtree_unsafe
+    os.unlink(fullname)
+E   PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcwiz\\AppData\\Local\\Temp\\tmpp2gqojzf\\.agentos\\verdicts.db'
+
+During handling of the above exception, another exception occurred:
+tests\test_issue_104.py:89: in temp_dir
+    with tempfile.TemporaryDirectory() as tmpdir:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:971: in __exit__
+    self.cleanup()
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:975: in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:955: in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:852: in rmtree
+    _rmtree_impl(path, dir_fd, onexc)
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:705: in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:930: in onexc
+    _os.unlink(path)
+E   PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcwiz\\AppData\\Local\\Temp\\tmpp2gqojzf\\.agentos\\verdicts.db'
+________________________ ERROR at teardown of test_170 ________________________
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:701: in _rmtree_unsafe
+    os.unlink(fullname)
+E   PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcwiz\\AppData\\Local\\Temp\\tmpraj5x2x2\\.agentos\\verdicts.db'
+
+During handling of the above exception, another exception occurred:
+tests\test_issue_104.py:89: in temp_dir
+    with tempfile.TemporaryDirectory() as tmpdir:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:971: in __exit__
+    self.cleanup()
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:975: in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:955: in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:852: in rmtree
+    _rmtree_impl(path, dir_fd, onexc)
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:705: in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:930: in onexc
+    _os.unlink(path)
+E   PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcwiz\\AppData\\Local\\Temp\\tmpraj5x2x2\\.agentos\\verdicts.db'
+________________________ ERROR at teardown of test_200 ________________________
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:701: in _rmtree_unsafe
+    os.unlink(fullname)
+E   PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcwiz\\AppData\\Local\\Temp\\tmp_2jsntmi\\.agentos\\verdicts.db'
+
+During handling of the above exception, another exception occurred:
+tests\test_issue_104.py:89: in temp_dir
+    with tempfile.TemporaryDirectory() as tmpdir:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:971: in __exit__
+    self.cleanup()
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:975: in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:955: in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:852: in rmtree
+    _rmtree_impl(path, dir_fd, onexc)
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:705: in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:930: in onexc
+    _os.unlink(path)
+E   PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcwiz\\AppData\\Local\\Temp\\tmp_2jsntmi\\.agentos\\verdicts.db'
+________________________ ERROR at teardown of test_220 ________________________
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:701: in _rmtree_unsafe
+    os.unlink(fullname)
+E   PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcwiz\\AppData\\Local\\Temp\\tmptc1gf4r4\\new_project\\.agentos\\verdicts.db'
+
+During handling of the above exception, another exception occurred:
+tests\test_issue_104.py:89: in temp_dir
+    with tempfile.TemporaryDirectory() as tmpdir:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:971: in __exit__
+    self.cleanup()
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:975: in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:955: in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:852: in rmtree
+    _rmtree_impl(path, dir_fd, onexc)
+..\..\AppData\Local\Programs\Python\Python314\Lib\shutil.py:705: in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+..\..\AppData\Local\Programs\Python\Python314\Lib\tempfile.py:930: in onexc
+    _os.unlink(path)
+E   PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcwiz\\AppData\\Local\\Temp\\tmptc1gf4r4\\new_project\\.agentos\\verdicts.db'
+
+---------- coverage: platform win32, python 3.14.0-final-0 -----------
+Name                                         Stmts   Miss  Cover   Missing
+--------------------------------------------------------------------------
+tools\verdict_analyzer\__init__.py               6      0   100%
+tools\verdict_analyzer\database.py              80      5    94%   116, 145-159, 246
+tools\verdict_analyzer\parser.py                72      3    96%   111, 120, 135
+tools\verdict_analyzer\patterns.py              19      4    79%   71-74
+tools\verdict_analyzer\scanner.py               82     48    41%   24, 36-40, 57-59, 87, 106-154
+tools\verdict_analyzer\template_updater.py      67      4    94%   143-145, 164
+--------------------------------------------------------------------------
+TOTAL                                          326     64    80%
+
+FAIL Required test coverage of 95% not reached. Total coverage: 80.37%
+=========================== short test summary info ===========================
+ERROR tests/test_issue_104.py::test_040 - PermissionError: [WinError 32] The ...
+ERROR tests/test_issue_104.py::test_120 - PermissionError: [WinError 32] The ...
+ERROR tests/test_issue_104.py::test_140 - PermissionError: [WinError 32] The ...
+ERROR tests/test_issue_104.py::test_170 - PermissionError: [WinError 32] The ...
+ERROR tests/test_issue_104.py::test_200 - PermissionError: [WinError 32] The ...
+ERROR tests/test_issue_104.py::test_220 - PermissionError: [WinError 32] The ...
+=================== 22 passed, 1 skipped, 6 errors in 0.72s ===================
+

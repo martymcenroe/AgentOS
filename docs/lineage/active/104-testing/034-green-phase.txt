@@ -1,0 +1,57 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\mcwiz\AppData\Local\pypoetry\Cache\virtualenvs\unleashed-Zukdy2xA-py3.14\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\mcwiz\Projects\AgentOS
+configfile: pyproject.toml
+plugins: anyio-4.12.1, langsmith-0.6.4, cov-4.1.0
+collecting ... collected 23 items
+
+tests/test_issue_104.py::test_010 PASSED                                 [  4%]
+tests/test_issue_104.py::test_020 PASSED                                 [  8%]
+tests/test_issue_104.py::test_030 PASSED                                 [ 13%]
+tests/test_issue_104.py::test_040 PASSED                                 [ 17%]
+tests/test_issue_104.py::test_050 FAILED                                 [ 21%]
+tests/test_issue_104.py::test_060 PASSED                                 [ 26%]
+tests/test_issue_104.py::test_070 PASSED                                 [ 30%]
+tests/test_issue_104.py::test_080 PASSED                                 [ 34%]
+tests/test_issue_104.py::test_090 PASSED                                 [ 39%]
+tests/test_issue_104.py::test_100 PASSED                                 [ 43%]
+tests/test_issue_104.py::test_110 PASSED                                 [ 47%]
+tests/test_issue_104.py::test_120 PASSED                                 [ 52%]
+tests/test_issue_104.py::test_130 PASSED                                 [ 56%]
+tests/test_issue_104.py::test_140 PASSED                                 [ 60%]
+tests/test_issue_104.py::test_150 PASSED                                 [ 65%]
+tests/test_issue_104.py::test_160 PASSED                                 [ 69%]
+tests/test_issue_104.py::test_170 PASSED                                 [ 73%]
+tests/test_issue_104.py::test_180 PASSED                                 [ 78%]
+tests/test_issue_104.py::test_190 PASSED                                 [ 82%]
+tests/test_issue_104.py::test_195 PASSED                                 [ 86%]
+tests/test_issue_104.py::test_200 PASSED                                 [ 91%]
+tests/test_issue_104.py::test_210 SKIPPED (Symlinks not supported on...) [ 95%]
+tests/test_issue_104.py::test_220 PASSED                                 [100%]
+
+================================== FAILURES ===================================
+__________________________________ test_050 ___________________________________
+tests\test_issue_104.py:238: in test_050
+    assert "line <N>" in norm1.lower() or "<n>" in norm1
+E   AssertionError: assert ('line <N>' in 'error in file <file> at line <n>' or '<n>' in 'Error in file <FILE> at line <N>')
+E    +  where 'error in file <file> at line <n>' = <built-in method lower of str object at 0x000001F4072DB050>()
+E    +    where <built-in method lower of str object at 0x000001F4072DB050> = 'Error in file <FILE> at line <N>'.lower
+
+---------- coverage: platform win32, python 3.14.0-final-0 -----------
+Name                                         Stmts   Miss  Cover   Missing
+--------------------------------------------------------------------------
+tools\verdict_analyzer\__init__.py               6      0   100%
+tools\verdict_analyzer\database.py             108      7    94%   138-159, 208, 299, 303-304
+tools\verdict_analyzer\parser.py                72      3    96%   111, 120, 135
+tools\verdict_analyzer\patterns.py              22      5    77%   34, 78-81
+tools\verdict_analyzer\scanner.py               96     57    41%   39-43, 56-57, 62-64, 99, 103-105, 120-174
+tools\verdict_analyzer\template_updater.py      67      4    94%   143-145, 164
+--------------------------------------------------------------------------
+TOTAL                                          371     76    80%
+
+FAIL Required test coverage of 95% not reached. Total coverage: 79.51%
+=========================== short test summary info ===========================
+FAILED tests/test_issue_104.py::test_050 - AssertionError: assert ('line <N>'...
+=================== 1 failed, 21 passed, 1 skipped in 0.43s ===================
+

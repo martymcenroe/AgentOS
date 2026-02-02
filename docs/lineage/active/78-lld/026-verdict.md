@@ -1,3 +1,0 @@
-# Governance Verdict: BLOCK
-
-The LLD provides a clear, logical design for shifting workflow storage to a per-repository model. It correctly prioritizes environment variables and leverages standard Git tooling for path resolution. The Fail-Closed strategy is sound. However, there are High Priority improvements needed regarding observability (logging the active DB path) and error handling specificity to ensure a smooth developer experience during this breaking change.

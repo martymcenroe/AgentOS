@@ -1,0 +1,29 @@
+{
+  "issue_number": 104,
+  "lld_path": "C:\\Users\\mcwiz\\Projects\\AgentOS\\docs\\lld\\active\\LLD-104.md",
+  "completed_at": "2026-02-01T20:35:20.671224",
+  "test_files": [
+    "C:\\Users\\mcwiz\\Projects\\AgentOS\\tests\\test_issue_104.py"
+  ],
+  "implementation_files": [
+    "C:\\Users\\mcwiz\\Projects\\AgentOS\\tools\\verdict_analyzer\\__init__.py",
+    "C:\\Users\\mcwiz\\Projects\\AgentOS\\tools\\verdict_analyzer\\parser.py",
+    "C:\\Users\\mcwiz\\Projects\\AgentOS\\tools\\verdict_analyzer\\database.py",
+    "C:\\Users\\mcwiz\\Projects\\AgentOS\\tools\\verdict_analyzer\\patterns.py",
+    "C:\\Users\\mcwiz\\Projects\\AgentOS\\tools\\verdict_analyzer\\template_updater.py",
+    "C:\\Users\\mcwiz\\Projects\\AgentOS\\tools\\verdict_analyzer\\scanner.py",
+    "C:\\Users\\mcwiz\\Projects\\AgentOS\\tools\\verdict_analyzer\\__init__.py",
+    "C:\\Users\\mcwiz\\Projects\\AgentOS\\tools\\verdict_analyzer\\parser.py",
+    "C:\\Users\\mcwiz\\Projects\\AgentOS\\tools\\verdict_analyzer\\database.py",
+    "C:\\Users\\mcwiz\\Projects\\AgentOS\\tools\\verdict_analyzer\\patterns.py",
+    "C:\\Users\\mcwiz\\Projects\\AgentOS\\tools\\verdict_analyzer\\template_updater.py",
+    "C:\\Users\\mcwiz\\Projects\\AgentOS\\tools\\verdict_analyzer\\scanner.py"
+  ],
+  "coverage_achieved": 95.0,
+  "coverage_target": 95,
+  "total_iterations": 7,
+  "test_count": 60,
+  "passed_count": 60,
+  "failed_count": 0,
+  "e2e_passed": null
+}

@@ -1,0 +1,80 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\mcwiz\AppData\Local\pypoetry\Cache\virtualenvs\unleashed-Zukdy2xA-py3.14\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\mcwiz\Projects\AgentOS
+configfile: pyproject.toml
+plugins: anyio-4.12.1, langsmith-0.6.4, cov-4.1.0
+collecting ... collected 0 items
+
+
+---------- coverage: platform win32, python 3.14.0-final-0 -----------
+Name                                                   Stmts   Miss  Cover   Missing
+------------------------------------------------------------------------------------
+agentos\__init__.py                                        1      1     0%   3
+agentos\core\__init__.py                                   5      5     0%   3-30
+agentos\core\audit.py                                    102    102     0%   12-328
+agentos\core\config.py                                    16     16     0%   7-66
+agentos\core\gemini_client.py                            281    281     0%   12-802
+agentos\core\llm_provider.py                             147    147     0%   14-543
+agentos\core\state.py                                      4      4     0%   7-13
+agentos\graphs\__init__.py                                 0      0   100%
+agentos\nodes\__init__.py                                  3      3     0%   3-6
+agentos\nodes\designer.py                                134    134     0%   15-501
+agentos\nodes\governance.py                               90     90     0%   7-335
+agentos\workflows\__init__.py                              0      0   100%
+agentos\workflows\governance\__init__.py                   4      4     0%   17-31
+agentos\workflows\governance\audit.py                    130    130     0%   20-501
+agentos\workflows\governance\config.py                    68     68     0%   11-240
+agentos\workflows\governance\graph.py                     65     65     0%   26-298
+agentos\workflows\governance\nodes\__init__.py             6      6     0%   14-23
+agentos\workflows\governance\nodes\finalize.py            71     71     0%   10-207
+agentos\workflows\governance\nodes\generate_draft.py      65     65     0%   12-205
+agentos\workflows\governance\nodes\human_gate.py          32     32     0%   12-132
+agentos\workflows\governance\nodes\load_input.py          93     93     0%   12-252
+agentos\workflows\governance\nodes\review.py              52     52     0%   9-134
+agentos\workflows\governance\state.py                     43     43     0%   16-314
+agentos\workflows\issue\__init__.py                        3      3     0%   10-13
+agentos\workflows\issue\audit.py                         138    138     0%   12-474
+agentos\workflows\issue\graph.py                          59     59     0%   11-249
+agentos\workflows\issue\nodes\__init__.py                  8      8     0%   15-23
+agentos\workflows\issue\nodes\draft.py                    94     94     0%   10-294
+agentos\workflows\issue\nodes\file_issue.py              185    185     0%   9-472
+agentos\workflows\issue\nodes\human_edit_draft.py        131    131     0%   9-252
+agentos\workflows\issue\nodes\human_edit_verdict.py      140    140     0%   10-278
+agentos\workflows\issue\nodes\load_brief.py               49     49     0%   9-184
+agentos\workflows\issue\nodes\review.py                   77     77     0%   9-193
+agentos\workflows\issue\nodes\sandbox.py                  30     30     0%   11-104
+agentos\workflows\issue\state.py                          18     18     0%   9-40
+agentos\workflows\lld\__init__.py                          3      3     0%   17-20
+agentos\workflows\lld\audit.py                           291    291     0%   14-875
+agentos\workflows\lld\graph.py                            49     49     0%   12-195
+agentos\workflows\lld\nodes.py                           347    347     0%   14-1040
+agentos\workflows\lld\state.py                             7      7     0%   10-22
+agentos\workflows\testing\__init__.py                      3      3     0%   18-21
+agentos\workflows\testing\audit.py                        82     82     0%   13-307
+agentos\workflows\testing\graph.py                        94     94     0%   41-358
+agentos\workflows\testing\knowledge\__init__.py            2      2     0%   8-10
+agentos\workflows\testing\knowledge\patterns.py           60     60     0%   7-193
+agentos\workflows\testing\nodes\__init__.py                9      9     0%   19-31
+agentos\workflows\testing\nodes\document.py              140    140     0%   13-360
+agentos\workflows\testing\nodes\e2e_validation.py         84     84     0%   9-280
+agentos\workflows\testing\nodes\finalize.py               46     46     0%   9-140
+agentos\workflows\testing\nodes\implement_code.py        143    143     0%   7-450
+agentos\workflows\testing\nodes\load_lld.py              192    192     0%   10-548
+agentos\workflows\testing\nodes\review_test_plan.py      107    107     0%   9-391
+agentos\workflows\testing\nodes\scaffold_tests.py        157    157     0%   9-372
+agentos\workflows\testing\nodes\verify_phases.py         139    139     0%   7-455
+agentos\workflows\testing\state.py                         9      9     0%   12-36
+agentos\workflows\testing\templates\__init__.py            5      5     0%   12-23
+agentos\workflows\testing\templates\cp_docs.py            73     73     0%   9-296
+agentos\workflows\testing\templates\lessons.py           115    115     0%   8-304
+agentos\workflows\testing\templates\runbook.py            94     94     0%   8-259
+agentos\workflows\testing\templates\wiki_page.py          74     74     0%   8-207
+------------------------------------------------------------------------------------
+TOTAL                                                   4669   4669     0%
+
+FAIL Required test coverage of 95% not reached. Total coverage: 0.00%
+============================ no tests ran in 0.34s ============================
+
+C:\Users\mcwiz\AppData\Local\pypoetry\Cache\virtualenvs\unleashed-Zukdy2xA-py3.14\Lib\site-packages\coverage\control.py:958: CoverageWarning: No data was collected. (no-data-collected); see https://coverage.readthedocs.io/en/7.13.2/messages.html#warning-no-data-collected
+  self._warn("No data was collected.", slug="no-data-collected")

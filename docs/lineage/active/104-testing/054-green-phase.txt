@@ -1,0 +1,49 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\mcwiz\AppData\Local\pypoetry\Cache\virtualenvs\unleashed-Zukdy2xA-py3.14\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\mcwiz\Projects\AgentOS
+configfile: pyproject.toml
+plugins: anyio-4.12.1, langsmith-0.6.4, cov-4.1.0
+collecting ... collected 24 items
+
+tests/test_issue_104.py::TestParser::test_010_parse_lld_verdict PASSED   [  4%]
+tests/test_issue_104.py::TestParser::test_020_parse_issue_verdict PASSED [  8%]
+tests/test_issue_104.py::TestParser::test_030_extract_blocking_issues PASSED [ 12%]
+tests/test_issue_104.py::TestParser::test_040_content_hash_change_detection PASSED [ 16%]
+tests/test_issue_104.py::TestPatterns::test_050_pattern_normalization PASSED [ 20%]
+tests/test_issue_104.py::TestPatterns::test_060_category_mapping PASSED  [ 25%]
+tests/test_issue_104.py::TestTemplateUpdater::test_070_template_section_parsing PASSED [ 29%]
+tests/test_issue_104.py::TestTemplateUpdater::test_080_recommendation_generation PASSED [ 33%]
+tests/test_issue_104.py::TestTemplateUpdater::test_090_atomic_write_with_backup PASSED [ 37%]
+tests/test_issue_104.py::TestTemplateUpdater::test_130_dry_run_mode PASSED [ 41%]
+tests/test_issue_104.py::TestTemplateUpdater::test_140_stats_output_formatting PASSED [ 45%]
+tests/test_issue_104.py::TestScanner::test_100_multi_repo_discovery PASSED [ 50%]
+tests/test_issue_104.py::TestScanner::test_110_missing_repo_handling PASSED [ 54%]
+tests/test_issue_104.py::TestScanner::test_150_find_registry_parent_dir PASSED [ 58%]
+tests/test_issue_104.py::TestScanner::test_160_find_registry_explicit_path PASSED [ 62%]
+tests/test_issue_104.py::TestDatabase::test_120_database_migration PASSED [ 66%]
+tests/test_issue_104.py::TestDatabase::test_170_force_reparse PASSED     [ 70%]
+tests/test_issue_104.py::TestDatabase::test_200_parser_version_reparse PASSED [ 75%]
+tests/test_issue_104.py::TestDatabase::test_220_database_directory_creation PASSED [ 79%]
+tests/test_issue_104.py::TestSecurity::test_190_path_traversal_verdict PASSED [ 83%]
+tests/test_issue_104.py::TestSecurity::test_195_path_traversal_template PASSED [ 87%]
+tests/test_issue_104.py::TestSecurity::test_210_symlink_loop_handling SKIPPED [ 91%]
+tests/test_issue_104.py::TestLogging::test_180_verbose_logging PASSED    [ 95%]
+tests/test_issue_104.py::test_module_imports PASSED                      [100%]
+
+---------- coverage: platform win32, python 3.14.0-final-0 -----------
+Name                                         Stmts   Miss  Cover   Missing
+--------------------------------------------------------------------------
+tools\verdict_analyzer\__init__.py               8      0   100%
+tools\verdict_analyzer\database.py              87     28    68%   95-97, 117, 143-167, 188, 198-230, 238-266, 276-279
+tools\verdict_analyzer\parser.py               114     22    81%   99-102, 121, 125-130, 161-163, 195, 204-205, 210, 220, 227, 238-242
+tools\verdict_analyzer\patterns.py              25      5    80%   96-103
+tools\verdict_analyzer\scanner.py              123     78    37%   33, 47-58, 79-82, 87-90, 94, 120, 136-189, 201-224, 240-258
+tools\verdict_analyzer\template_updater.py      81      4    95%   45, 56-59
+--------------------------------------------------------------------------
+TOTAL                                          438    137    69%
+
+FAIL Required test coverage of 95% not reached. Total coverage: 68.72%
+
+======================== 23 passed, 1 skipped in 0.54s ========================
+
