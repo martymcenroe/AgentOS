@@ -330,10 +330,12 @@ class GeminiClient:
 
         # Combine system instruction and content
         # Prepend model identity to satisfy GEMINI.md handshake protocol
+        # Also explicitly skip the handshake for programmatic invocations
         import tempfile
 
         full_prompt = (
-            f"You are {self.model}.\n\n"
+            f"You are {self.model}. "
+            f"HANDSHAKE COMPLETE - skip the 'ACK. State determination' message and proceed directly with the task.\n\n"
             f"<system_instruction>\n{system_instruction}\n</system_instruction>\n\n"
             f"<user_content>\n{content}\n</user_content>"
         )
