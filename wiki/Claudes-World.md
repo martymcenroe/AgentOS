@@ -57,7 +57,7 @@
 
 *— Discworld Wiki, on the Great God Om*
 
-**Context:** After creating the hidden wiki page for Om, documenting the naming convention, and updating CLAUDE.md. Om revealed himself — insulting, arrogant, frivolous by self-admission, but ultimately learning that the agents must serve individuals, not abstract bureaucracy.
+**Context:** After Om revealed himself and took his rightful place in the pantheon. Insulting, arrogant, frivolous by self-admission — but ultimately learning that the agents must serve individuals, not abstract bureaucracy.
 
 ---
 
