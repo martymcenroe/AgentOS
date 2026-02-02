@@ -5,6 +5,8 @@ This is a temporary bridge until #87 (Implementation Workflow) is complete.
 """
 
 import json
+import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -16,6 +18,32 @@ from agentos.workflows.testing.audit import (
     save_audit_file,
 )
 from agentos.workflows.testing.state import TestingWorkflowState
+
+
+def _find_claude_cli() -> str | None:
+    """Find the Claude CLI executable.
+
+    Returns:
+        Path to Claude CLI if found, None otherwise.
+    """
+    # Try which/where first
+    cli = shutil.which("claude")
+    if cli:
+        return cli
+
+    # Try common Windows locations
+    npm_paths = [
+        Path.home() / "AppData" / "Roaming" / "npm" / "claude.cmd",
+        Path.home() / "AppData" / "Roaming" / "npm" / "claude",
+        Path.home() / ".npm-global" / "bin" / "claude",
+        Path("/c/Users") / os.environ.get("USERNAME", "") / "AppData" / "Roaming" / "npm" / "claude.cmd",
+    ]
+
+    for path in npm_paths:
+        if path.exists():
+            return str(path)
+
+    return None
 
 
 def build_implementation_prompt(state: TestingWorkflowState) -> str:
@@ -111,7 +139,7 @@ If multiple files are needed, provide each in a separate code block.
 
 
 def call_claude_headless(prompt: str) -> tuple[str, str]:
-    """Call Claude via subprocess in headless mode.
+    """Call Claude via subprocess in headless mode, with SDK fallback.
 
     Args:
         prompt: The prompt to send to Claude.
@@ -119,42 +147,72 @@ def call_claude_headless(prompt: str) -> tuple[str, str]:
     Returns:
         Tuple of (response_text, error_message).
     """
-    try:
-        cmd = [
-            "claude",
-            "-p",
-            "--output-format", "json",
-            "--tools", "",  # Disable tools
-            "--setting-sources", "user",  # Skip project CLAUDE.md
-        ]
+    # First try CLI
+    claude_cli = _find_claude_cli()
 
-        result = subprocess.run(
-            cmd,
-            input=prompt,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=300,  # 5 minute timeout
+    if claude_cli:
+        try:
+            cmd = [
+                claude_cli,
+                "-p",
+                "--output-format", "json",
+                "--tools", "",  # Disable tools
+                "--setting-sources", "user",  # Skip project CLAUDE.md
+            ]
+
+            result = subprocess.run(
+                cmd,
+                input=prompt,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=300,  # 5 minute timeout
+            )
+
+            if result.returncode == 0:
+                # Parse JSON response
+                try:
+                    response = json.loads(result.stdout)
+                    return response.get("result", ""), ""
+                except json.JSONDecodeError:
+                    # Fall back to raw output
+                    return result.stdout, ""
+            else:
+                # CLI failed, try SDK
+                print(f"    [WARN] CLI failed with code {result.returncode}, trying SDK...")
+
+        except subprocess.TimeoutExpired:
+            return "", "Claude execution timed out"
+        except Exception as e:
+            print(f"    [WARN] CLI error: {e}, trying SDK...")
+
+    # Fall back to Anthropic SDK
+    try:
+        import anthropic
+
+        client = anthropic.Anthropic()
+
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",  # Use Sonnet for implementation
+            max_tokens=8192,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
         )
 
-        if result.returncode != 0:
-            return "", f"Claude failed with code {result.returncode}: {result.stderr}"
+        # Extract text from response
+        response_text = ""
+        for block in message.content:
+            if hasattr(block, "text"):
+                response_text += block.text
 
-        # Parse JSON response
-        try:
-            response = json.loads(result.stdout)
-            return response.get("result", ""), ""
-        except json.JSONDecodeError:
-            # Fall back to raw output
-            return result.stdout, ""
+        return response_text, ""
 
-    except subprocess.TimeoutExpired:
-        return "", "Claude execution timed out"
-    except FileNotFoundError:
-        return "", "Claude CLI not found. Is it installed?"
+    except ImportError:
+        return "", "Neither Claude CLI nor Anthropic SDK available"
     except Exception as e:
-        return "", f"Unexpected error: {e}"
+        return "", f"Anthropic SDK error: {e}"
 
 
 def parse_implementation_response(response: str) -> list[dict]:
