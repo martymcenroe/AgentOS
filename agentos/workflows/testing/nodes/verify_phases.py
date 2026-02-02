@@ -239,8 +239,9 @@ def verify_green_phase(state: TestingWorkflowState) -> dict[str, Any]:
     if impl_files:
         # Extract the first non-test directory from implementation paths
         for impl_path in impl_files:
-            # Skip test files
-            if "test" in impl_path.lower():
+            # Skip test files (in tests/ directory, not just any path containing "test")
+            path_parts = Path(impl_path).parts
+            if any(part.lower() in ("tests", "test") for part in path_parts):
                 continue
             rel_path = Path(impl_path).relative_to(repo_root) if repo_root else Path(impl_path)
             parts = rel_path.parts
