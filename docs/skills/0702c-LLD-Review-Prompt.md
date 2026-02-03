@@ -4,8 +4,8 @@
 
 | Field | Value |
 |-------|-------|
-| **Version** | 2.3.0 |
-| **Last Updated** | 2026-02-02 |
+| **Version** | 2.4.0 |
+| **Last Updated** | 2026-02-03 |
 | **Role** | Senior Software Architect & AI Governance Lead |
 | **Purpose** | LLD gatekeeper review before implementation begins |
 | **Standard** | [0010-prompt-schema.md](../standards/0010-prompt-schema.md) |
@@ -115,6 +115,7 @@ These issues require fixes but don't block implementation. Be thorough.
 
 | Check | Question |
 |-------|----------|
+| **Section 10.0 TDD Test Plan (CRITICAL)** | Does Section 10.0 contain a Test Plan table with Test ID, Description, Expected Behavior, and Status columns? Are tests marked as RED (not yet implemented)? Is coverage target ≥95% specified? LLDs without a TDD test plan BLOCK implementation. |
 | **Section 10 Test Scenarios (CRITICAL)** | Does Section 10 contain a structured table of test scenarios with columns for: ID/Name, Scenario/Description, Type (unit/integration/e2e), and Expected behavior? LLDs without parseable test scenarios BLOCK the TDD workflow. |
 | **Requirement Coverage (CRITICAL - 95% threshold)** | You MUST output a **Requirement Coverage Table** (see Output Format below). Extract EVERY numbered requirement from Section 3. Map each to test scenario(s) from Section 10. Calculate coverage = (requirements with tests / total requirements). **BLOCK if coverage < 95%.** Do NOT make qualitative assessments - count explicitly. |
 | **Test Assertions (CRITICAL)** | Does every test scenario have explicit assertions or expected outcomes? **BLOCK if any test is vague** (e.g., "verify it works", "check behavior", "test the feature"). Each test must specify WHAT is checked and WHAT the expected result is. |
@@ -292,6 +293,7 @@ The LLD proposes a batch file cleanup utility but contains critical Safety block
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-02-03 | 2.4.0 | Added TDD Test Plan check (Section 10.0) to Quality tier. Verifies tests are marked RED before implementation and coverage target ≥95% is specified. Issue #209. |
 | 2026-02-02 | 2.3.0 | Added MANDATORY Requirement Coverage Table to output format. Gemini must explicitly map every Section 3 requirement to tests and calculate coverage numerically. Fixes LLD-141 gap where Gemini saw missing test but classified as Tier 3 suggestion instead of blocking. |
 | 2026-02-02 | 2.2.0 | Added Path Structure check to Architecture tier. BLOCKS if LLD file paths don't match actual project structure (e.g., `src/module/` vs `module/`). Issue #106 root cause. |
 | 2026-02-02 | 2.1.0 | Added 0706c test plan checks: 95% coverage, explicit assertions, no human delegation, edge cases (#126). Unified LLD review with test plan review. |

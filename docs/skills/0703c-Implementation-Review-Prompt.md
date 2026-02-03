@@ -4,8 +4,8 @@
 
 | Field | Value |
 |-------|-------|
-| **Version** | 2.0.0 |
-| **Last Updated** | 2026-01-22 |
+| **Version** | 2.1.0 |
+| **Last Updated** | 2026-02-03 |
 | **Role** | Senior Software Architect |
 | **Purpose** | Gatekeeper review of implementation before PR merge |
 | **Standard** | [0010-prompt-schema.md](../standards/0010-prompt-schema.md) |
@@ -148,6 +148,8 @@ These issues require fixes but don't block merge. Be thorough.
 
 | Check | Question |
 |-------|----------|
+| **TDD Compliance (CRITICAL)** | Were tests written BEFORE implementation code? Check git history: test commits should precede or accompany implementation commits, not follow them. If tests were added after implementation, flag as TDD violation. |
+| **Test Coverage Target** | Does test coverage meet the target specified in the LLD (typically ≥95%)? If coverage is below target, require justification or additional tests. |
 | **Test Integrity (CRITICAL)** | Do the tests ACTUALLY test the new code? Look for mocked-out logic that bypasses real checks. If tests mock the very thing they should be testing, flag it. |
 | **Test Coverage** | Do tests cover the acceptance criteria from the issue? Are edge cases tested? |
 | **Test Quality** | Are tests meaningful with proper assertions? Would they catch regressions? |
@@ -174,8 +176,9 @@ Note these but don't block on them.
 
 Quick verification before finalizing verdict:
 
+- [ ] **TDD followed:** Tests written before implementation (check git history)
 - [ ] **All tests pass:** Test report shows 0 failures
-- [ ] **Coverage adequate:** Coverage meets project threshold (or reason given)
+- [ ] **Coverage adequate:** Coverage meets LLD target (≥95% or reason given)
 - [ ] **LLD compliance:** Implementation matches approved LLD (deviations documented)
 - [ ] **No regressions:** Existing functionality not broken
 - [ ] **Error paths tested:** Both happy path AND error paths have coverage
@@ -335,5 +338,6 @@ The implementation contains critical Safety and Security blockers. The code devi
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-02-03 | 2.1.0 | Added TDD Compliance and Coverage Target checks to Quality tier. Added TDD verification to Review Checklist. Issue #209. |
 | 2026-01-22 | 2.0.0 | Refactored to Golden Schema (Standard 0010). Added Process Validation (LLD check), LLD Compliance to Tier 1, Test Integrity to Tier 2. |
 | 2026-01-XX | 1.0.0 | Initial version. |

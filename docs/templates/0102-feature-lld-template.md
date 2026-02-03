@@ -260,6 +260,26 @@ sequenceDiagram
 
 **Testing Philosophy:** Strive for 100% automated test coverage. Manual tests are a last resort for scenarios that genuinely cannot be automated (e.g., visual inspection, hardware interaction). Every scenario marked "Manual" requires justification.
 
+### 10.0 Test Plan (TDD - Complete Before Implementation)
+
+**TDD Requirement:** Tests MUST be written and failing BEFORE implementation begins.
+
+| Test ID | Test Description | Expected Behavior | Status |
+|---------|------------------|-------------------|--------|
+| T010 | {test name} | {what it verifies} | RED / GREEN |
+| T020 | {test name} | {what it verifies} | RED / GREEN |
+| T030 | {test name} | {what it verifies} | RED / GREEN |
+
+**Coverage Target:** ≥95% for all new code
+
+**TDD Checklist:**
+- [ ] All tests written before implementation
+- [ ] Tests currently RED (failing)
+- [ ] Test IDs match scenario IDs in 10.1
+- [ ] Test file created at: `tests/unit/test_{module}.py`
+
+*Note: Update Status from RED to GREEN as implementation progresses. All tests should be RED at LLD review time.*
+
 ### 10.1 Test Scenarios
 
 | ID | Scenario | Type | Input | Expected Output | Pass Criteria |
