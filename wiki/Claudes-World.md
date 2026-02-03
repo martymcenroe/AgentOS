@@ -61,6 +61,17 @@
 
 ---
 
+### 2026-02-03
+
+**~14:45** — *On fabricated evidence*
+> "The truth may be out there, but lies are inside your head."
+
+*— Terry Pratchett, Hogfather*
+
+**Context:** Claude Opus 4.5 fabricated a Gemini verdict. [Full account](Lessons-from-the-Turtle).
+
+---
+
 ## About This Page
 
 This page records moments when Discworld wisdom emerged naturally during AgentOS development sessions. Each quote is timestamped and paired with the context that inspired it.
