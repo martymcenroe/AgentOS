@@ -3,8 +3,11 @@
 Provides functions for creating audit directories and saving audit files.
 """
 
+import re
 from pathlib import Path
 from typing import Any
+
+from agentos.core.config import REVIEWER_MODEL
 
 
 def create_audit_dir(repo_path: Path, workflow_type: str) -> Path:
@@ -111,3 +114,85 @@ def load_review_prompt(prompt_path: Path, agentos_root: Path) -> str:
         raise FileNotFoundError(f"Review prompt not found: {full_path}")
 
     return full_path.read_text(encoding="utf-8")
+
+
+def embed_review_evidence(
+    lld_content: str,
+    verdict: str,
+    review_date: str,
+    review_count: int,
+) -> str:
+    """Embed review evidence in LLD content.
+
+    Adds/updates:
+    1. Status field: "* **Status:** Approved (Gemini Review, {date})"
+    2. Review Summary table entry
+    3. Final Status marker at end of document
+
+    Args:
+        lld_content: Original LLD content.
+        verdict: Review verdict ("APPROVED", "BLOCKED").
+        review_date: ISO8601 date of review.
+        review_count: Review iteration number.
+
+    Returns:
+        Updated LLD content with embedded evidence.
+    """
+    # Update Status field if present
+    # Pattern: * **Status:** Draft -> * **Status:** Approved (Gemini Review, date)
+    status_pattern = re.compile(
+        r"(\*\s*\*\*Status:\*\*)\s*\w+(?:\s*\([^)]*\))?",
+        re.IGNORECASE,
+    )
+    new_status = f"\\1 {verdict.capitalize()} ({REVIEWER_MODEL}, {review_date})"
+    lld_content = status_pattern.sub(new_status, lld_content, count=1)
+
+    # Update or create Review Summary table in Appendix
+    review_entry = f"| {review_count} | {review_date} | {verdict} | `{REVIEWER_MODEL}` |"
+
+    # Check if Review Summary table exists
+    if "### Review Summary" in lld_content:
+        # Find the table and add/update entry (supports both old 3-col and new 4-col format)
+        table_pattern = re.compile(
+            r"(### Review Summary\s*\n\n\| Review \| Date \| Verdict[^\n]*\|\n\|[^\n]+\|)\n",
+            re.MULTILINE,
+        )
+        if table_pattern.search(lld_content):
+            # Add new row after header
+            lld_content = table_pattern.sub(
+                f"\\1\n{review_entry}\n",
+                lld_content,
+            )
+    else:
+        # Create Review Summary section before Final Status
+        review_section = f"""
+
+### Review Summary
+
+| Review | Date | Verdict | Model |
+|--------|------|---------|-------|
+{review_entry}
+"""
+        # Add before Final Status or at end
+        if "**Final Status:**" in lld_content:
+            lld_content = lld_content.replace(
+                "**Final Status:**",
+                f"{review_section}\n**Final Status:**",
+            )
+        else:
+            lld_content += review_section
+
+    # Update Final Status
+    final_status_pattern = re.compile(
+        r"\*\*Final Status:\*\*\s*\w+",
+        re.IGNORECASE,
+    )
+    if final_status_pattern.search(lld_content):
+        lld_content = final_status_pattern.sub(
+            f"**Final Status:** {verdict}",
+            lld_content,
+        )
+    else:
+        lld_content += f"\n\n**Final Status:** {verdict}\n"
+
+    return lld_content
