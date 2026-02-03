@@ -389,9 +389,10 @@ Examples:
         help="Show what would happen without making changes",
     )
     parser.add_argument(
-        "--force",
+        "--yes", "-y",
         action="store_true",
-        help="Skip confirmation when regenerating existing LLD (shifts lineage to n-1)",
+        dest="yes",
+        help="Auto-confirm regeneration prompts (shifts existing lineage to n-1)",
     )
 
     # Paths
@@ -795,19 +796,19 @@ def run_resume_workflow(
 def check_and_shift_existing_lld(
     issue_number: int,
     target_repo: Path,
-    force: bool = False,
+    yes: bool = False,
 ) -> bool:
     """Check for existing LLD/lineage and handle regeneration.
 
     Per Standard 0012, before regenerating an LLD we must:
     1. Check for existing LLD file and lineage directory
-    2. Warn the user and require YES confirmation (unless --force)
+    2. Warn the user and require YES confirmation (unless --yes)
     3. Shift lineage versions to preserve history
 
     Args:
         issue_number: GitHub issue number.
         target_repo: Target repository path.
-        force: If True, skip confirmation prompt.
+        yes: If True, auto-confirm and skip interactive prompt.
 
     Returns:
         True if we should proceed with generation, False to abort.
@@ -839,9 +840,9 @@ def check_and_shift_existing_lld(
         print("  - Move existing lineage to {issue}-lld-n1")
     print()
 
-    # Force mode - proceed without confirmation
-    if force:
-        print("--force specified, proceeding with regeneration...")
+    # Yes mode - proceed without confirmation
+    if yes:
+        print("--yes specified, auto-confirming...")
         print()
         operations = shift_lineage_versions(issue_number, target_repo)
         for op in operations:
@@ -991,7 +992,7 @@ def main() -> int:
 
     # Pre-generation check for LLD workflow (Standard 0012)
     if args.type == "lld" and args.issue:
-        if not check_and_shift_existing_lld(args.issue, target_repo, args.force):
+        if not check_and_shift_existing_lld(args.issue, target_repo, args.yes):
             return 0  # User aborted
 
     # Run single workflow

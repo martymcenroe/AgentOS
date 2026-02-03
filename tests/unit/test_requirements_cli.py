@@ -896,26 +896,39 @@ class TestRepoAutoDetection:
 # =============================================================================
 
 
-class TestForceFlag:
-    """Tests for --force flag in CLI.
+class TestYesFlag:
+    """Tests for --yes/-y flag in CLI.
 
     Issue #237: Automate lineage n-1 versioning on LLD regeneration.
+    Issue #240: Rename --force to --yes/-y (--force is banned for LLM agents).
     """
 
-    def test_force_flag_in_parser(self):
-        """Verify --force argument is defined in parser."""
+    def test_yes_flag_accepts_long_form(self):
+        """The --yes long form should work."""
         from tools.run_requirements_workflow import parse_args
 
         args = parse_args([
             "--type", "lld",
             "--issue", "42",
-            "--force",
+            "--yes",
         ])
 
-        assert args.force is True
+        assert args.yes is True
 
-    def test_force_flag_default_false(self):
-        """Verify --force defaults to False."""
+    def test_yes_flag_accepts_short_form(self):
+        """The -y short form should work."""
+        from tools.run_requirements_workflow import parse_args
+
+        args = parse_args([
+            "--type", "lld",
+            "--issue", "42",
+            "-y",
+        ])
+
+        assert args.yes is True
+
+    def test_yes_flag_default_false(self):
+        """Verify --yes defaults to False."""
         from tools.run_requirements_workflow import parse_args
 
         args = parse_args([
@@ -923,25 +936,26 @@ class TestForceFlag:
             "--issue", "42",
         ])
 
-        assert args.force is False
+        assert args.yes is False
 
 
 class TestCheckAndShiftExistingLLD:
     """Tests for check_and_shift_existing_lld function.
 
     Issue #237: Automate lineage n-1 versioning on LLD regeneration.
+    Issue #240: Rename --force to --yes/-y.
     """
 
     def test_returns_true_when_nothing_exists(self, tmp_path):
         """Test returns True when no LLD or lineage exists."""
         from tools.run_requirements_workflow import check_and_shift_existing_lld
 
-        result = check_and_shift_existing_lld(42, tmp_path, force=False)
+        result = check_and_shift_existing_lld(42, tmp_path, yes=False)
 
         assert result is True
 
-    def test_returns_true_with_force_flag(self, tmp_path):
-        """Test returns True with --force even when LLD exists."""
+    def test_returns_true_with_yes_flag(self, tmp_path):
+        """Test returns True with --yes even when LLD exists."""
         from tools.run_requirements_workflow import check_and_shift_existing_lld
         from agentos.workflows.requirements.audit import LLD_ACTIVE_DIR
 
@@ -951,7 +965,7 @@ class TestCheckAndShiftExistingLLD:
         lld_file = lld_dir / "LLD-042.md"
         lld_file.write_text("# Existing LLD")
 
-        result = check_and_shift_existing_lld(42, tmp_path, force=True)
+        result = check_and_shift_existing_lld(42, tmp_path, yes=True)
 
         assert result is True
         # LLD should be deleted
@@ -972,7 +986,7 @@ class TestCheckAndShiftExistingLLD:
         lineage_dir.mkdir(parents=True)
         (lineage_dir / "001-issue.md").write_text("content")
 
-        result = check_and_shift_existing_lld(42, tmp_path, force=False)
+        result = check_and_shift_existing_lld(42, tmp_path, yes=False)
 
         assert result is True
         # LLD should be deleted, lineage shifted
@@ -991,7 +1005,7 @@ class TestCheckAndShiftExistingLLD:
         lld_dir.mkdir(parents=True)
         (lld_dir / "LLD-042.md").write_text("# Existing LLD")
 
-        result = check_and_shift_existing_lld(42, tmp_path, force=False)
+        result = check_and_shift_existing_lld(42, tmp_path, yes=False)
 
         assert result is True
         mock_input.assert_called_once()
@@ -1008,7 +1022,7 @@ class TestCheckAndShiftExistingLLD:
         lld_file = lld_dir / "LLD-042.md"
         lld_file.write_text("# Existing LLD")
 
-        result = check_and_shift_existing_lld(42, tmp_path, force=False)
+        result = check_and_shift_existing_lld(42, tmp_path, yes=False)
 
         assert result is False
         # LLD should NOT be deleted
@@ -1026,7 +1040,7 @@ class TestCheckAndShiftExistingLLD:
         lld_file = lld_dir / "LLD-042.md"
         lld_file.write_text("# Existing LLD")
 
-        result = check_and_shift_existing_lld(42, tmp_path, force=False)
+        result = check_and_shift_existing_lld(42, tmp_path, yes=False)
 
         # Exact match required - lowercase 'y' should abort
         assert result is False
@@ -1067,10 +1081,10 @@ class TestMainWithPreGenerationCheck:
     @patch("tools.run_requirements_workflow.check_and_shift_existing_lld")
     @patch("tools.run_requirements_workflow.run_single_workflow")
     @patch("tools.run_requirements_workflow.resolve_roots")
-    def test_main_passes_force_to_check(
+    def test_main_passes_yes_to_check(
         self, mock_roots, mock_run, mock_check, tmp_path
     ):
-        """Test main() passes --force flag to pre-generation check."""
+        """Test main() passes --yes flag to pre-generation check."""
         from tools.run_requirements_workflow import main
         import sys
 
@@ -1079,14 +1093,14 @@ class TestMainWithPreGenerationCheck:
         mock_run.return_value = 0
 
         original_argv = sys.argv
-        sys.argv = ["prog", "--type", "lld", "--issue", "42", "--force", "--mock"]
+        sys.argv = ["prog", "--type", "lld", "--issue", "42", "--yes", "--mock"]
 
         try:
             main()
         finally:
             sys.argv = original_argv
 
-        # Pre-generation check should be called with force=True
+        # Pre-generation check should be called with yes=True
         mock_check.assert_called_once_with(42, tmp_path, True)
 
     @patch("tools.run_requirements_workflow.check_and_shift_existing_lld")
