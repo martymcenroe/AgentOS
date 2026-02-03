@@ -9,10 +9,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
+from datetime import timezone
+
 from agentos.workflows.requirements.audit import (
     embed_review_evidence,
     next_file_number,
     save_audit_file,
+    update_lld_status,
 )
 from ..git_operations import commit_and_push, GitOperationError
 
@@ -20,72 +23,101 @@ from ..git_operations import commit_and_push, GitOperationError
 GH_TIMEOUT_SECONDS = 30
 
 
-def _finalize_issue(state: Dict[str, Any]) -> Dict[str, Any]:
-    """Finalize issue by updating with final draft.
+def _parse_issue_content(draft: str) -> tuple:
+    """Parse issue title and body from markdown draft.
+
+    Expects draft in format:
+    # Title Here
+
+    Body content...
 
     Args:
-        state: Workflow state containing issue_number, current_draft, etc.
+        draft: Markdown draft content.
 
     Returns:
-        Updated state with finalization status
+        Tuple of (title, body).
     """
-    issue_number = state.get("issue_number")
-    target_repo = state.get("target_repo", ".")
-    audit_dir = Path(state.get("audit_dir", "."))
+    lines = draft.strip().split("\n")
+
+    title = ""
+    body_start = 0
+
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("# "):
+            title = stripped[2:].strip()
+            body_start = i + 1
+            break
+
+    # Skip blank lines after title
+    while body_start < len(lines) and not lines[body_start].strip():
+        body_start += 1
+
+    body = "\n".join(lines[body_start:]).strip()
+
+    return title, body
+
+
+def _finalize_issue(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Finalize issue workflow by filing GitHub issue.
+
+    Args:
+        state: Workflow state containing current_draft, target_repo, etc.
+
+    Returns:
+        Updated state with issue_url, filed_issue_number.
+    """
+    target_repo = Path(state.get("target_repo", "."))
     current_draft = state.get("current_draft", "")
+    audit_dir = Path(state.get("audit_dir", "."))
 
-    if not current_draft:
-        error_msg = "No draft to finalize"
-        state["error_message"] = error_msg
-        if audit_dir.exists():
-            file_num = next_file_number(audit_dir)
-            save_audit_file(audit_dir, file_num, "error", error_msg)
-        return state
+    # Parse title and body from draft
+    title, body = _parse_issue_content(current_draft)
 
+    if not title:
+        return {"error_message": "Could not parse issue title from draft"}
+
+    # File issue using gh CLI
     try:
-        # Update issue comment with final draft using UTF-8 encoding
         result = subprocess.run(
-            ["gh", "issue", "comment", str(issue_number), "--body", current_draft],
+            ["gh", "issue", "create", "--title", title, "--body", body],
             capture_output=True,
             text=True,
             encoding="utf-8",  # Fix for Unicode handling on Windows
-            cwd=target_repo,
             timeout=GH_TIMEOUT_SECONDS,
-            check=False,
+            cwd=str(target_repo),
         )
 
         if result.returncode != 0:
-            error_msg = f"Failed to post comment to issue #{issue_number}: {result.stderr}"
-            state["error_message"] = error_msg
-            if audit_dir.exists():
-                file_num = next_file_number(audit_dir)
-                save_audit_file(audit_dir, file_num, "error", error_msg)
-            return state
+            return {"error_message": f"Failed to create issue: {result.stderr.strip()}"}
 
-        state["error_message"] = ""
-        state["finalized"] = True
+        issue_url = result.stdout.strip()
 
-        # Save finalization status to audit
-        if audit_dir.exists():
-            file_num = next_file_number(audit_dir)
-            audit_content = f"# Finalized Issue #{issue_number}\n\n"
-            audit_content += f"**Comment URL:** {result.stdout.strip()}\n"
-            save_audit_file(audit_dir, file_num, "finalize", audit_content)
+        # Extract issue number from URL
+        # Format: https://github.com/owner/repo/issues/123
+        issue_number = 0
+        if "/issues/" in issue_url:
+            try:
+                issue_number = int(issue_url.split("/issues/")[-1])
+            except ValueError:
+                pass
 
     except subprocess.TimeoutExpired:
-        error_msg = f"Timeout posting comment to issue #{issue_number}"
-        state["error_message"] = error_msg
-        if audit_dir.exists():
-            file_num = next_file_number(audit_dir)
-            save_audit_file(audit_dir, file_num, "error", error_msg)
-    except Exception as e:
-        error_msg = f"Unexpected error finalizing issue: {e}"
-        state["error_message"] = error_msg
-        if audit_dir.exists():
-            file_num = next_file_number(audit_dir)
-            save_audit_file(audit_dir, file_num, "error", error_msg)
+        return {"error_message": "Timeout creating GitHub issue"}
+    except FileNotFoundError:
+        return {"error_message": "gh CLI not found. Install GitHub CLI."}
 
-    return state
+    # Save final state to audit
+    if audit_dir.exists():
+        file_num = next_file_number(audit_dir)
+        final_content = f"# Issue Filed\n\nURL: {issue_url}\n\n---\n\n{current_draft}"
+        save_audit_file(audit_dir, file_num, "final.md", final_content)
+
+    return {
+        "issue_url": issue_url,
+        "filed_issue_number": issue_number,
+        "error_message": "",
+    }
 
 
 def _commit_and_push_files(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -129,7 +161,7 @@ def _save_lld_file(state: Dict[str, Any]) -> Dict[str, Any]:
     """Save LLD file with embedded review evidence.
 
     For workflow_type="lld", saves the draft to docs/lld/active/ with
-    the actual Gemini verdict embedded.
+    the actual Gemini verdict embedded. Also updates lld-status.json tracking.
 
     Args:
         state: Workflow state with current_draft, lld_status, etc.
@@ -147,6 +179,11 @@ def _save_lld_file(state: Dict[str, Any]) -> Dict[str, Any]:
     lld_status = state.get("lld_status", "BLOCKED")
     verdict_count = state.get("verdict_count", 0)
     audit_dir = Path(state.get("audit_dir", ""))
+
+    # Validate issue_number
+    if not issue_number:
+        state["error_message"] = "No issue number for LLD finalization"
+        return state
 
     if not current_draft:
         return state
@@ -166,8 +203,28 @@ def _save_lld_file(state: Dict[str, Any]) -> Dict[str, Any]:
     lld_path = lld_dir / f"LLD-{issue_number:03d}.md"
     lld_path.write_text(lld_content, encoding="utf-8")
 
+    # Output verification guard
+    if not lld_path.exists():
+        state["error_message"] = f"LLD file not created at {lld_path}"
+        return state
+
     print(f"    Saved LLD to: {lld_path}")
     print(f"    Final Status: {lld_status}")
+
+    # Update lld-status.json tracking
+    review_info = {
+        "has_gemini_review": verdict_count > 0,
+        "final_verdict": lld_status,
+        "last_review_date": datetime.now(timezone.utc).isoformat(),
+        "review_count": verdict_count,
+    }
+    update_lld_status(
+        issue_number=issue_number,
+        lld_path=str(lld_path),
+        review_info=review_info,
+        target_repo=target_repo,
+    )
+    print(f"    Updated lld-status.json tracking")
 
     # Add to created_files for commit
     created_files = list(state.get("created_files", []))
