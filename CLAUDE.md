@@ -225,6 +225,62 @@ Implementation Review Gate Check:
 
 **CRITICAL:** If orchestrator reports [BLOCK], Claude MUST NOT create the PR.
 
+### SKIPPED TEST GATE (MANDATORY)
+
+**After ANY test run with skipped tests, you MUST audit before claiming success.**
+
+```
+If test output shows "X skipped":
+├── AUDIT each skipped test
+│   ├── What does this test verify?
+│   ├── Why was it skipped?
+│   ├── Is this critical functionality?
+│   └── Was it verified another way?
+├── If critical AND not verified → Status = UNVERIFIED
+├── If critical AND verified manually → Document verification
+└── If not critical → Document and proceed
+```
+
+**Output format (REQUIRED when skips exist):**
+
+```
+SKIPPED TEST AUDIT:
+- [SKIPPED] "test_name_here"
+  - Verifies: {what functionality this test covers}
+  - Skip reason: {why it was skipped}
+  - Critical: YES/NO
+  - Alt verification: {how verified, or NONE}
+  - Status: VERIFIED/UNVERIFIED
+```
+
+**Rules:**
+1. NEVER say "tests pass" if any critical functionality is UNVERIFIED
+2. UNVERIFIED status blocks merge until resolved
+3. Non-critical skips can proceed with documentation
+4. `pytest.skip()` without reason in test code is always suspicious
+
+**Example - Critical Skip:**
+```
+SKIPPED TEST AUDIT:
+- [SKIPPED] "test_firefox_extension_loads"
+  - Verifies: Firefox extension initialization
+  - Skip reason: Firefox not installed in CI
+  - Critical: YES (core feature)
+  - Alt verification: NONE
+  - Status: UNVERIFIED ← BLOCKS MERGE
+```
+
+**Example - Non-Critical Skip:**
+```
+SKIPPED TEST AUDIT:
+- [SKIPPED] "test_japanese_locale_formatting"
+  - Verifies: Date formatting in ja_JP locale
+  - Skip reason: Locale not installed
+  - Critical: NO (edge case)
+  - Alt verification: N/A
+  - Status: VERIFIED (non-critical, documented)
+```
+
 ---
 
 ## First Action
