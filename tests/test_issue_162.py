@@ -58,8 +58,8 @@ def test_010(tmp_path):
         assert mock_run.call_args_list[0][0][0] == ["git", "add", "docs/lld/active/LLD-162.md"]
         assert mock_run.call_args_list[1][0][0] == ["git", "add", "docs/lld/lld-status.json"]
         
-        # Verify git commit
-        assert mock_run.call_args_list[2][0][0] == ["git", "commit", "-m", "docs: add LLD-162 via requirements workflow"]
+        # Verify git commit (includes "Closes #N" footer to auto-close GitHub issue)
+        assert mock_run.call_args_list[2][0][0] == ["git", "commit", "-m", "docs: add LLD-162 via requirements workflow\n\nCloses #162"]
         
         # Verify git push
         assert mock_run.call_args_list[3][0][0] == ["git", "push"]
@@ -121,8 +121,7 @@ def test_030(tmp_path):
 def test_040():
     """
     Commit message format - LLD | Auto | workflow_type="lld", issue=162 |
-    Formatted message | Message matches `docs: add LLD-162 via
-    requirements workflow`
+    Formatted message | Message includes title and "Closes #N" footer
     """
     # TDD: Arrange
     # (no setup needed)
@@ -130,8 +129,8 @@ def test_040():
     # TDD: Act
     message = format_commit_message("lld", issue_number=162)
 
-    # TDD: Assert
-    assert message == "docs: add LLD-162 via requirements workflow"
+    # TDD: Assert - message includes "Closes #N" to auto-close GitHub issue
+    assert message == "docs: add LLD-162 via requirements workflow\n\nCloses #162"
 
 
 def test_050():
