@@ -3447,6 +3447,72 @@ class TestScaffoldEdgeCases:
         assert "def test_api" in content
         assert "Integration" in content or "integration" in content.lower()
 
+    @pytest.mark.xfail(reason="Issue #178: scaffold_tests doesn't add pytest markers")
+    def test_generate_test_file_content_adds_e2e_marker(self):
+        """generate_test_file_content should add @pytest.mark.e2e for e2e tests.
+
+        Issue #178: Currently _generate_test_function() doesn't add markers,
+        but e2e_validation.py filters for '-m e2e or integration', causing
+        'no tests collected' failures.
+
+        This test documents the CORRECT behavior and will pass once #178 is fixed.
+        """
+        from agentos.workflows.testing.nodes.scaffold_tests import generate_test_file_content
+
+        scenarios: list[TestScenario] = [
+            {
+                "name": "test_full_workflow",
+                "description": "End-to-end test of full workflow",
+                "requirement_ref": "REQ-1",
+                "test_type": "e2e",
+                "mock_needed": False,
+                "assertions": ["workflow completes"],
+            }
+        ]
+
+        content = generate_test_file_content(scenarios, "workflow", 42)
+
+        # Should contain the test function
+        assert "def test_full_workflow" in content
+        # CORRECT BEHAVIOR: Should add @pytest.mark.e2e decorator
+        assert "@pytest.mark.e2e" in content, (
+            "e2e tests should have @pytest.mark.e2e decorator so e2e_validation.py "
+            "can filter for them with '-m e2e or integration'"
+        )
+
+    @pytest.mark.xfail(reason="Issue #178: scaffold_tests doesn't add pytest markers")
+    def test_generate_test_file_content_adds_integration_marker(self):
+        """generate_test_file_content should add @pytest.mark.integration for integration tests.
+
+        Issue #178: Currently _generate_test_function() doesn't add markers,
+        but e2e_validation.py filters for '-m e2e or integration', causing
+        'no tests collected' failures.
+
+        This test documents the CORRECT behavior and will pass once #178 is fixed.
+        """
+        from agentos.workflows.testing.nodes.scaffold_tests import generate_test_file_content
+
+        scenarios: list[TestScenario] = [
+            {
+                "name": "test_database_integration",
+                "description": "Integration test with database",
+                "requirement_ref": "REQ-1",
+                "test_type": "integration",
+                "mock_needed": True,
+                "assertions": ["data persists"],
+            }
+        ]
+
+        content = generate_test_file_content(scenarios, "database", 42)
+
+        # Should contain the test function
+        assert "def test_database_integration" in content
+        # CORRECT BEHAVIOR: Should add @pytest.mark.integration decorator
+        assert "@pytest.mark.integration" in content, (
+            "integration tests should have @pytest.mark.integration decorator so "
+            "e2e_validation.py can filter for them with '-m e2e or integration'"
+        )
+
 
 class TestAuditFullCoverage:
     """Additional tests for audit.py."""
