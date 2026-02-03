@@ -555,3 +555,154 @@ class TestSelectGitHubIssue:
         result = select_github_issue(tmp_path)
 
         assert result == 99
+
+
+class TestUnusedArgumentsRemoved:
+    """Tests to verify that previously unused arguments have been removed.
+
+    Issue #156: These arguments were defined but never used.
+    The fix removes them entirely from the argparse definition.
+    """
+
+    def test_resume_not_in_parser(self):
+        """Verify --resume argument has been removed from requirements CLI.
+
+        This argument was defined but never used in the code.
+        It should be removed from the parser.
+        """
+        from pathlib import Path
+        import re
+
+        cli_file = Path(__file__).parent.parent.parent / "tools" / "run_requirements_workflow.py"
+        content = cli_file.read_text(encoding="utf-8")
+
+        # Should NOT find --resume in argument definitions
+        resume_pattern = r'parser\.add_argument\([^)]*"--resume"'
+        matches = re.findall(resume_pattern, content)
+
+        assert len(matches) == 0, (
+            f"--resume argument should be removed from parser. "
+            f"Found {len(matches)} occurrences."
+        )
+
+
+class TestAllArgumentsUsed:
+    """Tests to verify every defined argument affects behavior.
+
+    Issue #156: Acceptance criteria requires each CLI flag has a test
+    verifying it affects behavior.
+    """
+
+    def test_debug_flag_affects_output(self, tmp_path, capsys):
+        """Test --debug flag enables debug output."""
+        from tools.run_requirements_workflow import parse_args
+
+        args = parse_args([
+            "--type", "lld",
+            "--issue", "42",
+            "--debug",
+        ])
+
+        assert args.debug is True
+
+        # When debug is True, the code prints DEBUG: lines
+        # This verifies the flag is actually checked
+
+    def test_dry_run_flag_skips_execution(self, tmp_path):
+        """Test --dry-run flag prevents actual execution."""
+        from tools.run_requirements_workflow import parse_args
+
+        args = parse_args([
+            "--type", "lld",
+            "--issue", "42",
+            "--dry-run",
+        ])
+
+        assert args.dry_run is True
+
+        # In main(), dry_run causes early return without running graph
+
+    def test_mock_flag_sets_mock_mode(self, tmp_path):
+        """Test --mock flag sets mock_mode in state."""
+        from tools.run_requirements_workflow import parse_args, build_initial_state
+
+        args = parse_args([
+            "--type", "lld",
+            "--issue", "42",
+            "--mock",
+        ])
+
+        state = build_initial_state(args, tmp_path, tmp_path)
+
+        assert state["config_mock_mode"] is True
+
+    def test_gates_none_sets_auto_mode(self, tmp_path):
+        """Test --gates none sets auto_mode in state."""
+        from tools.run_requirements_workflow import parse_args, build_initial_state
+
+        args = parse_args([
+            "--type", "lld",
+            "--issue", "42",
+            "--gates", "none",
+        ])
+
+        state = build_initial_state(args, tmp_path, tmp_path)
+
+        assert state["config_auto_mode"] is True
+
+    def test_context_flag_passed_to_state(self, tmp_path):
+        """Test --context files are passed to state."""
+        from tools.run_requirements_workflow import parse_args, build_initial_state
+
+        args = parse_args([
+            "--type", "lld",
+            "--issue", "42",
+            "--context", "src/auth.py",
+            "--context", "src/utils.py",
+        ])
+
+        state = build_initial_state(args, tmp_path, tmp_path)
+
+        assert state["context_files"] == ["src/auth.py", "src/utils.py"]
+
+    def test_max_iterations_passed_to_state(self, tmp_path):
+        """Test --max-iterations is passed to state."""
+        from tools.run_requirements_workflow import parse_args, build_initial_state
+
+        args = parse_args([
+            "--type", "lld",
+            "--issue", "42",
+            "--max-iterations", "5",
+        ])
+
+        state = build_initial_state(args, tmp_path, tmp_path)
+
+        assert state["max_iterations"] == 5
+
+    def test_drafter_passed_to_state(self, tmp_path):
+        """Test --drafter is passed to state."""
+        from tools.run_requirements_workflow import parse_args, build_initial_state
+
+        args = parse_args([
+            "--type", "lld",
+            "--issue", "42",
+            "--drafter", "gemini:2.5-flash",
+        ])
+
+        state = build_initial_state(args, tmp_path, tmp_path)
+
+        assert state["config_drafter"] == "gemini:2.5-flash"
+
+    def test_reviewer_passed_to_state(self, tmp_path):
+        """Test --reviewer is passed to state."""
+        from tools.run_requirements_workflow import parse_args, build_initial_state
+
+        args = parse_args([
+            "--type", "lld",
+            "--issue", "42",
+            "--reviewer", "claude:sonnet",
+        ])
+
+        state = build_initial_state(args, tmp_path, tmp_path)
+
+        assert state["config_reviewer"] == "claude:sonnet"

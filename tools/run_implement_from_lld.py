@@ -191,11 +191,6 @@ def main():
         help="Stop after scaffolding tests",
     )
     parser.add_argument(
-        "--green-only",
-        action="store_true",
-        help="Only run green phase verification",
-    )
-    parser.add_argument(
         "--sandbox-repo",
         type=str,
         help="Sandbox repository for E2E tests",

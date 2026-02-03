@@ -277,11 +277,6 @@ Examples:
         help="Use mock providers for testing",
     )
     parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="Resume from previous checkpoint",
-    )
-    parser.add_argument(
         "--debug",
         action="store_true",
         help="Enable debug logging",
