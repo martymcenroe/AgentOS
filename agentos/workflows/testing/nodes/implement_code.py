@@ -227,12 +227,12 @@ DO NOT:
             # --print (-p): non-interactive mode, prints response to stdout
             # --dangerously-skip-permissions: required for non-interactive file writes
             # --system-prompt: enforce strict output format
-            # --model sonnet: use Claude Sonnet for faster implementation
+            # --model opus: use Claude Opus for reliable implementation
             cmd = [
                 claude_cli,
                 "--print",
                 "--dangerously-skip-permissions",
-                "--model", "sonnet",
+                "--model", "opus",
                 "--system-prompt", system_prompt,
             ]
 
@@ -267,7 +267,7 @@ DO NOT:
         client = anthropic.Anthropic()
 
         message = client.messages.create(
-            model="claude-sonnet-4-20250514",  # Use Sonnet for implementation
+            model="claude-opus-4-20250514",  # Use Opus for reliable implementation
             max_tokens=8192,
             messages=[
                 {"role": "user", "content": prompt}
