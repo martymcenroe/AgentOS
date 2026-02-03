@@ -1,13 +1,16 @@
 """Finalize node for requirements workflow.
 
 Updates GitHub issue with final draft, commits artifacts to git, and closes workflow.
+For LLD workflows, saves LLD file with embedded review evidence.
 """
 
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
 from agentos.workflows.requirements.audit import (
+    embed_review_evidence,
     next_file_number,
     save_audit_file,
 )
@@ -122,10 +125,69 @@ def _commit_and_push_files(state: Dict[str, Any]) -> Dict[str, Any]:
     return state
 
 
+def _save_lld_file(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Save LLD file with embedded review evidence.
+
+    For workflow_type="lld", saves the draft to docs/lld/active/ with
+    the actual Gemini verdict embedded.
+
+    Args:
+        state: Workflow state with current_draft, lld_status, etc.
+
+    Returns:
+        Updated state with created_files populated
+    """
+    workflow_type = state.get("workflow_type", "lld")
+    if workflow_type != "lld":
+        return state
+
+    target_repo = Path(state.get("target_repo", "."))
+    issue_number = state.get("issue_number")
+    current_draft = state.get("current_draft", "")
+    lld_status = state.get("lld_status", "BLOCKED")
+    verdict_count = state.get("verdict_count", 0)
+    audit_dir = Path(state.get("audit_dir", ""))
+
+    if not current_draft:
+        return state
+
+    # Embed review evidence with ACTUAL verdict (not hardcoded APPROVED!)
+    review_date = datetime.now().strftime("%Y-%m-%d")
+    lld_content = embed_review_evidence(
+        current_draft,
+        verdict=lld_status,  # Use actual verdict from Gemini review
+        review_date=review_date,
+        review_count=verdict_count,
+    )
+
+    # Save to docs/lld/active/LLD-{issue_number}.md
+    lld_dir = target_repo / "docs" / "lld" / "active"
+    lld_dir.mkdir(parents=True, exist_ok=True)
+    lld_path = lld_dir / f"LLD-{issue_number:03d}.md"
+    lld_path.write_text(lld_content, encoding="utf-8")
+
+    print(f"    Saved LLD to: {lld_path}")
+    print(f"    Final Status: {lld_status}")
+
+    # Add to created_files for commit
+    created_files = list(state.get("created_files", []))
+    created_files.append(str(lld_path))
+    state["created_files"] = created_files
+    state["lld_path"] = str(lld_path)
+
+    # Save to audit trail
+    if audit_dir.exists():
+        file_num = next_file_number(audit_dir)
+        save_audit_file(audit_dir, file_num, "final.md", lld_content)
+
+    return state
+
+
 def finalize(state: Dict[str, Any]) -> Dict[str, Any]:
     """Public interface for finalize node.
 
-    Finalizes the issue (if applicable) and commits artifacts to git.
+    Finalizes the issue (if applicable), saves LLD file (if LLD workflow),
+    and commits artifacts to git.
 
     Args:
         state: Workflow state
@@ -133,10 +195,16 @@ def finalize(state: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Updated state with finalization status
     """
-    # First, finalize the issue (existing behavior)
-    state = _finalize_issue(state)
+    workflow_type = state.get("workflow_type", "lld")
 
-    # Then, commit and push artifacts to git (new behavior for #162)
+    if workflow_type == "lld":
+        # For LLD workflow: save LLD file with embedded review evidence
+        state = _save_lld_file(state)
+    else:
+        # For issue workflow: post comment to GitHub issue
+        state = _finalize_issue(state)
+
+    # Then, commit and push artifacts to git
     state = _commit_and_push_files(state)
 
     return state
