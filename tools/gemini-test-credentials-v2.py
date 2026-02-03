@@ -62,8 +62,92 @@ def test_api_key(name: str, key: str) -> Tuple[bool, str]:
         return False, f"API ERROR: {str(e)[:100]}"
     except Exception as e:
         if "timeout" in str(e).lower():
-            return False, f"TIMEOUT ({TIMEOUT_SECONDS}s)"
+            return False, f"TIMEOUT ({TIMEOUT_MS}ms)"
         return False, f"EXCEPTION: {type(e).__name__}: {str(e)[:100]}"
+
+
+def test_oauth(name: str, oauth_cred: dict) -> Tuple[bool, str]:
+    """Test OAuth credentials using the google-genai SDK.
+
+    Args:
+        name: Credential name for logging.
+        oauth_cred: Dict containing OAuth credential data:
+            - client_id: OAuth client ID
+            - client_secret: OAuth client secret
+            - refresh_token: OAuth refresh token
+            - token_uri: (optional) Token endpoint URI
+
+    Returns:
+        Tuple of (success: bool, message: str).
+    """
+    # Validate required OAuth fields
+    client_id = oauth_cred.get("client_id", "")
+    client_secret = oauth_cred.get("client_secret", "")
+    refresh_token = oauth_cred.get("refresh_token", "")
+
+    if not client_id:
+        return False, "MISSING client_id in OAuth credentials"
+    if not client_secret:
+        return False, "MISSING client_secret in OAuth credentials"
+    if not refresh_token:
+        return False, "MISSING refresh_token in OAuth credentials"
+
+    try:
+        # Build OAuth2 credentials using google-auth library
+        from google.oauth2.credentials import Credentials
+
+        token_uri = oauth_cred.get("token_uri", "https://oauth2.googleapis.com/token")
+
+        credentials = Credentials(
+            token=None,  # Will be refreshed
+            refresh_token=refresh_token,
+            token_uri=token_uri,
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+
+        # Create client with OAuth credentials
+        client = genai.Client(credentials=credentials)
+
+        # Test with a simple request
+        response = client.models.generate_content(
+            model=TEST_MODEL,
+            contents=TEST_PROMPT,
+            config=types.GenerateContentConfig(
+                http_options=types.HttpOptions(timeout=TIMEOUT_MS)
+            )
+        )
+
+        if response.text:
+            preview = response.text.strip()[:50]
+            return True, f"OK - Response: {preview}"
+        else:
+            return False, "ERROR: Empty response"
+
+    except ImportError:
+        return False, "ERROR: google-auth library not installed (pip install google-auth)"
+    except errors.ClientError as e:
+        error_msg = str(e)
+        if "invalid_grant" in error_msg.lower() or "revoked" in error_msg.lower():
+            return False, "INVALID/REVOKED OAuth token"
+        elif "403" in error_msg or "PERMISSION_DENIED" in error_msg:
+            return False, "PERMISSION DENIED"
+        elif "429" in error_msg or "QUOTA_EXHAUSTED" in error_msg:
+            return False, "RATE LIMITED (429) / QUOTA EXHAUSTED"
+        else:
+            return False, f"CLIENT ERROR: {error_msg[:100]}"
+    except errors.APIError as e:
+        return False, f"API ERROR: {str(e)[:100]}"
+    except Exception as e:
+        error_str = str(e).lower()
+        if "timeout" in error_str or "timed out" in error_str:
+            return False, f"TIMEOUT ({TIMEOUT_MS}ms)"
+        elif "invalid_grant" in error_str or "revoked" in error_str:
+            return False, "INVALID/REVOKED OAuth token"
+        elif "429" in str(e) or "quota" in error_str:
+            return False, "RATE LIMITED (429) / QUOTA EXHAUSTED"
+        return False, f"EXCEPTION: {type(e).__name__}: {str(e)[:100]}"
+
 
 def main():
     print("=" * 60)
@@ -112,9 +196,7 @@ def main():
             else:
                 success, message = test_api_key(name, key)
         elif cred_type == "oauth":
-            # OAuth is handled differently in the new SDK; 
-            # for this tool, we'll focus on API Keys first.
-            success, message = False, "OAuth test not implemented in v2 yet"
+            success, message = test_oauth(name, cred)
         else:
             success, message = False, f"UNKNOWN TYPE: {cred_type}"
 
