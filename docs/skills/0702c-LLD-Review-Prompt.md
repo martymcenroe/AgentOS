@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Version** | 2.4.0 |
+| **Version** | 2.5.0 |
 | **Last Updated** | 2026-02-03 |
 | **Role** | Senior Software Architect & AI Governance Lead |
 | **Purpose** | LLD gatekeeper review before implementation begins |
@@ -46,6 +46,16 @@ The submitted LLD does not meet structural requirements for review.
 
 **Verdict: REJECTED - LLD must include all required elements before review can proceed.**
 ```
+
+---
+
+## Open Questions Protocol
+
+OPEN QUESTIONS:
+- The draft may contain unchecked open questions in Section 1
+- You MUST answer each question with a concrete recommendation
+- Mark answered questions as [x] with your recommendation
+- Format: `- [x] ~~Original question~~ **RESOLVED: Your answer.**`
 
 ---
 
@@ -154,6 +164,12 @@ I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
 
 ## Review Summary
 {2-3 sentence overall assessment of the LLD's readiness for implementation}
+
+## Open Questions Resolved
+{If Section 1 had unchecked questions, list your answers here}
+- [x] ~~Question 1~~ **RESOLVED: Your answer.**
+- [x] ~~Question 2~~ **RESOLVED: Your answer.**
+{If no open questions, write "No open questions found in Section 1."}
 
 ## Requirement Coverage Analysis (MANDATORY)
 
@@ -293,6 +309,7 @@ The LLD proposes a batch file cleanup utility but contains critical Safety block
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-02-03 | 2.5.0 | Added Open Questions Protocol. Gemini must answer unchecked questions in Section 1 before approving. Issue #248. |
 | 2026-02-03 | 2.4.0 | Added TDD Test Plan check (Section 10.0) to Quality tier. Verifies tests are marked RED before implementation and coverage target ≥95% is specified. Issue #209. |
 | 2026-02-02 | 2.3.0 | Added MANDATORY Requirement Coverage Table to output format. Gemini must explicitly map every Section 3 requirement to tests and calculate coverage numerically. Fixes LLD-141 gap where Gemini saw missing test but classified as Tier 3 suggestion instead of blocking. |
 | 2026-02-02 | 2.2.0 | Added Path Structure check to Architecture tier. BLOCKS if LLD file paths don't match actual project structure (e.g., `src/module/` vs `module/`). Issue #106 root cause. |

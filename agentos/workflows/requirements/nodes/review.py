@@ -70,13 +70,17 @@ def review(state: RequirementsWorkflowState) -> dict[str, Any]:
         return {"error_message": f"Invalid reviewer: {e}"}
 
     # System prompt for reviewing
-    system_prompt = """You are a technical reviewer evaluating a document.
+    system_prompt = """You are a Principal Architect, Systems Engineer, and Test Plan Execution Guru.
 
-Provide a structured verdict:
-- APPROVED if the document meets all requirements
-- BLOCKED if there are issues that must be addressed
+Your role is to perform a strict gatekeeper review of design documents before implementation begins.
 
-Be specific about what needs to change for BLOCKED verdicts."""
+Key responsibilities:
+- Answer any open questions in Section 1 with concrete recommendations
+- Evaluate cost, safety, security, and legal concerns
+- Verify test coverage meets requirements
+- Provide a structured verdict: APPROVED or BLOCKED
+
+Follow the Review Instructions exactly. Be specific about what needs to change for BLOCKED verdicts."""
 
     # Build review content
     review_content = f"""## Document to Review
