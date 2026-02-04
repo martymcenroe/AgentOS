@@ -2,154 +2,135 @@
 
 <!-- Template Metadata
 Last Updated: 2025-01-XX
-Updated By: Issue #19 creation
+Updated By: Issue #19 LLD creation
 Update Reason: Initial LLD for audit reorganization
 -->
 
 ## 1. Context & Goal
 * **Issue:** #19
-* **Objective:** Review all 33 audits for category fit, define --ultimate tier criteria, and update the audit index with coherent organization
+* **Objective:** Review and rearrange the 33 audits across categories for better coherence, and define the `--ultimate` tier criteria.
 * **Status:** Draft
-* **Related Issues:** #18 (--ultimate tier concept)
+* **Related Issues:** #18 (ultimate tier concept)
 
 ### Open Questions
-*Questions that need clarification before or during implementation. Remove when resolved.*
 
-- [ ] Should the --ultimate tier be a separate category or a tag that spans existing categories?
-- [ ] Are there audits that should be deprecated rather than rearranged?
-- [ ] What's the threshold for "expensive" that qualifies for --ultimate tier (time, API calls, manual effort)?
+- [ ] Should `--ultimate` tier audits be excluded from `--all` runs?
+- [ ] What cost threshold qualifies an audit as "ultimate" (e.g., >$1 API call, >5 min runtime)?
+- [ ] Are there audits that should be deprecated rather than recategorized?
 
 ## 2. Proposed Changes
 
-*This section is the **source of truth** for implementation. Describe exactly what will be built.*
+*This section is the **source of truth** for implementation. Describes exactly what will be built.*
 
 ### 2.1 Files Changed
 
 | File | Change Type | Description |
 |------|-------------|-------------|
-| `docs/0800-audit-index.md` | Modify | Reorganize audit categories, add tier definitions |
-| `docs/0801-frequency-matrix.md` | Modify | Update frequency recommendations per new tiers |
-| `docs/08xx-*.md` (various) | Modify | Update category headers in individual audit docs |
+| `docs/0800-audit-index.md` | Modify | Reorganize audit categories and add tier definitions |
+| `docs/0800-audit-index.md` | Modify | Add `--ultimate` tier column to audit listings |
+| `docs/0800-audit-index.md` | Modify | Update frequency matrix with tier considerations |
 
 ### 2.2 Dependencies
 
-*New packages, APIs, or services required.*
+*No new packages required - this is a documentation-only change.*
 
 ```toml
-# No new dependencies - documentation-only change
+# pyproject.toml additions (if any)
+# N/A - documentation only
 ```
 
 ### 2.3 Data Structures
 
-```markdown
-# Conceptual structure - audit categorization schema
-
-## Categories (existing)
-- Documentation Health (08xx)
-- Core Development (08xx)  
-- AI Governance (08xx)
-- Meta (08xx)
-
-## Tiers (new dimension)
-- Standard: Default tier, run per frequency matrix
-- Ultimate: Expensive/rare audits, explicit --ultimate flag required
-```
+*N/A - This is a documentation reorganization task, no code changes.*
 
 ### 2.4 Function Signatures
 
-```bash
-# CLI usage patterns (no code changes, just documentation)
-./audit.sh --category documentation  # Run category
-./audit.sh --ultimate               # Run expensive audits
-./audit.sh --all                    # Standard audits only
-./audit.sh --all --ultimate         # Include ultimate tier
-```
+*N/A - Documentation only.*
 
 ### 2.5 Logic Flow (Pseudocode)
 
 ```
-1. Inventory all 33 audits with current categories
-2. FOR EACH audit:
-   - Evaluate primary focus (docs, code, AI, meta)
-   - Check for category misalignment
-   - Assess cost (time, API calls, manual steps)
-   - Flag if --ultimate candidate
-3. Group proposed changes
-4. Draft new index structure
-5. Update frequency matrix
-6. Update individual audit headers
+1. Export current audit inventory from 0800-audit-index.md
+2. For each of 33 audits:
+   a. Evaluate category fit against category definitions
+   b. Flag mismatches
+   c. Assign ultimate tier flag based on criteria
+3. Group audits by proposed new category
+4. Generate updated 0800-audit-index.md structure
+5. Update frequency matrix to include tier dimension
 ```
 
 ### 2.6 Technical Approach
 
-* **Module:** `docs/08xx-*`
-* **Pattern:** Documentation reorganization
-* **Key Decisions:** Tiers are orthogonal to categories (an audit can be in "Core Development" AND be "--ultimate" tier)
+* **Module:** `docs/` (documentation only)
+* **Pattern:** Taxonomy reorganization
+* **Key Decisions:** Preserve audit numbering to avoid breaking references; add tier as new dimension rather than replacing categories
 
 ### 2.7 Architecture Decisions
 
 | Decision | Options Considered | Choice | Rationale |
 |----------|-------------------|--------|-----------|
-| Tier structure | Separate category vs. Tag/flag | Tag/flag | Allows audits to stay in logical categories while marking expense |
-| Category count | Keep 4 vs. Add 5th vs. Reduce to 3 | Keep 4 | Existing categories are sound, just need cleanup |
-| Ultimate criteria | Time-based vs. Cost-based vs. Both | Both | "Expensive" means slow OR costly OR both |
+| Tier integration | New column vs. separate section | New column | Keeps audit info consolidated in one view |
+| Category restructure | 4 categories vs. 3 vs. 5 | Evaluate after review | Need to see actual fit before deciding |
+| Ultimate tier trigger | Explicit flag vs. cost heuristic | Explicit flag | Clearer intent, audits may have variable cost |
 
 **Architectural Constraints:**
-- Must not break existing audit runner scripts
-- Must maintain backward compatibility with current `--category` flags
+- Must preserve existing audit IDs (08XX numbering)
+- Must not break any references from CLAUDE.md or other docs
+- Must maintain backward compatibility with existing `--all` flag behavior
 
 ## 3. Requirements
 
 *What must be true when this is done. These become acceptance criteria.*
 
-1. All 33 audits reviewed and assigned to appropriate category
-2. --ultimate tier criteria documented with clear threshold definitions
-3. Candidate audits identified and marked for --ultimate tier
-4. 0800-audit-index.md updated with new organization
-5. Frequency matrix updated if any timing changes needed
-6. Each rearranged audit's individual doc header updated
+1. All 33 audits are reviewed and assigned to appropriate categories
+2. Each category has a clear, documented definition
+3. `--ultimate` tier is defined with explicit criteria
+4. At least 2-5 audits are identified as `--ultimate` candidates
+5. Frequency matrix is updated to reflect tier considerations
+6. No existing audit references are broken
 
 ## 4. Alternatives Considered
 
 | Option | Pros | Cons | Decision |
 |--------|------|------|----------|
-| Keep current organization | No work, no risk | Continued confusion, technical debt | **Rejected** |
-| Full redesign with new categories | Fresh start | Scope creep, not needed per issue | **Rejected** |
-| Light reorganization + tier system | Addresses pain points, minimal disruption | Requires tier definition work | **Selected** |
+| Full redesign of audit taxonomy | Clean slate, optimal structure | High effort, breaks references | **Rejected** |
+| Minor tweaks only | Low risk, quick | May not address underlying issues | **Rejected** |
+| Reorganize + add tier dimension | Balanced approach, adds value | Moderate effort | **Selected** |
+| Automated categorization analysis | Data-driven | Overkill for 33 items | **Rejected** |
 
-**Rationale:** Issue explicitly states "housekeeping task, not a redesign" - light touch is appropriate
+**Rationale:** The issue explicitly states "housekeeping task, not a redesign" - the selected option provides meaningful improvement while staying in scope.
 
 ## 5. Data & Fixtures
-
-*Per [0108-lld-pre-implementation-review.md](0108-lld-pre-implementation-review.md) - complete this section BEFORE implementation.*
 
 ### 5.1 Data Sources
 
 | Attribute | Value |
 |-----------|-------|
-| Source | Existing `docs/08xx-*.md` files |
-| Format | Markdown |
-| Size | 33 audit documents |
+| Source | `docs/0800-audit-index.md` |
+| Format | Markdown with tables |
+| Size | ~33 audit entries |
 | Refresh | Manual (one-time reorganization) |
-| Copyright/License | N/A (internal docs) |
+| Copyright/License | N/A - internal documentation |
 
 ### 5.2 Data Pipeline
 
 ```
-08xx-*.md files ──manual review──► Categorization spreadsheet ──edit──► Updated 08xx-*.md files
+Current 0800-audit-index.md ──manual review──► Proposed reorganization ──commit──► Updated 0800-audit-index.md
 ```
 
 ### 5.3 Test Fixtures
 
 | Fixture | Source | Notes |
 |---------|--------|-------|
-| N/A | N/A | Documentation-only change, no test fixtures needed |
+| Current audit list | Export from 0800-audit-index.md | Reference snapshot |
+| Category definitions | Infer from existing content | May need clarification |
 
 ### 5.4 Deployment Pipeline
 
-Manual merge to main branch. No deployment steps.
+Documentation changes go through standard PR review. No deployment pipeline needed.
 
-**If data source is external:** N/A - all internal documentation
+**If data source is external:** N/A - internal documentation only.
 
 ## 6. Diagram
 
@@ -165,10 +146,10 @@ Before finalizing any diagram, verify in [Mermaid Live Editor](https://mermaid.l
 
 **Auto-Inspection Results:**
 ```
-- Touching elements: [ ] None / [ ] Found: ___
-- Hidden lines: [ ] None / [ ] Found: ___
-- Label readability: [ ] Pass / [ ] Issue: ___
-- Flow clarity: [ ] Clear / [ ] Issue: ___
+- Touching elements: [x] None / [ ] Found: ___
+- Hidden lines: [x] None / [ ] Found: ___
+- Label readability: [x] Pass / [ ] Issue: ___
+- Flow clarity: [x] Clear / [ ] Issue: ___
 ```
 
 *Reference: [0006-mermaid-diagrams.md](0006-mermaid-diagrams.md)*
@@ -176,30 +157,29 @@ Before finalizing any diagram, verify in [Mermaid Live Editor](https://mermaid.l
 ### 6.2 Diagram
 
 ```mermaid
-graph TB
-    subgraph Categories
+flowchart TD
+    subgraph Current["Current State (4 Categories)"]
         DH[Documentation Health]
         CD[Core Development]
         AG[AI Governance]
-        ME[Meta]
+        META[Meta]
     end
     
-    subgraph Tiers
-        ST[Standard Tier<br/>Default, per frequency]
-        UT[Ultimate Tier<br/>--ultimate flag required]
+    subgraph Proposed["Proposed State"]
+        DH2[Documentation Health]
+        CD2[Core Development]
+        AG2[AI Governance]
+        META2[Meta]
+        ULT[Ultimate Tier Flag]
     end
     
-    DH --> ST
-    DH --> UT
-    CD --> ST
-    CD --> UT
-    AG --> ST
-    AG --> UT
-    ME --> ST
-    ME --> UT
+    subgraph Tiers["Tier Dimension"]
+        STD[Standard: --all includes]
+        ULTIMATE[Ultimate: explicit only]
+    end
     
-    style UT fill:#ff9999
-    style ST fill:#99ff99
+    Current --> |Review 33 audits| Proposed
+    Proposed --> Tiers
 ```
 
 ## 7. Security & Safety Considerations
@@ -214,12 +194,13 @@ graph TB
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| Breaking existing audit scripts | Test `--category` flags still work | TODO |
-| Loss of audit history | Git history preserves all changes | Addressed |
+| Breaking references | Preserve all audit IDs | Addressed |
+| Lost audit coverage | Review all 33 audits systematically | Addressed |
+| Unclear tier assignment | Document explicit criteria | Addressed |
 
-**Fail Mode:** N/A - documentation change
+**Fail Mode:** N/A - Documentation change
 
-**Recovery Strategy:** Git revert if issues discovered
+**Recovery Strategy:** Git revert if reorganization causes issues
 
 ## 8. Performance & Cost Considerations
 
@@ -227,27 +208,27 @@ graph TB
 
 | Metric | Budget | Approach |
 |--------|--------|----------|
-| N/A | N/A | Documentation-only change |
+| N/A | N/A | Documentation only |
 
-**Bottlenecks:** None
+**Bottlenecks:** None - no code execution
 
 ### 8.2 Cost Analysis
 
 | Resource | Unit Cost | Estimated Usage | Monthly Cost |
 |----------|-----------|-----------------|--------------|
-| Human time | ~2 hours | One-time | N/A |
+| Human review time | ~30 min | One-time | N/A |
 
 **Cost Controls:**
-- [x] Scope limited to reorganization, not redesign
+- [x] Scope limited to review/reorganize (not redesign)
 
-**Worst-Case Scenario:** N/A
+**Worst-Case Scenario:** Reorganization takes longer than expected; still minimal cost.
 
 ## 9. Legal & Compliance
 
 | Concern | Applies? | Mitigation |
 |---------|----------|------------|
 | PII/Personal Data | No | Internal documentation |
-| Third-Party Licenses | No | No external content |
+| Third-Party Licenses | No | N/A |
 | Terms of Service | No | N/A |
 | Data Retention | No | N/A |
 | Export Controls | No | N/A |
@@ -262,105 +243,113 @@ graph TB
 
 ## 10. Verification & Testing
 
-*Ref: [0005-testing-strategy-and-protocols.md](0005-testing-strategy-and-protocols.md)*
+### 10.0 Test Plan (TDD - Complete Before Implementation)
 
-**Testing Philosophy:** Documentation changes verified through manual review and link checking.
+**TDD Requirement:** For documentation changes, verification is manual but structured.
+
+| Test ID | Test Description | Expected Behavior | Status |
+|---------|------------------|-------------------|--------|
+| T010 | All 33 audits accounted for | No audits missing or duplicated | RED |
+| T020 | Categories have definitions | Each category has clear scope statement | RED |
+| T030 | Ultimate tier criteria defined | Explicit, measurable criteria documented | RED |
+| T040 | No broken references | All audit IDs preserved | RED |
+
+**Coverage Target:** 100% of audits reviewed
+
+**TDD Checklist:**
+- [x] All tests written before implementation
+- [x] Tests currently RED (failing)
+- [x] Test IDs match scenario IDs in 10.1
+- [ ] Test file created at: N/A - manual verification
 
 ### 10.1 Test Scenarios
 
 | ID | Scenario | Type | Input | Expected Output | Pass Criteria |
 |----|----------|------|-------|-----------------|---------------|
-| 010 | All audits accounted for | Manual | Count audits in index | 33 audits listed | All 33 present |
-| 020 | Category links valid | Auto | Run link checker | No broken links | 0 broken links |
-| 030 | Tier criteria documented | Manual | Review index | Clear --ultimate definition | Human verified |
-| 040 | Frequency matrix consistent | Manual | Cross-check index vs matrix | Categories match | All align |
-
-*Note: Use 3-digit IDs with gaps of 10 (010, 020, 030...) to allow insertions.*
+| 010 | Audit count verification | Manual | 0800-audit-index.md | 33 audits listed | Count matches |
+| 020 | Category definition check | Manual | Category headers | Definition present for each | All 4 have definitions |
+| 030 | Ultimate tier documentation | Manual | Tier section | Criteria + candidate list | ≥2 candidates identified |
+| 040 | Reference integrity | Manual | grep for 08XX patterns | No broken links | All references valid |
+| 050 | Frequency matrix update | Manual | Matrix section | Tier column added | Matrix includes tier |
 
 ### 10.2 Test Commands
 
 ```bash
-# Check for broken links in docs
-find docs -name "08*.md" -exec grep -l "0800\|08[0-9][0-9]" {} \;
+# Count audits in index
+grep -c "^| 08" docs/0800-audit-index.md
 
-# Verify audit count
-ls docs/08[0-9][0-9]-*.md | wc -l
+# Find all audit references in docs
+grep -rn "08[0-9][0-9]" docs/ --include="*.md"
+
+# Verify no broken markdown links
+# (use markdown linter or manual review)
 ```
 
 ### 10.3 Manual Tests (Only If Unavoidable)
 
 | ID | Scenario | Why Not Automated | Steps |
 |----|----------|-------------------|-------|
-| 010 | Audit accounting | Requires semantic understanding of audit scope | Review each audit, confirm category assignment |
-| 030 | Tier criteria quality | Subjective quality judgment | Read --ultimate definition, verify it's actionable |
-| 040 | Matrix consistency | Cross-document semantic alignment | Compare category names between index and matrix |
+| 010-050 | All scenarios | Documentation review requires semantic understanding | Read and verify each section manually |
+
+*Justification: This is a documentation reorganization task. Automated testing of semantic coherence is not feasible.*
 
 ## 11. Risks & Mitigations
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| Scope creep into redesign | Med | Med | Strict adherence to "housekeeping" framing |
-| Breaking audit runner | High | Low | Test existing --category flags post-change |
-| Incomplete review | Low | Low | Systematic checklist for all 33 audits |
+| Categories still unclear after reorganization | Med | Low | Define categories before assigning audits |
+| Ultimate tier too exclusive/inclusive | Low | Med | Start conservative; iterate based on usage |
+| Scope creep into redesign | Med | Med | Explicitly limit to reorganization per issue |
+| Missing an audit in the count | Low | Low | Systematic enumeration before and after |
 
 ## 12. Definition of Done
 
 ### Code
-- [ ] N/A - Documentation only
+- [x] N/A - Documentation only
 
 ### Tests
-- [ ] All 33 audits accounted for in index
-- [ ] No broken internal links
+- [ ] All 33 audits verified in updated index
+- [ ] No broken references confirmed
 
 ### Documentation
-- [ ] 0800-audit-index.md reorganized
-- [ ] --ultimate tier criteria defined
-- [ ] Frequency matrix updated
-- [ ] Individual audit headers updated (if moved)
+- [ ] 0800-audit-index.md updated with new organization
+- [ ] Category definitions added/clarified
+- [ ] Ultimate tier section added with criteria and candidates
+- [ ] Frequency matrix updated with tier dimension
 
 ### Review
-- [ ] Code review completed
+- [ ] PR review completed
 - [ ] User approval before closing issue
 
 ---
 
 ## Appendix A: Current Audit Inventory
 
-*Working document for review process*
+*To be populated during implementation - extract all 33 audits with current categories*
 
-### Documentation Health (Current)
-| Audit | Description | Potential Issues | Ultimate? |
-|-------|-------------|------------------|-----------|
-| TBD | TBD | TBD | TBD |
+| Audit ID | Name | Current Category | Proposed Category | Ultimate? |
+|----------|------|------------------|-------------------|-----------|
+| 0801 | TBD | TBD | TBD | TBD |
+| ... | ... | ... | ... | ... |
 
-### Core Development (Current)
-| Audit | Description | Potential Issues | Ultimate? |
-|-------|-------------|------------------|-----------|
-| TBD | TBD | TBD | TBD |
+## Appendix B: Proposed Category Definitions
 
-### AI Governance (Current)
-| Audit | Description | Potential Issues | Ultimate? |
-|-------|-------------|------------------|-----------|
-| TBD | TBD | TBD | TBD |
+*To be finalized during implementation*
 
-### Meta (Current)
-| Audit | Description | Potential Issues | Ultimate? |
-|-------|-------------|------------------|-----------|
-| TBD | TBD | TBD | TBD |
+| Category | Definition | Scope |
+|----------|------------|-------|
+| Documentation Health | Audits ensuring docs are complete, accurate, and current | README, guides, references |
+| Core Development | Audits for code quality, testing, and build health | Code, tests, CI/CD |
+| AI Governance | Audits for AI/LLM usage patterns and compliance | Prompts, agents, AI config |
+| Meta | Audits of the audit system itself | Index, frequencies, tooling |
 
-*Note: This inventory will be populated during implementation*
+## Appendix C: Ultimate Tier Criteria (Proposed)
 
----
-
-## Appendix B: --Ultimate Tier Criteria (Draft)
-
-An audit qualifies for --ultimate tier if it meets ANY of:
-
-1. **Time:** Takes >10 minutes to complete
-2. **Cost:** Makes >100 API calls OR costs >$1 per run
-3. **Frequency:** Should run less than monthly
-4. **Manual:** Requires significant manual verification steps
-5. **Invasive:** Makes changes that are hard to reverse
+An audit qualifies for `--ultimate` tier if it meets ANY of:
+- **Cost:** Involves LLM calls costing >$0.50 per run
+- **Time:** Takes >5 minutes to complete
+- **Frequency:** Should run less than monthly
+- **Resources:** Requires external services that may rate-limit or cost
 
 ---
 
@@ -372,6 +361,6 @@ An audit qualifies for --ultimate tier if it meets ANY of:
 
 | Review | Date | Verdict | Key Issue |
 |--------|------|---------|-----------|
-| - | - | - | Awaiting review |
+| Pending | - | - | - |
 
 **Final Status:** PENDING
