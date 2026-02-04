@@ -29,6 +29,18 @@ Previous: Added sections based on 80 blocking issues from 164 governance verdict
 |------|-------------|-------------|
 | `{path/to/file.py}` | Add / Modify / Delete | {Brief description} |
 
+### 2.1.1 Path Validation (Mechanical - Auto-Checked)
+
+*Issue #277: Before human or Gemini review, paths are verified programmatically.*
+
+Mechanical validation automatically checks:
+- All "Modify" files must exist in repository
+- All "Delete" files must exist in repository
+- All "Add" files must have existing parent directories
+- No placeholder prefixes (`src/`, `lib/`, `app/`) unless directory exists
+
+**If validation fails, the LLD is BLOCKED before reaching review.**
+
 ### 2.2 Dependencies
 
 *New packages, APIs, or services required.*
@@ -344,6 +356,16 @@ poetry run pytest tests/test_{module}.py -v -m live
 ### Review
 - [ ] Code review completed
 - [ ] User approval before closing issue
+
+### 12.1 Traceability (Mechanical - Auto-Checked)
+
+*Issue #277: Cross-references are verified programmatically.*
+
+Mechanical validation automatically checks:
+- Every file mentioned in this section must appear in Section 2.1
+- Every risk mitigation in Section 11 should have a corresponding function in Section 2.4 (warning if not)
+
+**If files are missing from Section 2.1, the LLD is BLOCKED.**
 
 ---
 

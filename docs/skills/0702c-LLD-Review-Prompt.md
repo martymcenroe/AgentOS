@@ -4,8 +4,8 @@
 
 | Field | Value |
 |-------|-------|
-| **Version** | 2.5.0 |
-| **Last Updated** | 2026-02-03 |
+| **Version** | 2.6.0 |
+| **Last Updated** | 2026-02-04 |
 | **Role** | Senior Software Architect & AI Governance Lead |
 | **Purpose** | LLD gatekeeper review before implementation begins |
 | **Standard** | [0010-prompt-schema.md](../standards/0010-prompt-schema.md) |
@@ -105,9 +105,11 @@ These issues require fixes but don't block implementation. Be thorough.
 
 ### Architecture
 
+**Note (Issue #277):** File path existence and placeholder prefix validation are performed **mechanically** before this review. If an LLD reaches Gemini review, its paths have already passed automated checks. Focus your path review on **semantic correctness** (right module, right directory structure) rather than file existence.
+
 | Check | Question |
 |-------|----------|
-| **Path Structure (CRITICAL)** | Do file paths in "Files Changed" match the actual project directory structure? **BLOCK if LLD uses `src/module/` when project uses `module/` (or vice versa).** Validate against existing codebase layout. Common error: LLDs defaulting to `src/` prefix when project doesn't use it. |
+| **Path Structure (CRITICAL)** | Do file paths in "Files Changed" match the actual project directory structure? **BLOCK if LLD uses `src/module/` when project uses `module/` (or vice versa).** Validate against existing codebase layout. Common error: LLDs defaulting to `src/` prefix when project doesn't use it. (Note: Mechanical validation already verifies paths exist; this check is for semantic correctness.) |
 | **Design Patterns** | Does the design follow established project patterns? |
 | **Dependency Chain** | Are blocking dependencies and parallel work identified? |
 | **Offline Development (CRITICAL)** | Can this be developed "on an airplane"? Is a Mock Mode defined for external dependencies (APIs, Auth, LLMs)? |
@@ -309,6 +311,7 @@ The LLD proposes a batch file cleanup utility but contains critical Safety block
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-02-04 | 2.6.0 | Added note that path existence is validated mechanically before Gemini review. Gemini should focus on semantic path correctness. Issue #277. |
 | 2026-02-03 | 2.5.0 | Added Open Questions Protocol. Gemini must answer unchecked questions in Section 1 before approving. Issue #248. |
 | 2026-02-03 | 2.4.0 | Added TDD Test Plan check (Section 10.0) to Quality tier. Verifies tests are marked RED before implementation and coverage target ≥95% is specified. Issue #209. |
 | 2026-02-02 | 2.3.0 | Added MANDATORY Requirement Coverage Table to output format. Gemini must explicitly map every Section 3 requirement to tests and calculate coverage numerically. Fixes LLD-141 gap where Gemini saw missing test but classified as Tier 3 suggestion instead of blocking. |

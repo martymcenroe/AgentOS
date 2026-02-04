@@ -189,6 +189,10 @@ class RequirementsWorkflowState(TypedDict, total=False):
     # Error handling
     error_message: str
 
+    # Mechanical validation (Issue #277)
+    validation_errors: list[str]
+    validation_warnings: list[str]
+
     # Git commit tracking (Issue #162)
     created_files: list[str]
     commit_sha: str
@@ -274,6 +278,9 @@ def create_initial_state(
         "next_node": "",
         # Error handling
         "error_message": "",
+        # Mechanical validation (Issue #277)
+        "validation_errors": [],
+        "validation_warnings": [],
         # Git commit tracking (Issue #162)
         "created_files": [],
         "commit_sha": "",

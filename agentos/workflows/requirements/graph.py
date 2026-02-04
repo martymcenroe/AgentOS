@@ -2,23 +2,28 @@
 
 Issue #101: Unified Requirements Workflow
 Issue #248: Add conditional edge for question-loop after review
+Issue #277: Add mechanical validation node before human gate
 
 Creates a LangGraph StateGraph that connects:
 - N0: load_input (brief or issue loading)
 - N1: generate_draft (pluggable drafter)
+- N1.5: validate_lld_mechanical (mechanical validation - Issue #277)
 - N2: human_gate_draft (human checkpoint)
 - N3: review (pluggable reviewer)
 - N4: human_gate_verdict (human checkpoint)
 - N5: finalize (issue filing or LLD saving)
 
 Graph structure:
-    START -> N0 -> N1 -> N2 -> N3 -> N4 -> N5 -> END
-                    ^          |         |
-                    |          v         |
-                    +-----<----+---------+
+    START -> N0 -> N1 -> N1.5 -> N2 -> N3 -> N4 -> N5 -> END
+                    ^                   |         |
+                    |                   v         |
+                    +-------<-----------+---------+
 
 Issue #248 addition: After N3 (review), if open questions are UNANSWERED,
 loop back to N3 with a followup prompt. If HUMAN_REQUIRED, force N4.
+
+Issue #277 addition: N1.5 validates LLD structure mechanically (paths, sections)
+before any human or LLM review. Blocks on errors, warns on issues.
 
 Routing is controlled by:
 - error_message: Non-empty routes to END
@@ -39,6 +44,7 @@ from agentos.workflows.requirements.nodes import (
     human_gate_verdict,
     load_input,
     review,
+    validate_lld_mechanical,
 )
 from agentos.workflows.requirements.state import RequirementsWorkflowState
 
@@ -49,6 +55,7 @@ from agentos.workflows.requirements.state import RequirementsWorkflowState
 
 N0_LOAD_INPUT = "N0_load_input"
 N1_GENERATE_DRAFT = "N1_generate_draft"
+N1_5_VALIDATE_MECHANICAL = "N1_5_validate_mechanical"  # Issue #277
 N2_HUMAN_GATE_DRAFT = "N2_human_gate_draft"
 N3_REVIEW = "N3_review"
 N4_HUMAN_GATE_VERDICT = "N4_human_gate_verdict"
@@ -82,16 +89,19 @@ def route_after_load_input(
 
 def route_after_generate_draft(
     state: RequirementsWorkflowState,
-) -> Literal["N2_human_gate_draft", "N3_review", "END"]:
+) -> Literal["N1_5_validate_mechanical", "N2_human_gate_draft", "N3_review", "END"]:
     """Route after generate_draft node.
 
     Routes to:
-    - N2_human_gate_draft: Gate enabled
-    - N3_review: Gate disabled
+    - N1_5_validate_mechanical: LLD workflow (Issue #277)
+    - N2_human_gate_draft: Issue workflow with gate enabled
+    - N3_review: Issue workflow with gate disabled
     - END: Error generating draft
 
     Issue #248: Pre-review validation gate removed. Drafts with open
     questions now proceed to review where Gemini can answer them.
+
+    Issue #277: LLD workflows now go through mechanical validation first.
 
     Args:
         state: Current workflow state.
@@ -102,6 +112,48 @@ def route_after_generate_draft(
     if state.get("error_message"):
         return "END"
 
+    # Issue #277: LLD workflows go through mechanical validation
+    if state.get("workflow_type") == "lld":
+        return "N1_5_validate_mechanical"
+
+    # Issue workflows skip mechanical validation
+    if state.get("config_gates_draft", True):
+        return "N2_human_gate_draft"
+    else:
+        return "N3_review"
+
+
+def route_after_validate_mechanical(
+    state: RequirementsWorkflowState,
+) -> Literal["N2_human_gate_draft", "N3_review", "N1_generate_draft", "END"]:
+    """Route after validate_lld_mechanical node.
+
+    Issue #277: Routes based on validation result.
+
+    Routes to:
+    - N2_human_gate_draft: Validation passed, gate enabled
+    - N3_review: Validation passed, gate disabled
+    - N1_generate_draft: Validation failed (BLOCKED), return to drafter
+    - END: Error or max iterations reached
+
+    Args:
+        state: Current workflow state.
+
+    Returns:
+        Next node name.
+    """
+    # Check for validation failure (BLOCKED status)
+    if state.get("lld_status") == "BLOCKED":
+        # Check max iterations before looping back
+        iteration_count = state.get("iteration_count", 0)
+        max_iterations = state.get("max_iterations", 20)
+        if iteration_count >= max_iterations:
+            print(f"    [ROUTING] Max iterations ({max_iterations}) reached with validation errors - ending")
+            return "END"
+        print("    [ROUTING] Mechanical validation failed - returning to drafter")
+        return "N1_generate_draft"
+
+    # Validation passed - proceed to human gate or review
     if state.get("config_gates_draft", True):
         return "N2_human_gate_draft"
     else:
@@ -262,6 +314,7 @@ def create_requirements_graph() -> StateGraph:
     # Add nodes
     graph.add_node(N0_LOAD_INPUT, load_input)
     graph.add_node(N1_GENERATE_DRAFT, generate_draft)
+    graph.add_node(N1_5_VALIDATE_MECHANICAL, validate_lld_mechanical)  # Issue #277
     graph.add_node(N2_HUMAN_GATE_DRAFT, human_gate_draft)
     graph.add_node(N3_REVIEW, review)
     graph.add_node(N4_HUMAN_GATE_VERDICT, human_gate_verdict)
@@ -281,13 +334,28 @@ def create_requirements_graph() -> StateGraph:
         },
     )
 
-    # N1 -> N2 or N3 or END (based on gates and error)
+    # N1 -> N1.5 (LLD) or N2 or N3 or END (based on workflow type, gates, error)
+    # Issue #277: LLD workflows go through mechanical validation
     graph.add_conditional_edges(
         N1_GENERATE_DRAFT,
         route_after_generate_draft,
         {
+            "N1_5_validate_mechanical": N1_5_VALIDATE_MECHANICAL,
             "N2_human_gate_draft": N2_HUMAN_GATE_DRAFT,
             "N3_review": N3_REVIEW,
+            "END": END,
+        },
+    )
+
+    # N1.5 -> N2 or N3 or N1 or END (based on validation result)
+    # Issue #277: Mechanical validation routes based on BLOCKED status
+    graph.add_conditional_edges(
+        N1_5_VALIDATE_MECHANICAL,
+        route_after_validate_mechanical,
+        {
+            "N2_human_gate_draft": N2_HUMAN_GATE_DRAFT,
+            "N3_review": N3_REVIEW,
+            "N1_generate_draft": N1_GENERATE_DRAFT,
             "END": END,
         },
     )
