@@ -1,4 +1,4 @@
-# LLD Review: 102 - Feature: TDD Test Initialization Gate
+# LLD Review: 102-Feature: TDD Test Initialization Gate
 
 ## Identity Confirmation
 I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
@@ -7,30 +7,30 @@ I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
 PASSED
 
 ## Review Summary
-The LLD is well-structured and comprehensive, addressing the critical Tier 1 Safety issue regarding worktree scoping raised in previous revisions. The design now correctly stores state files within the repository root. Requirement coverage is excellent (100%), and the test strategy is robust with specific failure modes addressed. The architecture uses standard patterns (CLI, Hooks) that fit the existing ecosystem.
+The LLD is robust, well-structured, and compliant with safety protocols. The critical issue identified in Review #2 (storing pending issues in the user's home directory) has been effectively resolved by moving storage to the worktree root (`.tdd-pending-issues.json`). The architecture sensibly delegates complex logic to Python CLI tools while using Shell hooks for integration. Test coverage is comprehensive (100%), and the "Fail Open" strategy for overrides ensures developer velocity is maintained during emergencies.
+
+## Open Questions Resolved
+No open questions found in Section 1.
 
 ## Requirement Coverage Analysis (MANDATORY)
 
 **Section 3 Requirements:**
 | # | Requirement | Test(s) | Status |
 |---|-------------|---------|--------|
-| 1 | Pre-commit hook blocks commits without corresponding test files for implementation code | 070, 080 | ✓ Covered |
-| 2 | Pre-commit hook excludes documentation (`*.md`) and config files (`*.json`, `*.yaml`) | 090, 100 | ✓ Covered |
-| 3 | `tdd-gate --verify-red <test-file>` runs only the specified test file, not full suite | 200, 210 | ✓ Covered |
-| 4 | Red phase verification accepts only exit code `1` (tests failed) | 010 | ✓ Covered |
-| 5 | Red phase verification rejects exit codes `0`, `2`, `5` with specific error messages | 020, 030, 040 | ✓ Covered |
-| 6 | Red phase proof is stored in commit message footer: `TDD-Red-Phase: <sha>:<timestamp>` | 110 | ✓ Covered |
-| 7 | Prepare-commit-msg hook runs before GPG signing | 230 | ✓ Covered |
-| 8 | Green phase verification confirms exit code `0` (tests pass) | 050, 060 | ✓ Covered |
-| 9 | `--skip-tdd-gate --reason "<justification>"` allows override with mandatory reason | 120, 130 | ✓ Covered |
-| 10 | Override logs debt locally and creates GitHub issue asynchronously | 120, 160, 170 | ✓ Covered |
-| 11 | Audit trail is strictly append-only at `docs/reports/{IssueID}/tdd-audit.md` | 190 | ✓ Covered |
-| 12 | CI extracts red phase proof from any commit in PR branch | 140, 150 | ✓ Covered |
-| 13 | Works with pytest (`test_*.py`) and Jest (`*.test.js`, `*.spec.js`) | 200, 210 | ✓ Covered |
-| 14 | Configuration via `.tdd-config.json` for custom patterns and exclusions | 240 | ✓ Covered |
-| 15 | Husky auto-installs hooks on `npm install` | 250 | ✓ Covered |
+| 1 | Pre-commit hook blocks commits to source files without corresponding test files | T140, T150 | ✓ Covered |
+| 2 | Documentation and configuration files are excluded from TDD gate | T100 | ✓ Covered |
+| 3 | Red phase verification runs only the specific test file, not full suite | T060 | ✓ Covered |
+| 4 | Red phase requires exit code 1 (failures); codes 0, 2, 5 are rejected | T010, T020, T030, T040 | ✓ Covered |
+| 5 | Green phase requires exit code 0 (tests pass) | T050 | ✓ Covered |
+| 6 | Commit message footer `TDD-Red-Phase: <sha>:<timestamp>` is injected | T070 | ✓ Covered |
+| 7 | CI extracts footers from all commits in PR branch (supports squash workflows) | T120 | ✓ Covered |
+| 8 | Override flag `--skip-tdd-gate --reason "<text>"` allows emergency bypass | T080, T090 | ✓ Covered |
+| 9 | Override is non-blocking; issue creation is async with local queue | T190, T210, T080 | ✓ Covered |
+| 10 | Audit trail in `docs/reports/{IssueID}/tdd-audit.md` is strictly append-only | T110 | ✓ Covered |
+| 11 | Husky automatically installs hooks on `npm install` | T180 | ✓ Covered |
+| 12 | Configuration via `.tdd-config.json` for patterns and exclusions | T160, T170, T130 | ✓ Covered |
 
-**Coverage Calculation:** 15 requirements covered / 15 total = **100%**
+**Coverage Calculation:** 12 requirements covered / 12 total = **100%**
 
 **Verdict:** PASS
 
@@ -38,14 +38,14 @@ The LLD is well-structured and comprehensive, addressing the critical Tier 1 Saf
 No blocking issues found. LLD is approved for implementation.
 
 ### Cost
-- [ ] No issues found. Local execution model minimizes API costs.
+- [ ] No issues found. Design uses local compute and minimal free API calls.
 
 ### Safety
-- [ ] **Worktree Scope Verified:** Previous blocking issue resolved. State files (`.tdd-state.json`) are now explicitly stored in the repo root (git-ignored) rather than the home directory.
-- [ ] **Fail-Safe:** Hooks are designed to fail open (warn only) on execution errors, preventing deadlock.
+- [ ] **Worktree Scope:** Addressed. Pending issues now stored in `.tdd-pending-issues.json` (worktree root) rather than user home directory.
+- [ ] **Fail-Safe:** Addressed. Override flow allows bypass if tooling fails/blocks critical work.
 
 ### Security
-- [ ] No issues found. Command injection mitigated via list-based subprocess calls.
+- [ ] **Input Validation:** Addressed. T090 ensures sanitize logic for override reasons preventing shell injection.
 
 ### Legal
 - [ ] No issues found.
@@ -54,19 +54,18 @@ No blocking issues found. LLD is approved for implementation.
 No high-priority issues found.
 
 ### Architecture
-- [ ] No issues found. `tools/` directory structure aligns with project standards.
+- [ ] No issues found. Structure uses standard `tools/` and `.husky/` patterns.
 
 ### Observability
-- [ ] No issues found. Audit trail mechanism is solid.
+- [ ] No issues found. Audit trails and commit footers provide excellent traceability.
 
 ### Quality
-- [ ] **Requirement Coverage:** 100% coverage achieved.
-- [ ] **Test Strategy:** Tests are automated and check specific exit codes and output strings.
-- [ ] **Scoping:** Worktree compliance test (Test 260) is a strong addition.
+- [ ] **Requirement Coverage:** PASS (100%).
+- [ ] **Test Plan:** Section 10.0 includes all necessary fields, tests are RED, and coverage target is met.
 
 ## Tier 3: SUGGESTIONS
-- **Performance:** For Test 200/210, ensure the test explicitly asserts that the command construction includes the *specific file path* to guarantee the "not full suite" requirement is met operationally, not just superficially.
-- **Resilience:** In `tools/tdd-pending-issues.py`, consider adding a simplified deadlock-breaker (e.g., a `--force-reset` flag) to clear `.tdd-state.json` if it becomes corrupted, although manual deletion is also acceptable for an ignored file.
+- **Shell Script Integration Test:** While T080/T190 test the Python tool logic for overrides, ensure a manual smoke test verifies the actual shell hook returns exit code 0 when `--skip-tdd-gate` is used.
+- **GitIgnore:** Verify that `.tdd-state.json` (local developer state) is also added to `.gitignore` to prevent accidental commit of local red/green status.
 
 ## Questions for Orchestrator
 1. None.

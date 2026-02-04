@@ -7,54 +7,53 @@ I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
 PASSED
 
 ## Review Summary
-The LLD is well-structured with excellent test coverage (100%) and clear logic flows. The adherence to TDD principles within the design of a TDD tool is commendable. However, there is a **Tier 1 Safety Blocking** issue regarding file storage locations that violates worktree scoping rules. This must be corrected before implementation.
+The LLD provides a robust design for enforcing TDD discipline via git hooks and CLI tools. The test coverage planning is excellent (100% requirement coverage) and the state management using commit footers is a clever architectural choice to handle distributed version control challenges. However, the design is **BLOCKED** by a strict Safety violation regarding file storage outside the worktree.
+
+## Open Questions Resolved
+No open questions found in Section 1. (All questions were marked as resolved in the draft).
 
 ## Requirement Coverage Analysis (MANDATORY)
 
 **Section 3 Requirements:**
 | # | Requirement | Test(s) | Status |
 |---|-------------|---------|--------|
-| 1 | Pre-commit hook blocks commits without corresponding test files for implementation code | Test 070, Test 080 | ✓ Covered |
-| 2 | Pre-commit hook excludes documentation (`*.md`) and config files | Test 090, Test 100 | ✓ Covered |
-| 3 | `tdd-gate --verify-red <test-file>` runs only the specified test file, not full suite | Test 200, Test 210 (verify runner args) | ✓ Covered |
-| 4 | Red phase verification accepts only exit code `1` (tests failed) | Test 010 | ✓ Covered |
-| 5 | Red phase verification rejects exit codes `0`, `2`, `5` with specific error messages | Test 020, Test 030, Test 040 | ✓ Covered |
-| 6 | Red phase proof is stored in commit message footer | Test 110 | ✓ Covered |
-| 7 | Prepare-commit-msg hook runs before GPG signing | Test 230 | ✓ Covered |
-| 8 | Green phase verification confirms exit code `0` (tests pass) | Test 050 | ✓ Covered |
-| 9 | `--skip-tdd-gate --reason "<justification>"` allows override with mandatory reason | Test 120, Test 130 | ✓ Covered |
-| 10 | Override logs debt locally and creates GitHub issue asynchronously | Test 160, Test 170, Test 180 | ✓ Covered |
-| 11 | Audit trail is strictly append-only at `docs/reports/{IssueID}/tdd-audit.md` | Test 190 | ✓ Covered |
-| 12 | CI extracts red phase proof from any commit in PR branch | Test 140 | ✓ Covered |
-| 13 | Works with pytest (`test_*.py`) and Jest (`*.test.js`, `*.spec.js`) | Test 200, Test 210 | ✓ Covered |
-| 14 | Configuration via `.tdd-config.json` for custom patterns and exclusions | Test 240 | ✓ Covered |
-| 15 | Husky auto-installs hooks on `npm install` | Test 250 | ✓ Covered |
+| 1 | Pre-commit hook blocks commits to source files without corresponding test files | T140, T150 | ✓ Covered |
+| 2 | Documentation and configuration files are excluded from TDD gate | T100 | ✓ Covered |
+| 3 | Red phase verification runs only the specific test file, not full suite | T060 | ✓ Covered |
+| 4 | Red phase requires exit code 1 (test failures); codes 0, 2, 5 are rejected | T010, T020, T030, T040 | ✓ Covered |
+| 5 | Green phase requires exit code 0 (tests pass) | T050 | ✓ Covered |
+| 6 | Commit message footer `TDD-Red-Phase:` is injected via prepare-commit-msg hook | T070 | ✓ Covered |
+| 7 | CI extracts footers from all commits in PR branch (supports squash workflows) | T120 | ✓ Covered |
+| 8 | Override flag `--skip-tdd-gate` allows emergency bypass | T080 | ✓ Covered |
+| 9 | Override is non-blocking; issue creation is async with local queue | T080, T190 | ✓ Covered |
+| 10 | Audit trail in `docs/reports/...` is strictly append-only | T110 | ✓ Covered |
+| 11 | Husky automatically installs hooks on `npm install` | T180 | ✓ Covered |
+| 12 | Configuration via `.tdd-config.json` for patterns and exclusions | T160, T170 | ✓ Covered |
 
-**Coverage Calculation:** 15 requirements covered / 15 total = **100%**
+**Coverage Calculation:** 12 requirements covered / 12 total = **100%**
 
 **Verdict:** PASS
 
 ## Tier 1: BLOCKING Issues
 
 ### Cost
-No blocking issues found.
+- [ ] No issues found.
 
 ### Safety
-- [ ] **CRITICAL - Worktree Scope Violation:** Section 2.5 and 2.3 specify that pending issues are stored in `~/.tdd-pending-issues.json` (Home Directory). This violates the safety rule that all file operations must be scoped to the worktree. Writing to the user's home directory is not permitted for this tool.
-    *   **Recommendation:** Store pending issues in a git-ignored file within the repository root (e.g., `.tdd-pending.json` or within `.tdd-state.json`). Untracked/Ignored files persist across branch checkouts, so the functionality will remain consistent without polluting the global environment.
+- [ ] **Worktree Scope Violation (CRITICAL):** The design specifies storing pending issues in `~/.tdd-pending-issues.json` (User Home Directory). This violates the safety protocol requiring all file operations to be scoped to the worktree. Storing project-specific state in the global user directory creates potential cross-contamination between projects (e.g., executing a flush in Project B creating issues for Project A) and leaves "cruft" on the developer's machine after a repo is deleted.
+    *   **Recommendation:** Store the pending issues queue in `.git/tdd-pending-issues.json` (local only, survives branch switches) or `.tdd-pending-issues.json` in the root (added to `.gitignore`).
 
 ### Security
-No blocking issues found.
+- [ ] No issues found.
 
 ### Legal
-No blocking issues found.
+- [ ] No issues found.
 
 ## Tier 2: HIGH PRIORITY Issues
 No high-priority issues found.
 
 ## Tier 3: SUGGESTIONS
-- **Consolidate State Files:** Since you are moving the pending issues file into the repo (per Tier 1 feedback), consider consolidating `PendingIssue` queue into the `TDDState` structure (stored in `.tdd-state.json`). This reduces the number of untracked files cluttering the repo root.
-- **Performance Verification:** For Test 200/210, ensure the test explicitly asserts that the command executed includes the specific file path argument, ensuring Requirement 3 ("runs *only* the specified test file") is strictly met and not just inferred.
+- **Performance:** For the `pre-commit` hook (Requirement 1), iterating through every staged file to call `tdd-gate --check-existence` individually may be slow for large commits. Consider adding a `--batch` mode to `tdd-gate.py` to accept a list of files and check them in a single Python process startup.
 
 ## Questions for Orchestrator
 1. None.
