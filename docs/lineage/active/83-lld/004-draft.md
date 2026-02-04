@@ -13,10 +13,10 @@ Update Reason: New feature design for structured issue file naming
 * **Related Issues:** None
 
 ### Open Questions
-*Questions that need clarification before or during implementation. Remove when resolved.*
+*All questions resolved during review.*
 
-- [ ] Should the wordlist be extensible via configuration, or is the embedded 80+ word list sufficient?
-- [ ] What should happen if the wordlist is exhausted (all 80+ words collide for a repo)?
+- [x] ~~Should the wordlist be extensible via configuration, or is the embedded 80+ word list sufficient?~~ **RESOLVED: Embedded is sufficient.** Following YAGNI, file I/O for configuration adds unnecessary complexity for an internal tool. 80 words * 9999 issues provides ample headroom (~800k issues).
+- [x] ~~What should happen if the wordlist is exhausted (all 80+ words collide for a repo)?~~ **RESOLVED: Raise ValueError.** This is the correct "Fail Closed" behavior. In the unlikely event of 80 active, colliding issues for a single repo, human intervention is required to archive old issues.
 
 ## 2. Proposed Changes
 
@@ -100,6 +100,8 @@ def get_next_issue_number(
     
     Scans active/ and done/ directories for files matching {repo_id}-*-????-*.md
     Returns max(found_numbers) + 1, or 1 if none exist.
+    
+    Note: Ignores legacy-format files (NNN-*.md) that don't match the new naming scheme.
     """
     ...
 
@@ -129,6 +131,8 @@ def generate_slug(
     
     Returns:
         tuple of (full_slug, word) e.g., ("AgentOS-quasar-0042", "quasar")
+    
+    Note: Also updates workflow state with issue_word when called from workflow context.
     """
     ...
 
@@ -265,9 +269,9 @@ ISSUE_WORDS: list[str] = [...]  # 80+ curated vocabulary-expanding words
 8. All new audit files use `{SLUG}-{TYPE}.md` naming convention
 9. Audit directories named with full slug
 10. Revision files append sequence number (draft2, verdict2)
-11. Existing old-format issues continue to work unchanged
+11. Existing old-format issues continue to work unchanged (backward compatibility)
 12. Wordlist contains 80+ curated vocabulary-expanding words
-13. `issue_word` tracked in workflow state
+13. `issue_word` tracked in workflow state and returned by `generate_slug()`
 
 ## 4. Alternatives Considered
 
@@ -315,6 +319,7 @@ Brief Content ──MD5 hash──► Word Index ──collision check──► 
 | Mock directory structure | Generated in tmp | Simulates active/done with various file patterns |
 | Mock git remote output | Hardcoded | Various URL patterns |
 | Malicious input strings | Hardcoded | Path traversal attempts, special chars |
+| Legacy format files | Generated in tmp | Files named `001-brief.md` for backward compat testing |
 
 ### 5.4 Deployment Pipeline
 
@@ -505,6 +510,8 @@ flowchart TD
 | T180 | test_wordlist_count | Contains 80+ words | RED |
 | T190 | test_wordlist_unique | All words unique | RED |
 | T200 | test_wordlist_valid_chars | All words 4-6 lowercase letters | RED |
+| T210 | test_get_next_issue_number_ignores_legacy | Ignores `001-brief.md` format files | RED |
+| T220 | test_workflow_state_update | `generate_slug()` returns issue_word for state | RED |
 
 **Coverage Target:** ≥95% for all new code
 
@@ -533,11 +540,13 @@ flowchart TD
 | 130 | Number existing | Auto | Files with numbers 0041, 0042 | `43` | Max + 1 |
 | 140 | Number scoped | Auto | AgentOS-0042, Unleash-0015 | AgentOS→43, Unleash→16 | Per-repo scoping |
 | 150 | Slug format | Auto | Repo=AgentOS, word=quasar, num=42 | `"AgentOS-quasar-0042"` | Pattern match |
-| 160 | Save creates dir | Auto | slug, type, content | Directory created | Path exists |
+| 160 | Save creates dir | Auto | slug, type, content | Directory exists and file created | Path.is_dir() and Path.is_file() |
 | 170 | Save revision | Auto | slug, type, content, seq=2 | `*-type2.md` | Sequence in name |
 | 180 | Wordlist count | Auto | `ISSUE_WORDS` | `len >= 80` | Count check |
 | 190 | Wordlist unique | Auto | `ISSUE_WORDS` | All unique | No duplicates |
 | 200 | Wordlist valid | Auto | Each word | 4-6 lowercase letters | Regex match |
+| 210 | Legacy file ignored | Auto | `001-brief.md` in active/ | Not counted in number sequence | Returns 1 for new repo |
+| 220 | State word returned | Auto | Call `generate_slug()` | Returns tuple with issue_word | Second element is valid word |
 
 ### 10.2 Test Commands
 
@@ -563,7 +572,7 @@ poetry run pytest tests/unit/test_audit_naming.py -v --cov=src/skills/audit --co
 | Wordlist exhaustion for active repo | Med | Low | Clear error message, 80+ words covers typical workloads |
 | Git remote parsing fails for unusual URLs | Low | Low | Fallback to directory name |
 | .audit-config malformed | Low | Low | JSON parse error with helpful message |
-| Backward compatibility regression | High | Low | Existing format detection, comprehensive tests |
+| Backward compatibility regression | High | Low | Existing format detection, comprehensive tests (T210) |
 | Number overflow at 9999 | Med | Very Low | Log warning, document limitation |
 
 ## 12. Definition of Done
@@ -572,7 +581,7 @@ poetry run pytest tests/unit/test_audit_naming.py -v --cov=src/skills/audit --co
 - [ ] `get_repo_short_id()` implemented with sanitization
 - [ ] `get_next_issue_number()` implemented with per-repo scoping
 - [ ] `generate_issue_word()` implemented with collision detection
-- [ ] `generate_slug()` implemented
+- [ ] `generate_slug()` implemented returning tuple with word
 - [ ] `save_audit_file()` updated with new signature
 - [ ] `wordlist.py` created with 80+ curated words
 - [ ] All 5 node files updated
@@ -580,7 +589,7 @@ poetry run pytest tests/unit/test_audit_naming.py -v --cov=src/skills/audit --co
 - [ ] Code comments reference this LLD
 
 ### Tests
-- [ ] All test scenarios pass (T010-T200)
+- [ ] All test scenarios pass (T010-T220)
 - [ ] Test coverage ≥95% for new code
 - [ ] Integration test: full workflow with new naming
 
@@ -600,10 +609,24 @@ poetry run pytest tests/unit/test_audit_naming.py -v --cov=src/skills/audit --co
 
 *Track all review feedback with timestamps and implementation status.*
 
+### Gemini Review #1 (REVISE)
+
+**Reviewer:** Gemini 3 Pro
+**Verdict:** REVISE
+
+#### Comments
+
+| ID | Comment | Implemented? |
+|----|---------|--------------|
+| G1.1 | "Add tests for backward compatibility (R11)" | YES - Added T210 test_get_next_issue_number_ignores_legacy |
+| G1.2 | "Add tests for state updates (R13)" | YES - Added T220 test_workflow_state_update |
+| G1.3 | "Ensure T160 explicitly asserts directory creation" | YES - Updated T160 pass criteria to verify both dir and file |
+| G1.4 | "Consider debug tooling CLI command" | NOTED - Suggestion for future enhancement |
+
 ### Review Summary
 
 | Review | Date | Verdict | Key Issue |
 |--------|------|---------|-----------|
-| - | - | - | - |
+| Gemini #1 | 2025-01-10 | REVISE | Test coverage below 95% threshold |
 
 **Final Status:** PENDING

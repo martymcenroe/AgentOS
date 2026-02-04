@@ -1,3 +1,10 @@
+---
+repo: martymcenroe/AgentOS
+issue: 83
+url: https://github.com/martymcenroe/AgentOS/issues/83
+fetched: 2026-02-04T07:55:56.417617Z
+---
+
 # Issue #83: Structured Issue File Naming Scheme for Multi-Repo Workflows
 
 # Structured Issue File Naming Scheme for Multi-Repo Workflows
@@ -63,7 +70,7 @@ Implement a new naming convention `{REPO}-{WORD}-{NUM}-{TYPE}.md` that provides 
 
 ### Repo ID Sanitization (SECURITY REQUIREMENT)
 1. **MUST** sanitize all Repo ID sources to alphanumeric characters only
-2. Apply regex filter: `[a-zA-Z0-9]+` â€” strip all other characters
+2. Apply regex filter: `[a-zA-Z0-9]+` — strip all other characters
 3. Truncate to first 7 alphanumeric characters
 4. Capitalize first letter
 5. Reject empty results with clear error message
@@ -123,15 +130,15 @@ Implement a new naming convention `{REPO}-{WORD}-{NUM}-{TYPE}.md` that provides 
 - **No sensitive data in filenames:** Only contains repo identifier, vocabulary word, and sequence number
 
 ## Files to Create/Modify
-- `src/skills/audit/utils.py` â€” Add `get_repo_short_id()` with sanitization, `get_next_issue_number()`, `generate_issue_word()`, update `generate_slug()`, update `save_audit_file()`
-- `src/skills/audit/wordlist.py` â€” New file containing curated `ISSUE_WORDS` list (80+ words)
-- `src/skills/audit/nodes/load_brief.py` â€” Use new slug generation
-- `src/skills/audit/nodes/draft.py` â€” Use updated `save_audit_file()` signature
-- `src/skills/audit/nodes/review.py` â€” Use updated `save_audit_file()` signature
-- `src/skills/audit/nodes/human_edit_draft.py` â€” Use updated `save_audit_file()` signature
-- `src/skills/audit/nodes/human_edit_verdict.py` â€” Use updated `save_audit_file()` signature
-- `src/skills/audit/nodes/file_issue.py` â€” Update `done/` directory naming
-- `src/skills/audit/state.py` â€” Add `issue_word` to `IssueWorkflowState`
+- `src/skills/audit/utils.py` — Add `get_repo_short_id()` with sanitization, `get_next_issue_number()`, `generate_issue_word()`, update `generate_slug()`, update `save_audit_file()`
+- `src/skills/audit/wordlist.py` — New file containing curated `ISSUE_WORDS` list (80+ words)
+- `src/skills/audit/nodes/load_brief.py` — Use new slug generation
+- `src/skills/audit/nodes/draft.py` — Use updated `save_audit_file()` signature
+- `src/skills/audit/nodes/review.py` — Use updated `save_audit_file()` signature
+- `src/skills/audit/nodes/human_edit_draft.py` — Use updated `save_audit_file()` signature
+- `src/skills/audit/nodes/human_edit_verdict.py` — Use updated `save_audit_file()` signature
+- `src/skills/audit/nodes/file_issue.py` — Update `done/` directory naming
+- `src/skills/audit/state.py` — Add `issue_word` to `IssueWorkflowState`
 
 ## Dependencies
 - None: self-contained feature
@@ -145,9 +152,9 @@ Implement a new naming convention `{REPO}-{WORD}-{NUM}-{TYPE}.md` that provides 
 - Automatic directory rename detection/migration
 
 ## Acceptance Criteria
-- [ ] `get_repo_short_id()` returns â‰¤7 char capitalized repo identifier
+- [ ] `get_repo_short_id()` returns ≤7 char capitalized repo identifier
 - [ ] `get_repo_short_id()` sanitizes input to alphanumeric only (regex `[a-zA-Z0-9]+`)
-- [ ] `get_repo_short_id()` follows priority order: `.audit-config` â†’ git remote â†’ directory name
+- [ ] `get_repo_short_id()` follows priority order: `.audit-config` → git remote → directory name
 - [ ] `get_repo_short_id()` raises `ValueError` for empty result after sanitization
 - [ ] `generate_issue_word()` produces deterministic word from brief hash
 - [ ] Word selection detects and avoids collisions in `active/` and `done/`
@@ -203,7 +210,7 @@ assert get_repo_short_id("../../../etc") == "Etc"
 assert get_repo_short_id("my-repo!@#$%") == "Myrepo"
 
 # Spaces and unicode stripped
-assert get_repo_short_id("my repo æ—¥æœ¬èªž") == "Myrepo"
+assert get_repo_short_id("my repo 日本語") == "Myrepo"
 
 # Empty after sanitization raises error
 with pytest.raises(ValueError):
