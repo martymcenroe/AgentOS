@@ -1,3 +1,10 @@
+---
+repo: martymcenroe/AgentOS
+issue: 137
+url: https://github.com/martymcenroe/AgentOS/issues/137
+fetched: 2026-02-04T08:02:21.390472Z
+---
+
 # Issue #137: Integrate parallel execution module into workflow CLI tools
 
 ## Context

@@ -9,15 +9,15 @@ Previous: Added sections based on 80 blocking issues from 164 governance verdict
 
 ## 1. Context & Goal
 * **Issue:** #137
-* **Objective:** Integrate the existing parallel execution module from #106 into the workflow CLI tools to enable concurrent processing of multiple issues
+* **Objective:** Integrate the parallel execution infrastructure from #106 into the workflow CLI tools to enable concurrent processing of multiple issues
 * **Status:** Draft
-* **Related Issues:** #106 (parallel infrastructure - completed)
+* **Related Issues:** #106 (completed - parallel execution infrastructure)
 
 ### Open Questions
 *Questions that need clarification before or during implementation. Remove when resolved.*
 
-- [ ] What is the default value for `--parallel` when not specified? (Proposed: 1, sequential execution)
-- [ ] Should `--dry-run` output be JSON for machine parsing or human-readable text? (Proposed: Human-readable with optional `--json` flag)
+- [ ] What is the default parallelism level if `--parallel` flag is provided without a number?
+- [ ] Should there be a maximum limit on parallel workers to prevent resource exhaustion?
 
 ## 2. Proposed Changes
 
@@ -27,38 +27,35 @@ Previous: Added sections based on 80 blocking issues from 164 governance verdict
 
 | File | Change Type | Description |
 |------|-------------|-------------|
-| `tools/run_requirements_workflow.py` | Modify | Add `--parallel` and `--dry-run` CLI flags with parallel execution integration |
-| `tools/run_implement_from_lld.py` | Modify | Add `--parallel` and `--dry-run` CLI flags with parallel execution integration |
-| `agentos/workflows/parallel/__init__.py` | Modify | Export public API for easy imports |
-| `tests/test_cli_parallel_integration.py` | Add | Unit tests for CLI argument parsing |
-| `tests/test_parallel_dry_run.py` | Add | Integration tests for dry-run mode |
+| `tools/run_requirements_workflow.py` | Modify | Add `--parallel N` and `--dry-run` CLI flags, integrate with parallel coordinator |
+| `tools/run_implement_from_lld.py` | Modify | Add `--parallel N` and `--dry-run` CLI flags, integrate with parallel coordinator |
+| `agentos/workflows/parallel/__init__.py` | Modify | Export public API for easy import |
+| `tests/unit/test_workflow_cli_parallel.py` | Add | Unit tests for CLI argument parsing |
+| `tests/integration/test_workflow_parallel_integration.py` | Add | Integration tests with dry-run mode |
 
 ### 2.2 Dependencies
 
-*No new packages required. All dependencies were added in #106.*
+*New packages, APIs, or services required.*
 
 ```toml
 # pyproject.toml additions (if any)
-# None - parallel module dependencies already present from #106
+# No new dependencies - uses existing parallel module from #106
 ```
 
 ### 2.3 Data Structures
 
 ```python
 # Pseudocode - NOT implementation
-class WorkflowTask(TypedDict):
-    """Represents a single workflow task for parallel execution."""
-    issue_id: str              # GitHub issue identifier (e.g., "137")
-    workflow_type: str         # "requirements" or "implementation"
-    input_path: Path           # Path to input file (issue spec or LLD)
-    output_path: Path          # Path to output file
-    status: str                # "pending", "running", "completed", "failed"
+class ParallelWorkflowConfig(TypedDict):
+    parallel_workers: int  # Number of concurrent workers (0 = sequential)
+    dry_run: bool  # If True, list items without executing
+    credential_pool: list[str]  # Available API keys for rotation
 
-class ParallelConfig(TypedDict):
-    """Configuration for parallel execution."""
-    max_workers: int           # Number of concurrent workers
-    dry_run: bool              # If True, list tasks without executing
-    credential_pool: list[str] # Available API keys for rotation
+class WorkflowItem(TypedDict):
+    item_id: str  # Unique identifier for the workflow item
+    issue_number: int  # GitHub issue number
+    status: str  # pending | running | completed | failed
+    output_path: Path  # Where results are written
 ```
 
 ### 2.4 Function Signatures
@@ -66,34 +63,47 @@ class ParallelConfig(TypedDict):
 ```python
 # Signatures only - implementation in source files
 
-# In tools/run_requirements_workflow.py
+# tools/run_requirements_workflow.py
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments including --parallel and --dry-run flags."""
     ...
 
-def collect_pending_issues(input_dir: Path) -> list[WorkflowTask]:
-    """Scan input directory and return list of pending workflow tasks."""
+def collect_pending_items() -> list[WorkflowItem]:
+    """Gather all issues that need LLD generation."""
     ...
 
-def execute_parallel(tasks: list[WorkflowTask], config: ParallelConfig) -> dict[str, Any]:
-    """Execute workflow tasks in parallel using the coordinator."""
+def execute_workflow_item(item: WorkflowItem, credential: str) -> WorkflowResult:
+    """Execute a single workflow item with assigned credential."""
     ...
 
-def display_dry_run_summary(tasks: list[WorkflowTask]) -> None:
-    """Display summary of tasks that would be executed."""
+def run_parallel(items: list[WorkflowItem], workers: int) -> list[WorkflowResult]:
+    """Execute items in parallel using the coordinator."""
     ...
 
-# In tools/run_implement_from_lld.py  
+def run_sequential(items: list[WorkflowItem]) -> list[WorkflowResult]:
+    """Execute items sequentially (original behavior)."""
+    ...
+
+def print_dry_run_summary(items: list[WorkflowItem]) -> None:
+    """Print pending items without executing."""
+    ...
+
+
+# tools/run_implement_from_lld.py
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments including --parallel and --dry-run flags."""
     ...
 
-def collect_pending_llds(lld_dir: Path) -> list[WorkflowTask]:
-    """Scan LLD directory and return list of pending implementation tasks."""
+def collect_pending_llds() -> list[WorkflowItem]:
+    """Gather all LLDs that need implementation."""
     ...
 
-def execute_parallel(tasks: list[WorkflowTask], config: ParallelConfig) -> dict[str, Any]:
-    """Execute implementation tasks in parallel using the coordinator."""
+def execute_implementation(item: WorkflowItem, credential: str) -> WorkflowResult:
+    """Execute implementation for a single LLD."""
+    ...
+
+def run_parallel(items: list[WorkflowItem], workers: int) -> list[WorkflowResult]:
+    """Execute implementations in parallel using the coordinator."""
     ...
 ```
 
@@ -101,43 +111,42 @@ def execute_parallel(tasks: list[WorkflowTask], config: ParallelConfig) -> dict[
 
 ```
 1. Parse CLI arguments
-   - Extract --parallel N (default: 1)
-   - Extract --dry-run flag (default: False)
-   - Extract other existing arguments
+   - Extract --parallel N (default: 0 = sequential)
+   - Extract --dry-run flag
 
-2. Collect pending tasks
-   - Scan input directory for unprocessed items
-   - Build list of WorkflowTask objects
-   - Validate task inputs (use InputSanitizer)
+2. Collect pending workflow items
+   - Scan for unprocessed issues/LLDs
+   - Build WorkflowItem list
 
 3. IF --dry-run THEN
-   - Display task summary (count, issue IDs, estimated time)
+   - Print summary table of pending items
    - Exit without execution
-   
-4. Initialize parallel infrastructure
-   - Create CredentialCoordinator with available API keys
-   - Create WorkerPool with N workers
-   - Configure OutputPrefixer for each worker
+   END IF
 
-5. Execute tasks in parallel
-   - Submit tasks to worker pool
-   - Track progress with progress tracker
+4. IF --parallel > 0 THEN
+   - Initialize CredentialCoordinator with API keys
+   - Initialize WorkerPool with N workers
+   - Initialize OutputPrefixer for each workflow
+   - Submit all items to coordinator
+   - Wait for completion with progress tracking
    - Handle Ctrl+C for graceful shutdown
+   ELSE
+   - Execute items sequentially (original behavior)
+   END IF
 
-6. Collect and report results
-   - Aggregate success/failure counts
-   - Log any failures with details
-   - Return appropriate exit code
+5. Print execution summary
+   - Success/failure counts
+   - Duration statistics
 ```
 
 ### 2.6 Technical Approach
 
 * **Module:** `tools/run_requirements_workflow.py`, `tools/run_implement_from_lld.py`
-* **Pattern:** Adapter pattern - CLI tools adapt to the parallel module's coordinator interface
+* **Pattern:** Strategy pattern for execution mode (parallel vs sequential)
 * **Key Decisions:** 
-  - Reuse existing parallel module without modifications
-  - Keep CLI interface backward compatible (default to sequential)
-  - Use argparse for consistent CLI parsing
+  - Maintain backward compatibility - no flags = original sequential behavior
+  - Use existing parallel infrastructure from #106 without modification
+  - Credential rotation handled transparently by CredentialCoordinator
 
 ### 2.7 Architecture Decisions
 
@@ -145,15 +154,15 @@ def execute_parallel(tasks: list[WorkflowTask], config: ParallelConfig) -> dict[
 
 | Decision | Options Considered | Choice | Rationale |
 |----------|-------------------|--------|-----------|
-| CLI argument handling | Click, Typer, argparse | argparse | Consistent with existing tools, no new dependencies |
-| Default parallelism | Auto-detect CPUs, Fixed default, Required flag | Default to 1 | Backward compatible, explicit opt-in to parallel |
-| Credential distribution | Round-robin, Least-loaded, Random | CredentialCoordinator (from #106) | Already implemented and tested |
-| Output handling | Interleaved, Buffered, Prefixed | OutputPrefixer (from #106) | Already implemented, clear workflow identification |
+| CLI flag syntax | `--parallel=N`, `--parallel N`, `-p N` | `--parallel N` | Consistent with common CLI conventions, argparse default |
+| Default parallelism | 0 (sequential), 4 (moderate), auto-detect | 0 (sequential) | Backward compatible, explicit opt-in to parallel |
+| Dry-run output format | Table, JSON, Plain text | Table (rich) | Human-readable, consistent with existing tools |
+| Graceful shutdown | Immediate kill, Wait for current, Abort all | Wait for current | Prevents partial work, respects API rate limits |
 
 **Architectural Constraints:**
 - Must use existing parallel module from #106 without modifications
-- CLI interface must remain backward compatible for existing users
-- Graceful shutdown must work within 5 seconds on Ctrl+C
+- Must maintain backward compatibility with existing CLI usage
+- Cannot introduce new external dependencies
 
 ## 3. Requirements
 
@@ -163,20 +172,21 @@ def execute_parallel(tasks: list[WorkflowTask], config: ParallelConfig) -> dict[
 2. `run_requirements_workflow.py` accepts `--dry-run` flag to list pending items without executing
 3. `run_implement_from_lld.py` accepts `--parallel N` flag to process N issues concurrently
 4. `run_implement_from_lld.py` accepts `--dry-run` flag to list pending items without executing
-5. Parallel execution uses the CredentialCoordinator for API key management
+5. Parallel execution uses CredentialCoordinator for API key management
 6. Output is prefixed with workflow ID for clear identification
-7. Graceful shutdown on Ctrl+C completes within 5 seconds
-8. Sequential execution (default) behaves identically to current implementation
+7. Graceful shutdown on Ctrl+C preserves completed work
+8. Without flags, tools behave identically to current sequential behavior
 
 ## 4. Alternatives Considered
 
 | Option | Pros | Cons | Decision |
 |--------|------|------|----------|
-| Integrate parallel directly into CLI tools | Simple, single responsibility | Code duplication, harder to maintain | **Rejected** |
-| Create shared CLI wrapper module | Reusable, DRY | Another layer of abstraction | **Selected** |
-| Use multiprocessing instead of threading | True parallelism | Harder credential sharing, more overhead | **Rejected** |
+| Add flags to existing tools | Backward compatible, single tool | Slightly more complex arg parsing | **Selected** |
+| Create separate parallel wrapper script | Clean separation, simple tools | Duplicated logic, two entry points | Rejected |
+| Use environment variables for config | No CLI changes needed | Less discoverable, harder to document | Rejected |
+| Auto-detect parallelism from CPU cores | User-friendly, optimal by default | Unpredictable, may overwhelm APIs | Rejected |
 
-**Rationale:** A shared integration pattern between the two CLI tools ensures consistency and reduces maintenance burden while leveraging the existing parallel module infrastructure.
+**Rationale:** Adding flags to existing tools maintains backward compatibility while providing explicit control over parallel execution. Users who don't need parallelism see no change.
 
 ## 5. Data & Fixtures
 
@@ -186,31 +196,32 @@ def execute_parallel(tasks: list[WorkflowTask], config: ParallelConfig) -> dict[
 
 | Attribute | Value |
 |-----------|-------|
-| Source | Local filesystem (issue specs, LLDs) |
-| Format | Markdown files |
-| Size | Typically 10-50 files per batch |
-| Refresh | Manual (user runs workflow) |
-| Copyright/License | N/A - user's own content |
+| Source | GitHub Issues API, local filesystem (LLD files) |
+| Format | JSON (API), Markdown (LLD files) |
+| Size | ~10-50 items per batch typical |
+| Refresh | On-demand per execution |
+| Copyright/License | N/A - project internal data |
 
 ### 5.2 Data Pipeline
 
 ```
-Input Directory ──scan──► Task List ──validate──► Parallel Executor ──write──► Output Directory
+GitHub Issues API ──fetch──► Filter pending ──parse──► WorkflowItem list
+Local LLD files ──scan──► Filter unimplemented ──parse──► WorkflowItem list
 ```
 
 ### 5.3 Test Fixtures
 
 | Fixture | Source | Notes |
 |---------|--------|-------|
-| Mock issue specs | Generated | Minimal valid markdown files |
-| Mock LLDs | Generated | Minimal valid LLD structure |
-| Mock API responses | Hardcoded | Simulated successful/failed responses |
+| Mock GitHub issue list | Generated | Synthetic issue data for unit tests |
+| Mock LLD files | Hardcoded | Minimal valid LLD structure for parsing tests |
+| Mock credential pool | Hardcoded | Fake API keys for coordinator tests |
 
 ### 5.4 Deployment Pipeline
 
-Tests run entirely locally with mocked external services. No external data movement required.
+Tests run in CI with mocked external services. Dry-run mode enables safe integration testing without API calls.
 
-**If data source is external:** N/A - all data is local filesystem.
+**If data source is external:** GitHub API access uses existing authentication. No separate utility needed.
 
 ## 6. Diagram
 
@@ -223,6 +234,13 @@ Before finalizing any diagram, verify in [Mermaid Live Editor](https://mermaid.l
 - [x] **No hidden lines:** All arrows fully visible (per 0006 §8.3)
 - [x] **Readable:** Labels not truncated, flow direction clear
 - [ ] **Auto-inspected:** Agent rendered via mermaid.ink and viewed (per 0006 §8.5)
+
+**Agent Auto-Inspection (MANDATORY):**
+
+AI agents MUST render and view the diagram before committing:
+1. Base64 encode diagram → fetch PNG from `https://mermaid.ink/img/{base64}`
+2. Read the PNG file (multimodal inspection)
+3. Document results below
 
 **Auto-Inspection Results:**
 ```
@@ -238,37 +256,42 @@ Before finalizing any diagram, verify in [Mermaid Live Editor](https://mermaid.l
 
 ```mermaid
 sequenceDiagram
-    participant User
     participant CLI as CLI Tool
-    participant Scanner as Task Scanner
-    participant Coord as Coordinator
-    participant Worker as Worker Pool
-    participant Cred as CredentialCoordinator
-    participant API as External API
+    participant Parser as Arg Parser
+    participant Collector as Item Collector
+    participant Coord as WorkerPool Coordinator
+    participant Cred as Credential Coordinator
+    participant Prefix as Output Prefixer
+    participant Worker as Worker Thread
 
-    User->>CLI: --parallel 4 --dry-run
-    CLI->>Scanner: collect_pending_tasks()
-    Scanner-->>CLI: task_list[n]
+    CLI->>Parser: parse_args()
+    Parser-->>CLI: {parallel: N, dry_run: bool}
     
-    alt Dry Run Mode
-        CLI-->>User: Display task summary
-    else Execute Mode
-        CLI->>Coord: initialize(workers=4)
-        Coord->>Cred: setup_credentials()
-        Coord->>Worker: spawn_workers(4)
+    CLI->>Collector: collect_pending_items()
+    Collector-->>CLI: WorkflowItem[]
+    
+    alt dry_run = true
+        CLI->>CLI: print_dry_run_summary()
+    else parallel > 0
+        CLI->>Coord: initialize(workers=N)
+        CLI->>Cred: initialize(api_keys)
         
-        loop For each task
-            Worker->>Cred: reserve_credential()
-            Cred-->>Worker: api_key
-            Worker->>API: execute_workflow()
-            API-->>Worker: result
-            Worker->>Cred: release_credential()
-            Worker-->>Coord: task_complete
+        loop For each WorkflowItem
+            CLI->>Coord: submit(item)
+            Coord->>Cred: reserve_credential()
+            Cred-->>Coord: credential
+            Coord->>Worker: execute(item, credential)
+            Worker->>Prefix: wrap_output(workflow_id)
+            Worker-->>Coord: result
+            Coord->>Cred: release_credential()
         end
         
-        Coord-->>CLI: results_summary
-        CLI-->>User: Exit code + report
+        Coord-->>CLI: results[]
+    else sequential
+        CLI->>CLI: run_sequential(items)
     end
+    
+    CLI->>CLI: print_summary()
 ```
 
 ## 7. Security & Safety Considerations
@@ -279,9 +302,9 @@ sequenceDiagram
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| API key exposure in logs | OutputPrefixer sanitizes credential strings | Addressed |
-| Path traversal in input | InputSanitizer validates all paths | Addressed |
-| Credential leakage between workers | CredentialCoordinator enforces isolation | Addressed |
+| API key exposure in logs | OutputPrefixer does not log credentials; keys masked in error messages | Addressed |
+| Credential exhaustion attack | CredentialCoordinator has bounded pool, max wait timeout | Addressed |
+| Input injection via issue IDs | InputSanitizer validates identifiers before use | Addressed |
 
 ### 7.2 Safety
 
@@ -289,14 +312,14 @@ sequenceDiagram
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| Partial completion on Ctrl+C | Graceful shutdown completes in-progress tasks | Addressed |
-| Output file corruption | Atomic writes with temp files | TODO |
-| Worker deadlock | Timeout on credential reservation (30s) | Addressed |
-| Resource exhaustion | Worker pool size bounded by --parallel flag | Addressed |
+| Partial work loss on interrupt | Graceful shutdown completes in-progress items before exit | Addressed |
+| Worker thread deadlock | Timeout on credential acquisition, watchdog in coordinator | Addressed |
+| Output file corruption | Atomic writes with temp file + rename pattern | Addressed |
+| Resource exhaustion from unbounded parallelism | Max workers capped at reasonable limit (e.g., 10) | Addressed |
 
-**Fail Mode:** Fail Closed - On unrecoverable error, stop all workers and report partial results
+**Fail Mode:** Fail Closed - On coordinator failure, no new work is started; in-progress work completes
 
-**Recovery Strategy:** Tasks are idempotent; re-running with same inputs produces same outputs. Failed tasks can be retried by running the workflow again.
+**Recovery Strategy:** Completed work is persisted immediately. Re-running with same input skips already-completed items.
 
 ## 8. Performance & Cost Considerations
 
@@ -306,27 +329,27 @@ sequenceDiagram
 
 | Metric | Budget | Approach |
 |--------|--------|----------|
-| Worker startup | < 100ms per worker | Lightweight thread creation |
-| Task dispatch | < 10ms per task | Direct queue insertion |
-| Memory per worker | < 50MB | Shared module imports |
+| Startup latency | < 2s | Lazy initialization of coordinator |
+| Per-item overhead | < 100ms | Minimal wrapper around existing workflow |
+| Memory per worker | < 50MB | Workers share coordinator, output buffering bounded |
 
 **Bottlenecks:** 
-- External API rate limits may throttle effective parallelism
-- File I/O on slow disks may serialize output writes
+- API rate limits are the primary constraint, not CPU/memory
+- Credential pool size limits effective parallelism
 
 ### 8.2 Cost Analysis
 
 | Resource | Unit Cost | Estimated Usage | Monthly Cost |
 |----------|-----------|-----------------|--------------|
-| LLM API calls | $0.01 per 1K tokens | Same as sequential (parallel doesn't increase calls) | No change |
-| Local compute | $0 | CPU threads | $0 |
+| LLM API calls | ~$0.01 per call | ~100 calls/day parallel | ~$30 |
+| GitHub API calls | Free (within limits) | ~500 calls/day | $0 |
 
 **Cost Controls:**
-- [x] Parallelism does not multiply API calls, only concurrency
-- [x] Rate limiting inherited from individual workflow implementations
-- [x] No additional cloud resources required
+- [x] Rate limiting inherent in credential coordinator
+- [x] Dry-run mode prevents accidental batch execution
+- [ ] Budget alerts configured at {$X threshold} - N/A for this tool
 
-**Worst-Case Scenario:** If user specifies `--parallel 100` with only 3 API keys, CredentialCoordinator will queue workers waiting for credentials, naturally throttling to available capacity.
+**Worst-Case Scenario:** If usage spikes 10x, credential pool becomes the bottleneck, naturally throttling API costs. 100x would require more API keys, explicit decision.
 
 ## 9. Legal & Compliance
 
@@ -334,19 +357,19 @@ sequenceDiagram
 
 | Concern | Applies? | Mitigation |
 |---------|----------|------------|
-| PII/Personal Data | No | Workflows process technical documents only |
-| Third-Party Licenses | No | No new dependencies added |
-| Terms of Service | Yes | Parallel calls must respect API rate limits |
-| Data Retention | N/A | No data retained beyond workflow execution |
-| Export Controls | N/A | No restricted algorithms |
+| PII/Personal Data | No | Only processes technical issue content |
+| Third-Party Licenses | No | Uses existing project dependencies |
+| Terms of Service | Yes | LLM API usage stays within rate limits via credential rotation |
+| Data Retention | N/A | Outputs are project documentation |
+| Export Controls | No | No restricted algorithms or data |
 
-**Data Classification:** Internal - workflow inputs/outputs are project documentation
+**Data Classification:** Internal
 
 **Compliance Checklist:**
 - [x] No PII stored without consent
 - [x] All third-party licenses compatible with project license
-- [x] External API usage compliant with provider ToS (rate limits respected)
-- [x] Data retention policy documented (none retained)
+- [x] External API usage compliant with provider ToS
+- [x] Data retention policy documented
 
 ## 10. Verification & Testing
 
@@ -354,20 +377,49 @@ sequenceDiagram
 
 **Testing Philosophy:** Strive for 100% automated test coverage. Manual tests are a last resort for scenarios that genuinely cannot be automated (e.g., visual inspection, hardware interaction). Every scenario marked "Manual" requires justification.
 
+### 10.0 Test Plan (TDD - Complete Before Implementation)
+
+**TDD Requirement:** Tests MUST be written and failing BEFORE implementation begins.
+
+| Test ID | Test Description | Expected Behavior | Status |
+|---------|------------------|-------------------|--------|
+| T010 | test_parse_parallel_flag | Parses `--parallel 4` correctly | RED |
+| T020 | test_parse_parallel_flag_missing_value | Error when `--parallel` has no value | RED |
+| T030 | test_parse_dry_run_flag | Parses `--dry-run` as boolean | RED |
+| T040 | test_parse_combined_flags | Both flags work together | RED |
+| T050 | test_dry_run_outputs_table | Dry run prints table, no execution | RED |
+| T060 | test_parallel_uses_coordinator | Parallel mode initializes WorkerPool | RED |
+| T070 | test_parallel_uses_credential_coordinator | API keys rotated via coordinator | RED |
+| T080 | test_output_prefixer_applied | Worker output has workflow ID prefix | RED |
+| T090 | test_graceful_shutdown | SIGINT triggers clean shutdown | RED |
+| T100 | test_sequential_backward_compatible | No flags = original behavior | RED |
+
+**Coverage Target:** ≥95% for all new code
+
+**TDD Checklist:**
+- [ ] All tests written before implementation
+- [ ] Tests currently RED (failing)
+- [ ] Test IDs match scenario IDs in 10.1
+- [ ] Test file created at: `tests/unit/test_workflow_cli_parallel.py`
+
+*Note: Update Status from RED to GREEN as implementation progresses. All tests should be RED at LLD review time.*
+
 ### 10.1 Test Scenarios
 
 | ID | Scenario | Type | Input | Expected Output | Pass Criteria |
 |----|----------|------|-------|-----------------|---------------|
-| 010 | Parse --parallel flag | Auto | `--parallel 4` | config.max_workers == 4 | Argument parsed correctly |
-| 020 | Parse --dry-run flag | Auto | `--dry-run` | config.dry_run == True | Argument parsed correctly |
-| 030 | Default to sequential | Auto | No parallel flag | config.max_workers == 1 | Backward compatible |
-| 040 | Invalid parallel value | Auto | `--parallel -1` | ArgumentError | Validation rejects negative |
-| 050 | Dry run lists tasks | Auto | `--dry-run` + mock tasks | Stdout contains task list | No execution occurs |
-| 060 | Parallel execution completes | Auto | `--parallel 2` + 4 mock tasks | All tasks complete | Exit code 0 |
-| 070 | Output prefixed correctly | Auto | `--parallel 2` | Each line prefixed with [workflow-id] | Prefix pattern matches |
-| 080 | Graceful shutdown on SIGINT | Auto | Send SIGINT during execution | Clean exit within 5s | No zombie workers |
-| 090 | Credential rotation | Auto | 2 keys, 4 workers | All workers get credentials | No deadlock |
-| 100 | Mixed success/failure | Auto | 3 success, 1 failure tasks | Exit code 1, report shows failure | Partial results returned |
+| 010 | Parse --parallel flag | Auto | `--parallel 4` | `args.parallel == 4` | Value correctly extracted |
+| 020 | Parse --parallel missing value | Auto | `--parallel` (no value) | ArgumentError | Error message shown |
+| 030 | Parse --dry-run flag | Auto | `--dry-run` | `args.dry_run == True` | Boolean flag set |
+| 040 | Combined flags | Auto | `--parallel 2 --dry-run` | Both values set | No conflict |
+| 050 | Dry run output format | Auto | 3 pending items | Table with 3 rows, no API calls | Output contains all items |
+| 060 | Parallel coordinator init | Auto | `--parallel 4`, mock items | WorkerPool(4) called | Coordinator receives worker count |
+| 070 | Credential rotation | Auto | 2 keys, 4 workers | Keys reused across workers | No credential starvation |
+| 080 | Output prefixing | Auto | Workflow ID "issue-42" | Stdout prefixed `[issue-42]` | Prefix visible in output |
+| 090 | Graceful shutdown (SIGINT) | Auto | Send SIGINT during run | In-progress completes, pending cancelled | Exit code 0, no data loss |
+| 100 | Sequential mode (no flags) | Auto | No flags | Original behavior | No coordinator involvement |
+| 110 | Zero items to process | Auto | Empty item list | "Nothing to process" message | Clean exit, no errors |
+| 120 | Single item parallel | Auto | `--parallel 4`, 1 item | Completes successfully | No deadlock |
 
 *Note: Use 3-digit IDs with gaps of 10 (010, 020, 030...) to allow insertions.*
 
@@ -380,13 +432,16 @@ sequenceDiagram
 
 ```bash
 # Run all automated tests
-poetry run pytest tests/test_cli_parallel_integration.py tests/test_parallel_dry_run.py -v
+poetry run pytest tests/unit/test_workflow_cli_parallel.py -v
 
 # Run only fast/mocked tests (exclude live)
-poetry run pytest tests/test_cli_parallel_integration.py -v -m "not live"
+poetry run pytest tests/unit/test_workflow_cli_parallel.py -v -m "not live"
 
-# Run live integration tests (requires API keys)
-poetry run pytest tests/test_parallel_dry_run.py -v -m live
+# Run integration tests with dry-run
+poetry run pytest tests/integration/test_workflow_parallel_integration.py -v
+
+# Run with coverage
+poetry run pytest tests/unit/test_workflow_cli_parallel.py --cov=tools --cov-report=term-missing
 ```
 
 ### 10.3 Manual Tests (Only If Unavoidable)
@@ -397,25 +452,26 @@ N/A - All scenarios automated.
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| API rate limits hit with high parallelism | Med | Med | CredentialCoordinator rotates keys; documentation warns users |
-| Worker thread leak on crash | High | Low | Graceful shutdown handler with 5s timeout |
-| Inconsistent output ordering | Low | Med | OutputPrefixer ensures clear identification |
-| Backward compatibility break | High | Low | Default to sequential (--parallel 1) |
+| API rate limit exceeded | Med | Med | CredentialCoordinator rotates keys, built-in backoff |
+| Deadlock in worker pool | High | Low | Timeouts on all blocking operations, watchdog thread |
+| Output interleaving | Low | Med | OutputPrefixer ensures clear separation |
+| Incomplete backward compatibility | Med | Low | Explicit testing of no-flag scenario |
+| Credential leak in error messages | High | Low | Sanitize all error output, never log raw keys |
 
 ## 12. Definition of Done
 
 ### Code
 - [ ] Implementation complete and linted
-- [ ] Code comments reference this LLD (#137)
+- [ ] Code comments reference this LLD
 
 ### Tests
 - [ ] All test scenarios pass
-- [ ] Test coverage meets threshold (>80%)
+- [ ] Test coverage meets threshold (≥95%)
 
 ### Documentation
 - [ ] LLD updated with any deviations
 - [ ] Implementation Report (0103) completed
-- [ ] README updated with parallel execution examples
+- [ ] README updated with `--parallel` and `--dry-run` examples
 
 ### Review
 - [ ] Code review completed
@@ -427,11 +483,15 @@ N/A - All scenarios automated.
 
 *Track all review feedback with timestamps and implementation status.*
 
+<!-- Note: Timestamps are auto-generated by the workflow. Do not fill in manually. -->
+
 ### Review Summary
+
+<!-- Note: This table is auto-populated by the workflow with actual review dates. -->
 
 | Review | Date | Verdict | Key Issue |
 |--------|------|---------|-----------|
-| - | - | - | Pending initial review |
+| - | - | - | Awaiting initial review |
 
 **Final Status:** PENDING
 <!-- Note: This field is auto-updated to APPROVED by the workflow when finalized -->
