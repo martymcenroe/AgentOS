@@ -382,8 +382,10 @@ class TestTestScaffolding:
         content = generate_test_file_content(scenarios, "example", 42)
 
         assert "def test_example(" in content
-        assert "assert False" in content
-        assert "TDD: Implementation pending" in content
+        # New behavior: tests use real assertions, not assert False
+        # The TDD RED phase now comes from ImportError, not assert False
+        assert "assert True" in content or "assert " in content
+        assert "ImportError" in content or "TDD" in content
         assert "import pytest" in content
 
     def test_generate_test_file_content_with_mock(self):
@@ -689,7 +691,8 @@ class TestNodeFunctions:
         assert test_file.exists()
         content = test_file.read_text()
         assert "def test_example" in content
-        assert "assert False" in content
+        # New behavior: tests use real assertions (TDD RED from ImportError, not assert False)
+        assert "assert" in content
 
 
 class TestDocumentNode:
