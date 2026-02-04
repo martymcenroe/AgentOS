@@ -1,23 +1,23 @@
-# 116 - Feature: Add GitHub Actions CI workflow for automated testing
+# 1116 - Feature: Add GitHub Actions CI Workflow for Automated Testing
 
 <!-- Template Metadata
 Last Updated: 2025-01-XX
-Updated By: Initial creation
-Update Reason: New LLD for CI/CD workflow
+Updated By: Initial draft
+Update Reason: New LLD for CI workflow implementation
 -->
 
 ## 1. Context & Goal
 * **Issue:** #116
-* **Objective:** Add GitHub Actions CI workflow to automatically run tests on push to main and pull requests, with coverage reporting and Python version matrix testing.
+* **Objective:** Implement GitHub Actions CI workflow with tiered testing strategy to enable automated testing on PRs, pushes to main, and nightly runs.
 * **Status:** Draft
 * **Related Issues:** None
 
 ### Open Questions
-*Questions that need clarification before or during implementation. Remove when resolved.*
 
-- [x] Which Python versions to support? → 3.10, 3.11, 3.12 per issue scope
-- [x] Coverage threshold requirement? → No minimum threshold specified, report only
-- [ ] Should workflow fail if coverage drops below current level?
+- [x] Which CI strategy to use? → **Decision: Option D (Hybrid)** - combines tiered triggers with pytest markers
+- [ ] Python version matrix: Test 3.10, 3.11, 3.12 or single version?
+- [ ] Coverage threshold: 90% on new code vs overall coverage percentage?
+- [ ] Should we add branch protection rules requiring CI pass?
 
 ## 2. Proposed Changes
 
@@ -27,91 +27,127 @@ Update Reason: New LLD for CI/CD workflow
 
 | File | Change Type | Description |
 |------|-------------|-------------|
-| `.github/workflows/ci.yml` | Add | Main CI workflow configuration |
+| `.github/workflows/ci.yml` | Add | Main CI workflow with tiered testing |
+| `.github/workflows/nightly.yml` | Add | Nightly full test suite including live tests |
+| `pyproject.toml` | Modify | Add pytest markers configuration |
+| `pytest.ini` or `pyproject.toml` | Modify | Configure pytest markers (fast, slow, live) |
 | `README.md` | Modify | Add CI status badge |
-| `pyproject.toml` | Modify | Add pytest-cov dependency if not present |
+| `conftest.py` | Modify | Add marker registration and environment setup |
 
 ### 2.2 Dependencies
 
-*New packages, APIs, or services required.*
-
 ```toml
 # pyproject.toml additions (if any)
-pytest-cov = "^4.1.0"  # Coverage reporting for pytest
+# No new runtime dependencies required
+# pytest-cov already expected to be present for coverage
+
+[tool.pytest.ini_options]
+markers = [
+    "fast: marks tests as fast (run on every PR)",
+    "slow: marks tests as slow (run only on main)",
+    "live: marks tests as requiring live API access (nightly only)",
+]
 ```
 
 ### 2.3 Data Structures
 
-N/A - This feature involves workflow configuration, not application code.
+```python
+# Pseudocode - NOT implementation
+# No new data structures required - this is infrastructure configuration
+```
 
 ### 2.4 Function Signatures
 
-N/A - This feature involves workflow configuration, not application code.
+```python
+# No new Python functions - this feature is primarily YAML configuration
+# Existing conftest.py may need marker registration:
+
+def pytest_configure(config):
+    """Register custom pytest markers."""
+    ...
+```
 
 ### 2.5 Logic Flow (Pseudocode)
 
 ```
-CI Workflow Trigger:
-1. On push to main branch OR on pull request to main
-2. Create job matrix for Python 3.10, 3.11, 3.12
-3. FOR EACH Python version:
-   a. Checkout repository
-   b. Setup Python version
-   c. Install Poetry
-   d. Cache Poetry dependencies (keyed by poetry.lock hash)
-   e. Install project dependencies
-   f. Set LANGSMITH_TRACING=false
-   g. Run pytest with coverage
-   h. Upload coverage report (on primary Python version only)
-4. Report pass/fail status
+CI Workflow Triggers:
+
+1. ON pull_request (opened, synchronize, reopened):
+   - Checkout code
+   - Setup Python 3.11
+   - Cache poetry dependencies
+   - Install dependencies
+   - Run: pytest -m "not slow and not live" --cov
+   - Upload coverage report
+   - Fail if coverage on new code < 90%
+
+2. ON push to main:
+   - Checkout code
+   - Setup Python 3.11
+   - Cache poetry dependencies
+   - Install dependencies
+   - Run: pytest -m "not live" --cov
+   - Upload full coverage report
+   - Generate coverage badge
+
+3. ON schedule (daily 6 AM UTC) OR manual dispatch:
+   - Checkout code
+   - Setup Python 3.11
+   - Cache poetry dependencies
+   - Install dependencies
+   - Set LIVE_TESTS_ENABLED=true
+   - Run: pytest --cov (all tests)
+   - Upload full coverage report with live test results
+   - Notify on failure (optional)
 ```
 
 ### 2.6 Technical Approach
 
 * **Module:** `.github/workflows/`
-* **Pattern:** GitHub Actions matrix strategy
+* **Pattern:** Tiered CI with progressive test coverage
 * **Key Decisions:** 
-  - Use Poetry for dependency management (matching project setup)
-  - Cache dependencies to speed up workflow runs
-  - Run coverage upload only on one Python version to avoid duplicates
-  - Disable LangSmith tracing to prevent test failures from missing API keys
+  - Use GitHub Actions (native to repo, free for public repos)
+  - Hybrid strategy combines trigger-based tiers with pytest markers for flexibility
+  - Poetry caching for fast dependency installation
+  - Coverage gating prevents regression
 
 ### 2.7 Architecture Decisions
 
 | Decision | Options Considered | Choice | Rationale |
 |----------|-------------------|--------|-----------|
-| CI Platform | GitHub Actions, CircleCI, Jenkins | GitHub Actions | Native GitHub integration, free for public repos, no additional setup |
-| Dependency Caching | No cache, pip cache, poetry cache | Poetry cache | Matches project tooling, significant speedup on repeat runs |
-| Coverage Service | Codecov, Coveralls, GitHub native | GitHub native (artifact) | No external service dependency, simpler setup |
-| Matrix Strategy | Single version, multiple versions | Multiple (3.10, 3.11, 3.12) | Ensures compatibility across supported Python versions |
+| CI Platform | GitHub Actions, CircleCI, Jenkins | GitHub Actions | Native integration, free minutes, no external service |
+| Test Tiering | Trigger-only, Markers-only, Changed-files, Hybrid | Hybrid (Option D) | Balance of speed (~2-3 min PRs) and safety (full regression on main) |
+| Python Versions | Single (3.11), Matrix (3.10-3.12) | Single (3.11) initially | Start simple, add matrix if compatibility issues arise |
+| Coverage Tool | pytest-cov, coverage.py standalone | pytest-cov | Already integrated with pytest, simpler workflow |
 
 **Architectural Constraints:**
-- Must work without API keys (tests use fixtures and mocks)
-- Must integrate with existing Poetry-based project structure
-- Cannot require paid GitHub Actions features
+- Must not require API keys for PR tests (use mocks)
+- Must complete PR tests in < 5 minutes for good developer experience
+- Must handle ~600 tests / ~20 minute full regression gracefully
 
 ## 3. Requirements
 
 *What must be true when this is done. These become acceptance criteria.*
 
-1. Tests run automatically on every PR targeting main branch
-2. Tests run automatically on push to main branch
-3. Tests run against Python 3.10, 3.11, and 3.12
-4. Coverage report generated and accessible as workflow artifact
-5. README displays CI status badge showing current build status
-6. Workflow caches Poetry dependencies for faster subsequent runs
-7. Tests pass without requiring API keys or external service credentials
+1. Tests run automatically on every PR (unit + fast tests only, ~2-3 min)
+2. Tests run automatically on push to main (full regression minus live, ~20 min)
+3. Nightly scheduled run executes all tests including live API tests
+4. Coverage report generated and visible on PRs
+5. CI status badge displayed in README
+6. Failed CI blocks PR merge (via branch protection - optional follow-up)
+7. Poetry dependencies cached between runs for speed
+8. `LANGSMITH_TRACING=false` set to prevent accidental API calls
 
 ## 4. Alternatives Considered
 
 | Option | Pros | Cons | Decision |
 |--------|------|------|----------|
-| GitHub Actions with matrix | Native integration, free, supports matrix builds | Slightly verbose YAML | **Selected** |
-| CircleCI | Powerful, good caching | Requires external account, config complexity | Rejected |
-| Pre-commit hooks only | Runs before commit | Only local, no central verification | Rejected |
-| Single Python version | Simpler config, faster | May miss version-specific issues | Rejected |
+| Option A: Tiered by Trigger | Simple, predictable | PRs might miss integration bugs | Rejected |
+| Option B: Pytest Markers Only | Fine-grained control | Requires marking all 600 tests upfront | Rejected |
+| Option C: Changed Files Detection | Fast, targeted | Complex, might miss cross-cutting bugs | Rejected |
+| Option D: Hybrid (Trigger + Markers) | Balance of speed and safety, evolves over time | More complex workflow file | **Selected** |
 
-**Rationale:** GitHub Actions provides native integration with the repository, free minutes for public/private repos, and excellent support for matrix testing across Python versions.
+**Rationale:** Option D provides immediate value (fast PR feedback) while maintaining safety (full regression on main). The marker system can be incrementally adopted - not all 600 tests need markers on day one. Fast/slow/live markers will be added to specific tests as needed.
 
 ## 5. Data & Fixtures
 
@@ -119,33 +155,32 @@ CI Workflow Trigger:
 
 | Attribute | Value |
 |-----------|-------|
-| Source | Repository code and existing test fixtures |
-| Format | Python test files, pytest fixtures |
-| Size | Current test suite (~XX tests) |
-| Refresh | Every commit/PR |
-| Copyright/License | Project license (existing) |
+| Source | Existing test fixtures in `tests/` |
+| Format | Python test files, JSON fixtures |
+| Size | ~600 tests |
+| Refresh | Manual (developers update tests) |
+| Copyright/License | Project license (internal) |
 
 ### 5.2 Data Pipeline
 
 ```
-Code Push ──trigger──► GitHub Actions ──checkout──► Test Runner ──results──► Status Check
+tests/ ──pytest──► Test Results ──pytest-cov──► Coverage XML ──actions──► PR Comment/Badge
 ```
 
 ### 5.3 Test Fixtures
 
 | Fixture | Source | Notes |
 |---------|--------|-------|
-| Existing test mocks | Repository | Already present in codebase |
-| Environment variables | Workflow config | Set `LANGSMITH_TRACING=false` |
+| Existing test mocks | Already in codebase | No changes needed |
+| CI environment variables | GitHub Secrets | `LANGSMITH_TRACING=false` set in workflow |
 
 ### 5.4 Deployment Pipeline
 
-The CI workflow itself:
-- Development: Test changes in feature branch
-- Staging: PR triggers workflow (validates before merge)
-- Production: Push to main triggers workflow (validates after merge)
+- Workflow files committed to `.github/workflows/`
+- GitHub automatically detects and enables workflows on push
+- No manual deployment needed
 
-**If data source is external:** N/A - All tests use mocked data.
+**If data source is external:** N/A - tests use mocks
 
 ## 6. Diagram
 
@@ -167,44 +202,33 @@ Before finalizing any diagram, verify in [Mermaid Live Editor](https://mermaid.l
 - Flow clarity: [x] Clear / [ ] Issue: ___
 ```
 
+*Reference: [0006-mermaid-diagrams.md](0006-mermaid-diagrams.md)*
+
 ### 6.2 Diagram
 
 ```mermaid
-flowchart TB
+flowchart TD
     subgraph Triggers
-        A[Push to main]
-        B[Pull Request]
+        PR[Pull Request]
+        Push[Push to Main]
+        Nightly[Nightly Schedule]
     end
-    
-    subgraph "GitHub Actions Runner"
-        C[Checkout Code]
-        D[Setup Python Matrix]
-        
-        subgraph "Matrix Jobs"
-            E1[Python 3.10]
-            E2[Python 3.11]
-            E3[Python 3.12]
-        end
-        
-        F[Install Poetry]
-        G[Cache Dependencies]
-        H[Install Deps]
-        I[Run Tests + Coverage]
+
+    subgraph "CI Jobs"
+        PR --> FastTests["Fast Tests<br/>~2-3 min<br/>-m 'not slow and not live'"]
+        Push --> FullTests["Full Regression<br/>~20 min<br/>-m 'not live'"]
+        Nightly --> AllTests["All Tests + Live<br/>~25 min<br/>no exclusions"]
     end
-    
-    J[Upload Coverage Artifact]
-    K[Report Status]
-    
-    A --> C
-    B --> C
-    C --> D
-    D --> E1 & E2 & E3
-    E1 & E2 & E3 --> F
-    F --> G
-    G --> H
-    H --> I
-    I --> J
-    J --> K
+
+    subgraph "Outputs"
+        FastTests --> CovPR[Coverage on PR]
+        FullTests --> CovMain[Coverage Report]
+        AllTests --> CovFull[Full Report + Live Results]
+    end
+
+    CovPR --> Badge[README Badge]
+    CovMain --> Badge
+    CovFull --> Badge
 ```
 
 ## 7. Security & Safety Considerations
@@ -213,21 +237,21 @@ flowchart TB
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| Secret exposure | No secrets required for tests; use `LANGSMITH_TRACING=false` | Addressed |
-| Third-party action supply chain | Use pinned versions with SHA for actions | Addressed |
-| Fork PR security | Use `pull_request` not `pull_request_target` to avoid secret access | Addressed |
+| API key exposure | No secrets needed for mocked tests; live tests use GitHub Secrets | Addressed |
+| Fork PR security | Use `pull_request` not `pull_request_target` to avoid secret exposure | Addressed |
+| Malicious PR code | Sandboxed GitHub Actions runner, no write permissions | Addressed |
 
 ### 7.2 Safety
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| Workflow infinite loop | No workflow dispatch triggers, only push/PR | Addressed |
-| Resource exhaustion | Timeout set on jobs (default 6 hours, consider 30 min) | TODO |
-| Cache poisoning | Cache key includes poetry.lock hash | Addressed |
+| Accidental API calls | Set `LANGSMITH_TRACING=false` environment variable | Addressed |
+| CI cost overrun | GitHub Actions free tier sufficient; no paid API calls in PR tests | Addressed |
+| Test flakiness | Live tests isolated to nightly; won't block PRs | Addressed |
 
-**Fail Mode:** Fail Closed - Build fails on any test failure, PR cannot be merged
+**Fail Mode:** Fail Closed - Failed tests block merge (once branch protection enabled)
 
-**Recovery Strategy:** Failed workflows can be re-run manually; cache can be cleared if corrupted
+**Recovery Strategy:** Manual workflow re-run available; nightly failures logged but don't block development
 
 ## 8. Performance & Cost Considerations
 
@@ -235,175 +259,139 @@ flowchart TB
 
 | Metric | Budget | Approach |
 |--------|--------|----------|
-| Workflow Duration | < 10 minutes | Dependency caching, parallel matrix jobs |
-| Cache Hit Rate | > 90% | Key by poetry.lock hash |
-| Startup Time | < 2 minutes | Use official setup-python action with caching |
+| PR test time | < 5 min | Run only fast/unit tests on PRs |
+| Main test time | < 25 min | Full regression acceptable post-merge |
+| Cache hit rate | > 90% | Cache poetry virtualenv by lockfile hash |
 
-**Bottlenecks:** Initial dependency installation on cache miss (~2-3 min)
+**Bottlenecks:** 
+- Full test suite at ~20 min is acceptable for post-merge but not PR
+- Poetry install can be slow (~2 min) without caching
 
 ### 8.2 Cost Analysis
 
 | Resource | Unit Cost | Estimated Usage | Monthly Cost |
 |----------|-----------|-----------------|--------------|
-| GitHub Actions minutes (Linux) | Free (public repo) or $0.008/min | ~50 workflows × 10 min × 3 versions = 1500 min | $0 (public) or $12 |
-| Storage (cache) | Free up to 10GB | ~500MB Poetry cache | $0 |
-| Artifact storage | Free up to 500MB | ~10MB coverage reports | $0 |
+| GitHub Actions (public repo) | Free | ~50 workflow runs/day | $0 |
+| GitHub Actions (private repo) | $0.008/min Linux | ~500 min/month | ~$4/month |
+| Storage (artifacts) | Included | Coverage reports | $0 |
 
 **Cost Controls:**
-- [x] Caching reduces redundant work
-- [x] Matrix jobs run in parallel, not sequentially
-- [ ] Consider workflow concurrency limits if cost becomes concern
+- [x] Using free GitHub Actions minutes (public repo assumed)
+- [x] No paid API calls in automated tests
+- [x] Artifact retention limited to 7 days
 
-**Worst-Case Scenario:** Heavy PR activity (100 PRs/day) = 3000 workflow minutes = ~$24/month (private repo)
+**Worst-Case Scenario:** If usage spikes 10x, still within free tier for public repos. Private repos might hit ~$40/month which is acceptable.
 
 ## 9. Legal & Compliance
 
 | Concern | Applies? | Mitigation |
 |---------|----------|------------|
 | PII/Personal Data | No | Tests use mocked data only |
-| Third-Party Licenses | Yes | All GitHub Actions used are MIT/Apache licensed |
-| Terms of Service | Yes | Usage within GitHub Actions ToS |
-| Data Retention | N/A | Artifacts auto-expire after 90 days |
+| Third-Party Licenses | No | GitHub Actions is standard tooling |
+| Terms of Service | Yes | GitHub Actions usage within ToS |
+| Data Retention | N/A | Artifacts auto-expire after 7 days |
 | Export Controls | No | No restricted algorithms |
 
-**Data Classification:** Public - Workflow configuration and test results
+**Data Classification:** Internal (test results, coverage reports)
 
 **Compliance Checklist:**
 - [x] No PII stored without consent
 - [x] All third-party licenses compatible with project license
 - [x] External API usage compliant with provider ToS
-- [x] Data retention policy documented (GitHub default 90 days)
+- [x] Data retention policy documented (7-day artifact expiry)
 
 ## 10. Verification & Testing
+
+### 10.0 Test Plan (TDD - Complete Before Implementation)
+
+**TDD Requirement:** For infrastructure/CI changes, "tests" are verification that the workflows execute correctly.
+
+| Test ID | Test Description | Expected Behavior | Status |
+|---------|------------------|-------------------|--------|
+| T010 | PR workflow triggers on PR | Workflow starts, runs fast tests | RED |
+| T020 | Push workflow triggers on main | Workflow starts, runs full regression | RED |
+| T030 | Nightly workflow runs on schedule | Workflow includes live tests | RED |
+| T040 | Coverage report appears on PR | Coverage comment or status check visible | RED |
+| T050 | Badge updates in README | Badge reflects latest CI status | RED |
+| T060 | Poetry cache works | Subsequent runs faster than first | RED |
+
+**Coverage Target:** N/A for workflow files; underlying tests maintain ≥95%
+
+**TDD Checklist:**
+- [ ] Test PRs created to verify each workflow
+- [ ] Tests currently RED (workflows not yet implemented)
+- [ ] Verification plan documented below
 
 ### 10.1 Test Scenarios
 
 | ID | Scenario | Type | Input | Expected Output | Pass Criteria |
 |----|----------|------|-------|-----------------|---------------|
-| 010 | Push to main triggers workflow | Auto | Push commit to main | Workflow runs | Workflow status shown in commit |
-| 020 | PR triggers workflow | Auto | Open PR to main | Workflow runs | PR shows check status |
-| 030 | All Python versions tested | Auto | Any trigger | 3 matrix jobs complete | Jobs for 3.10, 3.11, 3.12 all pass |
-| 040 | Tests pass without API keys | Auto | Standard test run | All tests pass | Exit code 0 |
-| 050 | Coverage report generated | Auto | Test completion | Coverage artifact uploaded | Artifact visible in workflow |
-| 060 | Cache works on second run | Auto | Repeat workflow | Cache hit | "Cache restored" in logs |
-| 070 | README badge displays | Manual | View README | Badge shows status | Badge renders with correct status |
+| 010 | PR opens | Auto | New PR | Fast tests run, coverage reported | Workflow completes successfully |
+| 020 | PR updates | Auto | Push to PR branch | Fast tests re-run | Workflow triggers on synchronize |
+| 030 | Merge to main | Auto | PR merged | Full regression runs | All non-live tests pass |
+| 040 | Nightly schedule | Auto | 6 AM UTC trigger | All tests including live | Workflow runs on schedule |
+| 050 | Manual dispatch | Auto | workflow_dispatch | All tests run | Can trigger manually |
+| 060 | Cache hit | Auto | Second PR run | Faster install time | Poetry install < 30s on cache hit |
+| 070 | Test failure | Auto | Failing test in PR | PR blocked | Status check fails |
+| 080 | Coverage threshold | Auto | PR with low coverage | Warning or failure | Coverage gate enforced |
 
 ### 10.2 Test Commands
 
 ```bash
-# Local validation of workflow syntax
-act -n  # Dry run with act tool (optional)
+# Verify workflow syntax locally (requires act or similar)
+act pull_request --dryrun
 
-# Verify tests run locally with same settings
-LANGSMITH_TRACING=false poetry run pytest --cov -v
+# Verify pytest markers work
+poetry run pytest --collect-only -m "not slow and not live"
+poetry run pytest --collect-only -m "not live"
+poetry run pytest --collect-only -m "live"
 
-# Validate YAML syntax
-python -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"
+# Manual verification after deployment
+# 1. Open test PR → verify fast tests run
+# 2. Merge PR → verify full tests run
+# 3. Wait for nightly → verify all tests run
 ```
 
 ### 10.3 Manual Tests (Only If Unavoidable)
 
 | ID | Scenario | Why Not Automated | Steps |
 |----|----------|-------------------|-------|
-| 070 | README badge displays | Requires visual verification of rendered markdown | 1. Navigate to GitHub repo README 2. Verify badge shows and links to Actions |
+| M010 | Visual badge check | Requires human verification of badge appearance | 1. Open README in browser 2. Verify badge shows and links to CI |
+| M020 | Schedule verification | Cannot accelerate time in CI | 1. Wait for 6 AM UTC 2. Verify nightly workflow triggered |
 
 ## 11. Risks & Mitigations
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| Tests fail due to missing env vars | Med | Med | Document required env vars, set `LANGSMITH_TRACING=false` |
-| Poetry cache corruption | Low | Low | Cache key includes lock file hash; can manually clear |
-| GitHub Actions outage | Low | Low | Tests can still be run locally; monitor GitHub status |
-| Slow workflow times | Low | Med | Implement caching, monitor run times |
-| Flaky tests | Med | Unknown | Mark flaky tests, investigate and fix |
+| Workflow syntax errors | Med | Med | Use `act` for local testing; start with simple workflow |
+| Test marker migration burden | Low | Med | Adopt markers incrementally; default to running tests |
+| Flaky tests block PRs | High | Low | Live tests excluded from PR runs; address flakiness as found |
+| Cache invalidation issues | Low | Low | Include lockfile hash in cache key |
+| GitHub Actions outage | Med | Low | No mitigation needed; external dependency |
 
 ## 12. Definition of Done
 
 ### Code
-- [ ] `.github/workflows/ci.yml` created and committed
-- [ ] README.md updated with CI status badge
-- [ ] `pyproject.toml` includes pytest-cov dependency
+- [ ] `.github/workflows/ci.yml` implemented and working
+- [ ] `.github/workflows/nightly.yml` implemented and working
+- [ ] `pyproject.toml` updated with pytest markers
+- [ ] `conftest.py` updated with marker registration
+- [ ] README badge added
 
 ### Tests
-- [ ] Workflow runs successfully on PR
-- [ ] All matrix jobs (Python 3.10, 3.11, 3.12) pass
-- [ ] Coverage report artifact uploaded
+- [ ] PR workflow verified with test PR
+- [ ] Push workflow verified with merge to main
+- [ ] Nightly workflow verified (or manual dispatch tested)
+- [ ] Coverage reporting working
 
 ### Documentation
 - [ ] LLD updated with any deviations
 - [ ] Implementation Report (0103) completed
+- [ ] CI strategy documented in README or CONTRIBUTING.md
 
 ### Review
 - [ ] Code review completed
-- [ ] Workflow tested on feature branch PR
 - [ ] User approval before closing issue
-
----
-
-## Appendix: Workflow Configuration
-
-### Proposed `.github/workflows/ci.yml`
-
-```yaml
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11", "3.12"]
-      fail-fast: false
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-      
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            venv-${{ runner.os }}-${{ matrix.python-version }}-
-      
-      - name: Install dependencies
-        run: poetry install --no-interaction
-      
-      - name: Run tests with coverage
-        env:
-          LANGSMITH_TRACING: "false"
-        run: poetry run pytest --cov --cov-report=xml --cov-report=term -v
-      
-      - name: Upload coverage artifact
-        if: matrix.python-version == '3.11'
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage.xml
-```
-
-### Proposed README Badge
-
-```markdown
-[![CI](https://github.com/{owner}/{repo}/actions/workflows/ci.yml/badge.svg)](https://github.com/{owner}/{repo}/actions/workflows/ci.yml)
-```
 
 ---
 
@@ -415,6 +403,115 @@ jobs:
 
 | Review | Date | Verdict | Key Issue |
 |--------|------|---------|-----------|
-| - | - | - | No reviews yet |
+| - | - | - | Awaiting initial review |
 
 **Final Status:** PENDING
+
+---
+
+## Appendix: Workflow File Drafts
+
+### ci.yml (Draft)
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+env:
+  LANGSMITH_TRACING: "false"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+      
+      - name: Install dependencies
+        run: poetry install --no-interaction
+      
+      - name: Run tests (PR - fast only)
+        if: github.event_name == 'pull_request'
+        run: poetry run pytest -m "not slow and not live" --cov --cov-report=xml -v
+      
+      - name: Run tests (main - full regression)
+        if: github.event_name == 'push'
+        run: poetry run pytest -m "not live" --cov --cov-report=xml -v
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+```
+
+### nightly.yml (Draft)
+
+```yaml
+name: Nightly
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # 6 AM UTC daily
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  LANGSMITH_TRACING: "false"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  test-full:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+      
+      - name: Install dependencies
+        run: poetry install --no-interaction
+      
+      - name: Run all tests (including live)
+        run: poetry run pytest --cov --cov-report=xml -v
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+```
