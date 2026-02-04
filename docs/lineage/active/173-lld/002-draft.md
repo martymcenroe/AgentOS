@@ -1,23 +1,22 @@
-# 173 - Feature: TDD Workflow Safe File Write with Merge Protection
+# 173 - Feature: TDD Workflow Safe File Write with Merge Support
 
 <!-- Template Metadata
-Last Updated: 2025-01-XX
-Updated By: LLD creation for Issue #173
-Update Reason: Initial LLD creation for safe file write functionality
+Last Updated: 2025-01-09
+Updated By: Claude Agent
+Update Reason: Initial LLD creation for Issue #173
 -->
 
 ## 1. Context & Goal
 * **Issue:** #173
-* **Objective:** Prevent TDD workflow from silently overwriting existing files by implementing merge detection and approval requirements
+* **Objective:** Prevent TDD workflow from silently overwriting existing files by implementing merge detection and approval workflow
 * **Status:** Draft
 * **Related Issues:** #168 (Bug caused by silent file replacement), PR #165 (The breaking change)
 
 ### Open Questions
-*Questions that need clarification before or during implementation. Remove when resolved.*
 
-- [ ] Should the 100-line threshold be configurable via workflow settings?
-- [ ] What merge strategy should be the default when multiple are applicable?
-- [ ] Should merge history be persisted for audit/rollback purposes?
+- [ ] Should the 100-line threshold be configurable per-project or globally?
+- [ ] Should merge strategies be selectable via CLI flags or interactive prompt?
+- [ ] What behavior in --auto mode: fail-fast, skip file, or require explicit override flag?
 
 ## 2. Proposed Changes
 
@@ -27,52 +26,52 @@ Update Reason: Initial LLD creation for safe file write functionality
 
 | File | Change Type | Description |
 |------|-------------|-------------|
-| `src/workflow/nodes/safe_file_write.py` | Add | New node for file write protection |
-| `src/workflow/nodes/__init__.py` | Modify | Export new safe_file_write node |
-| `src/workflow/merge_strategies.py` | Add | Merge strategy implementations |
-| `src/workflow/state.py` | Modify | Add file_write_proposals to state |
-| `src/workflow/tdd_workflow.py` | Modify | Insert safe_file_write node before file writes |
+| `src/codegen/agents/tdd/nodes/safe_file_write.py` | Add | New LangGraph node for safe file operations |
+| `src/codegen/agents/tdd/nodes/__init__.py` | Modify | Export new safe_file_write node |
+| `src/codegen/agents/tdd/graph.py` | Modify | Insert safe_file_write node before file operations |
+| `src/codegen/agents/tdd/state.py` | Modify | Add merge-related state fields |
+| `src/codegen/agents/tdd/merge_strategies.py` | Add | Merge strategy implementations |
+| `src/codegen/agents/tdd/diff_display.py` | Add | Diff visualization utilities |
 | `tests/unit/test_safe_file_write.py` | Add | Unit tests for safe file write |
 | `tests/unit/test_merge_strategies.py` | Add | Unit tests for merge strategies |
 
 ### 2.2 Dependencies
 
-*No new packages required. Uses existing difflib from standard library.*
-
 ```toml
 # pyproject.toml additions (if any)
-# None - using standard library difflib
+# No new dependencies - using stdlib difflib
 ```
 
 ### 2.3 Data Structures
 
 ```python
 # Pseudocode - NOT implementation
+from typing import TypedDict, Literal
+from pathlib import Path
+
 class FileWriteProposal(TypedDict):
-    path: Path                    # Target file path
-    new_content: str              # Proposed content to write
-    existing_content: str | None  # Current file content if exists
-    merge_strategy: MergeStrategy # Proposed strategy
-    requires_approval: bool       # True if human must approve
-    deletion_preview: list[str]   # Lines that will be deleted
+    file_path: Path              # Target file path
+    new_content: str             # Proposed new content
+    existing_content: str | None # Current content if file exists
+    existing_lines: int          # Line count of existing file (0 if new)
+    new_lines: int               # Line count of proposed content
+    requires_approval: bool      # True if file has >100 lines
+    merge_strategy: MergeStrategy | None  # Selected strategy
 
-class MergeStrategy(Enum):
-    APPEND = "append"       # Add to end of file
-    INSERT = "insert"       # Add at specific location
-    EXTEND = "extend"       # Add fields/methods to class
-    REPLACE = "replace"     # Full replacement
+MergeStrategy = Literal["append", "insert", "extend", "replace"]
 
-class FileWriteDecision(TypedDict):
-    proposal: FileWriteProposal
-    approved: bool
-    merged_content: str | None    # Result of merge if applicable
-    rejection_reason: str | None
+class MergeDecision(TypedDict):
+    file_path: Path              # Which file
+    strategy: MergeStrategy      # How to merge
+    approved: bool               # Human approved?
+    insertion_point: int | None  # Line number for insert strategy
 
-class WorkflowState(TypedDict):
+class TDDWorkflowState(TypedDict):
     # ... existing fields ...
-    file_write_proposals: list[FileWriteProposal]
-    file_write_decisions: list[FileWriteDecision]
-    pending_approval: bool        # True if awaiting human input
+    proposed_writes: list[FileWriteProposal]    # Pending file operations
+    merge_decisions: list[MergeDecision]        # Human decisions
+    auto_mode: bool                              # Running in --auto mode
+    force_replace: bool                          # Explicit --force flag
 ```
 
 ### 2.4 Function Signatures
@@ -81,116 +80,135 @@ class WorkflowState(TypedDict):
 # Signatures only - implementation in source files
 
 # safe_file_write.py
-def check_file_write_safety(state: WorkflowState) -> dict:
-    """Analyze proposed file writes for merge requirements."""
+def safe_file_write_node(state: TDDWorkflowState) -> dict:
+    """LangGraph node: Check files before writing, request approval if needed."""
     ...
 
-def generate_deletion_preview(existing: str, proposed: str) -> list[str]:
-    """Generate list of lines that will be deleted."""
+def analyze_file_write(file_path: Path, new_content: str) -> FileWriteProposal:
+    """Analyze a proposed file write and determine if approval is needed."""
     ...
 
-def request_merge_approval(proposal: FileWriteProposal) -> bool:
-    """Present diff and request human approval for replacement."""
-    ...
-
-def execute_approved_writes(state: WorkflowState) -> dict:
-    """Execute only approved file writes."""
+def check_approval_required(existing_lines: int, new_lines: int) -> bool:
+    """Determine if human approval is required based on line counts."""
     ...
 
 # merge_strategies.py
+def apply_merge_strategy(
+    existing: str, 
+    new: str, 
+    strategy: MergeStrategy,
+    insertion_point: int | None = None
+) -> str:
+    """Apply the selected merge strategy to combine existing and new content."""
+    ...
+
 def merge_append(existing: str, new: str) -> str:
     """Append new content to end of existing file."""
     ...
 
-def merge_insert(existing: str, new: str, location: int) -> str:
+def merge_insert(existing: str, new: str, line_number: int) -> str:
     """Insert new content at specific line number."""
     ...
 
-def merge_extend_class(existing: str, new: str, class_name: str) -> str:
-    """Add new fields/methods to existing class definition."""
+def merge_extend_class(existing: str, new: str) -> str:
+    """Intelligently merge new methods/fields into existing class."""
     ...
 
-def detect_merge_strategy(existing: str, new: str) -> MergeStrategy:
-    """Analyze content to suggest appropriate merge strategy."""
+# diff_display.py
+def generate_diff(existing: str, new: str) -> str:
+    """Generate unified diff showing changes."""
     ...
 
-def calculate_content_overlap(existing: str, new: str) -> float:
-    """Calculate similarity ratio between existing and new content."""
+def format_deletion_warning(file_path: Path, existing_lines: int, new_lines: int) -> str:
+    """Format warning message about potential data loss."""
+    ...
+
+def display_merge_prompt(proposal: FileWriteProposal) -> MergeDecision:
+    """Interactive prompt for user to select merge strategy."""
     ...
 ```
 
 ### 2.5 Logic Flow (Pseudocode)
 
 ```
-1. Receive file write request from TDD workflow
-2. FOR each proposed file write:
-   a. Check if file exists at path
-   b. IF file does not exist:
-      - Mark as safe to write (no approval needed)
-      - CONTINUE
-   c. Read existing content
-   d. IF existing content <= 100 lines:
-      - Mark as safe to write (trivial file)
-      - CONTINUE
-   e. Generate deletion preview (lines to be removed)
-   f. Detect suggested merge strategy
-   g. IF in --auto mode AND strategy == REPLACE:
-      - BLOCK write (cannot silently replace in auto mode)
-      - Add to pending_approval list
-      - CONTINUE
-   h. IF interactive mode:
-      - Display diff
-      - Display deletion count warning
-      - Request approval or merge strategy selection
-      - Record decision
-3. Execute approved writes
-4. Return updated state with write results
+1. Receive proposed file writes from TDD generation
+2. FOR each proposed write:
+   a. Check if file exists
+   b. IF file exists:
+      - Read existing content
+      - Count existing lines
+      - IF existing_lines > 100:
+        * Mark as requires_approval = True
+        * Generate diff
+        * Calculate deletion impact
+   c. Add to proposed_writes list
+
+3. IF any writes require approval:
+   a. IF auto_mode AND NOT force_replace:
+      - RAISE SafeFileWriteError("Cannot replace non-trivial files in auto mode")
+   b. ELSE:
+      - FOR each requiring approval:
+        * Display warning: "About to replace {N} lines with {M} lines"
+        * Show what will be DELETED (red)
+        * Show what will be ADDED (green)
+        * Prompt for merge strategy selection
+        * Record decision
+
+4. FOR each approved write:
+   a. IF strategy == "replace":
+      - Write new content directly
+   b. ELSE:
+      - Apply merge strategy
+      - Write merged content
+
+5. Return updated state with write results
 ```
 
 ### 2.6 Technical Approach
 
-* **Module:** `src/workflow/nodes/safe_file_write.py`
-* **Pattern:** Guard node in LangGraph workflow (interceptor pattern)
+* **Module:** `src/codegen/agents/tdd/nodes/`
+* **Pattern:** LangGraph node with state machine for approval workflow
 * **Key Decisions:** 
-  - 100-line threshold chosen to ignore boilerplate/generated files
-  - Deletion preview prioritized over full diff for clarity
-  - Auto mode blocks replacements entirely (fail-safe)
+  - Using 100 lines as threshold (balances safety vs. noise)
+  - Blocking in --auto mode (fail-safe default)
+  - Unified diff format (familiar to developers)
 
 ### 2.7 Architecture Decisions
 
 | Decision | Options Considered | Choice | Rationale |
 |----------|-------------------|--------|-----------|
-| Threshold trigger | Line count, File size, Content hash | Line count (100) | Simple, predictable, matches human intuition |
-| Default behavior | Allow with warning, Block, Require approval | Require approval | Fail-safe prevents data loss |
-| Merge detection | AST analysis, Regex patterns, Diff similarity | Diff similarity + heuristics | Works across languages, no parser deps |
-| State storage | In workflow state, Temp files, Database | Workflow state | Consistent with LangGraph patterns |
+| Approval threshold | Fixed 100 lines, Configurable, Percentage-based | Fixed 100 lines | Simple, predictable, covers most real-world cases |
+| Auto mode behavior | Skip files, Fail-fast, Require flag | Fail-fast with --force override | Prevents silent data loss, explicit consent required |
+| Diff library | difflib (stdlib), unidiff, custom | difflib (stdlib) | No new dependencies, sufficient for use case |
+| Merge strategies | Simple append only, Full AST-based, Pattern-based | Pattern-based with AST for extend | Balance between simplicity and usefulness |
 
 **Architectural Constraints:**
-- Must integrate with existing LangGraph workflow structure
-- Cannot introduce new external dependencies
-- Must work with existing human-in-the-loop patterns
+- Must integrate with existing LangGraph workflow without breaking changes
+- Cannot introduce external dependencies (use stdlib only)
+- Must work with both sync and async execution modes
 
 ## 3. Requirements
 
 *What must be true when this is done. These become acceptance criteria.*
 
-1. TDD workflow detects existing files before any write operation
-2. Files with >100 lines of existing content require explicit merge approval
-3. Diff display shows what will be DELETED if replacement occurs
-4. Auto mode (--auto) cannot silently replace files with >100 lines
-5. Four merge strategies available: Append, Insert, Extend, Replace
-6. All file write decisions are recorded in workflow state for audit
+1. TDD workflow detects existing files before write operations
+2. Files with >100 lines require explicit merge approval before modification
+3. User sees clear diff showing what will be DELETED and ADDED
+4. Auto mode (--auto) cannot silently replace non-trivial files
+5. Four merge strategies available: append, insert, extend, replace
+6. Force flag (--force) allows explicit replacement in auto mode
+7. All file operations are logged for audit purposes
 
 ## 4. Alternatives Considered
 
 | Option | Pros | Cons | Decision |
 |--------|------|------|----------|
-| Pre-write backup with rollback | Simple, reversible | Doesn't prevent mistake, reactive | **Rejected** |
-| AST-aware merging | Precise, language-aware | Complex, multi-language support needed | **Rejected** |
-| Diff-based guard node | Proactive, shows impact | Requires approval flow | **Selected** |
-| Git integration (stash/restore) | Familiar, reliable | External dep, not all projects use git | **Rejected** |
+| Pre-write node in LangGraph | Clean integration, state-based | Requires workflow changes | **Selected** |
+| File system wrapper/decorator | Non-invasive, global protection | Hidden behavior, harder to test | Rejected |
+| Git-based backup before write | Full recovery possible | Requires git, complex rollback UX | Rejected |
+| AST-based intelligent merge | Perfect semantic merges | Complex, language-specific, slow | Rejected |
 
-**Rationale:** Diff-based guard node is proactive (prevents damage before it happens), shows clear impact to user, and integrates cleanly with existing LangGraph workflow without external dependencies.
+**Rationale:** LangGraph node approach provides explicit control flow, easy testing, and clean integration with existing TDD workflow state management.
 
 ## 5. Data & Fixtures
 
@@ -199,48 +217,52 @@ def calculate_content_overlap(existing: str, new: str) -> float:
 | Attribute | Value |
 |-----------|-------|
 | Source | Local filesystem (existing files) |
-| Format | Text files (Python, JSON, etc.) |
-| Size | Varies (test fixtures: 50-500 lines) |
-| Refresh | Real-time (read on demand) |
-| Copyright/License | N/A - user's own files |
+| Format | Text files (Python, TypeScript, etc.) |
+| Size | Typically 50-1000 lines per file |
+| Refresh | Real-time (read before each write) |
+| Copyright/License | N/A (user's own code) |
 
 ### 5.2 Data Pipeline
 
 ```
-Workflow State ──reads──► Proposed Writes ──analyze──► Safety Check ──approval──► File System
+TDD Generator ──proposed content──► Safe File Write Node ──check──► Filesystem
+                                           │
+                                           ▼
+                                    Diff Generator
+                                           │
+                                           ▼
+                                    User Approval ──decision──► Merge Strategy ──write──► Filesystem
 ```
 
 ### 5.3 Test Fixtures
 
 | Fixture | Source | Notes |
 |---------|--------|-------|
-| `large_state.py` (270 lines) | Generated | Simulates the original incident |
-| `small_config.py` (50 lines) | Generated | Below threshold, should pass |
-| `class_to_extend.py` (150 lines) | Generated | Tests EXTEND merge strategy |
-| `proposed_replacement.py` (56 lines) | Generated | The problematic new content |
+| `fixtures/existing_state_270_lines.py` | Generated | Simulates real state.py that was overwritten |
+| `fixtures/new_state_56_lines.py` | Generated | Simulates TDD-generated replacement |
+| `fixtures/simple_class.py` | Hardcoded | Basic class for merge testing |
+| `fixtures/complex_class.py` | Hardcoded | Multi-method class for extend testing |
 
 ### 5.4 Deployment Pipeline
 
-Test fixtures are generated during test setup and cleaned up after. No persistent test data required.
+Tests use temporary directories; no production data concerns. Fixtures are committed to repo under `tests/fixtures/`.
 
 ## 6. Diagram
 
 ### 6.1 Mermaid Quality Gate
 
-Before finalizing any diagram, verify in [Mermaid Live Editor](https://mermaid.live) or GitHub preview:
-
-- [x] **Simplicity:** Similar components collapsed (per 0006 §8.1)
-- [x] **No touching:** All elements have visual separation (per 0006 §8.2)
-- [x] **No hidden lines:** All arrows fully visible (per 0006 §8.3)
+- [x] **Simplicity:** Similar components collapsed
+- [x] **No touching:** All elements have visual separation
+- [x] **No hidden lines:** All arrows fully visible
 - [x] **Readable:** Labels not truncated, flow direction clear
-- [ ] **Auto-inspected:** Agent rendered via mermaid.ink and viewed (per 0006 §8.5)
+- [ ] **Auto-inspected:** Agent rendered via mermaid.ink and viewed
 
 **Auto-Inspection Results:**
 ```
-- Touching elements: [x] None / [ ] Found: ___
-- Hidden lines: [x] None / [ ] Found: ___
-- Label readability: [x] Pass / [ ] Issue: ___
-- Flow clarity: [x] Clear / [ ] Issue: ___
+- Touching elements: [ ] None / [x] Found: N/A - inspection pending
+- Hidden lines: [ ] None / [x] Found: N/A - inspection pending
+- Label readability: [ ] Pass / [x] Issue: N/A - inspection pending
+- Flow clarity: [ ] Clear / [x] Issue: N/A - inspection pending
 ```
 
 ### 6.2 Diagram
@@ -248,33 +270,37 @@ Before finalizing any diagram, verify in [Mermaid Live Editor](https://mermaid.l
 ```mermaid
 flowchart TD
     subgraph TDD["TDD Workflow"]
-        A[Generate Code] --> B[Propose File Write]
+        GEN[Generate Code]
+        SAFE[Safe File Write Node]
+        WRITE[Write Files]
     end
     
-    subgraph Guard["Safe File Write Node"]
-        B --> C{File Exists?}
-        C -->|No| D[Safe: Create New]
-        C -->|Yes| E[Read Existing]
-        E --> F{Lines > 100?}
-        F -->|No| G[Safe: Trivial File]
-        F -->|Yes| H[Generate Diff]
-        H --> I{Auto Mode?}
-        I -->|Yes| J[BLOCK: Require Approval]
-        I -->|No| K[Show Deletion Preview]
-        K --> L{User Decision}
-        L -->|Approve Replace| M[Execute Replace]
-        L -->|Select Merge| N[Apply Merge Strategy]
-        L -->|Reject| O[Abort Write]
+    subgraph SafeWrite["Safe File Write Logic"]
+        CHECK{File Exists?}
+        READ[Read Existing]
+        COUNT{Lines > 100?}
+        DIFF[Generate Diff]
+        AUTO{Auto Mode?}
+        FORCE{--force Flag?}
+        PROMPT[User Approval]
+        MERGE[Apply Strategy]
+        FAIL[Fail with Error]
     end
     
-    subgraph Output["Results"]
-        D --> P[Write File]
-        G --> P
-        M --> P
-        N --> P
-        J --> Q[Pending Approval]
-        O --> R[Write Skipped]
-    end
+    GEN --> SAFE
+    SAFE --> CHECK
+    CHECK -->|No| WRITE
+    CHECK -->|Yes| READ
+    READ --> COUNT
+    COUNT -->|No| WRITE
+    COUNT -->|Yes| DIFF
+    DIFF --> AUTO
+    AUTO -->|No| PROMPT
+    AUTO -->|Yes| FORCE
+    FORCE -->|Yes| PROMPT
+    FORCE -->|No| FAIL
+    PROMPT --> MERGE
+    MERGE --> WRITE
 ```
 
 ## 7. Security & Safety Considerations
@@ -283,21 +309,24 @@ flowchart TD
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| Path traversal | Validate paths stay within project directory | TODO |
-| Symlink attacks | Resolve symlinks before comparison | TODO |
+| Path traversal in file paths | Validate paths are within project root | TODO |
+| Arbitrary code execution via content | Content is user-generated, treat as trusted | Addressed |
 
 ### 7.2 Safety
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| Data loss on replacement | Require explicit approval, show deletion count | Addressed |
-| Silent overwrites in auto mode | Block all replacements of >100 line files | Addressed |
-| Partial write failure | Write to temp file, atomic rename | TODO |
-| Race condition on file read | Lock file during check-write cycle | TODO |
+| Accidental data loss (primary concern) | Require approval for >100 line files | Addressed |
+| Partial write corruption | Use atomic write (write to temp, rename) | TODO |
+| Merge strategy produces invalid code | Show preview, require explicit approval | Addressed |
+| Resource exhaustion from large files | Limit diff generation to first 10KB | TODO |
 
-**Fail Mode:** Fail Closed - When in doubt, block the write and require human approval
+**Fail Mode:** Fail Closed - If any uncertainty, abort write and request clarification
 
-**Recovery Strategy:** All proposed writes are stored in workflow state. If a write fails mid-operation, the state contains the intended content for retry.
+**Recovery Strategy:** 
+1. All replaced files are logged with original content hash
+2. Git history provides recovery path
+3. Future enhancement: automatic backup before modification
 
 ## 8. Performance & Cost Considerations
 
@@ -305,35 +334,37 @@ flowchart TD
 
 | Metric | Budget | Approach |
 |--------|--------|----------|
-| Latency per file check | < 50ms | difflib is fast for typical file sizes |
-| Memory | < 10MB additional | Only hold 2 file contents in memory at once |
-| I/O operations | 2 per file (read existing, write new) | Minimal overhead |
+| Latency per file check | < 10ms | Simple file read and line count |
+| Memory for diff | < 10MB | Stream large files, limit diff size |
+| Interactive prompt | < 100ms | Simple terminal I/O |
 
-**Bottlenecks:** Very large files (>10K lines) may slow diff generation. Consider streaming diff for files >5K lines.
+**Bottlenecks:** 
+- Very large files (>10K lines) may slow diff generation
+- Many files requiring approval could slow workflow
 
 ### 8.2 Cost Analysis
 
 | Resource | Unit Cost | Estimated Usage | Monthly Cost |
 |----------|-----------|-----------------|--------------|
-| Local compute | $0 | N/A | $0 |
-| No external APIs | $0 | N/A | $0 |
+| Compute | N/A | Local execution | $0 |
+| Storage | N/A | No additional storage | $0 |
 
 **Cost Controls:**
-- N/A - All operations are local
+- N/A - Local execution only
 
-**Worst-Case Scenario:** Large refactoring affecting 100+ files would require 100+ approvals in interactive mode. Consider batch approval UX for this case.
+**Worst-Case Scenario:** Workflow with 100 files all requiring approval would be slow but functional.
 
 ## 9. Legal & Compliance
 
 | Concern | Applies? | Mitigation |
 |---------|----------|------------|
-| PII/Personal Data | No | Only processes user's own source code |
-| Third-Party Licenses | No | No new dependencies |
-| Terms of Service | No | Local operation only |
-| Data Retention | No | No data persisted beyond session |
-| Export Controls | No | Standard text processing |
+| PII/Personal Data | No | Only processes user's own code |
+| Third-Party Licenses | No | Uses only stdlib |
+| Terms of Service | No | Local execution |
+| Data Retention | No | No data stored beyond session |
+| Export Controls | No | General-purpose software tool |
 
-**Data Classification:** Internal (user's source code)
+**Data Classification:** Internal (user's own project code)
 
 **Compliance Checklist:**
 - [x] No PII stored without consent
@@ -349,15 +380,16 @@ flowchart TD
 
 | Test ID | Test Description | Expected Behavior | Status |
 |---------|------------------|-------------------|--------|
-| T010 | test_new_file_no_approval | New files write without approval | RED |
-| T020 | test_small_file_no_approval | Files ≤100 lines write without approval | RED |
-| T030 | test_large_file_requires_approval | Files >100 lines require approval | RED |
-| T040 | test_auto_mode_blocks_replace | Auto mode blocks large file replacement | RED |
-| T050 | test_deletion_preview_accurate | Preview shows correct deleted lines | RED |
-| T060 | test_merge_append | Append strategy works correctly | RED |
-| T070 | test_merge_insert | Insert strategy works correctly | RED |
-| T080 | test_merge_extend | Extend strategy works correctly | RED |
-| T090 | test_approval_recorded | Decisions recorded in state | RED |
+| T010 | test_new_file_no_approval_needed | New file writes without prompting | RED |
+| T020 | test_small_file_no_approval_needed | Existing file <100 lines writes without prompting | RED |
+| T030 | test_large_file_requires_approval | Existing file >100 lines blocks for approval | RED |
+| T040 | test_auto_mode_blocks_large_file | Auto mode raises error for large file | RED |
+| T050 | test_auto_mode_force_flag_allows | Auto mode with --force allows replacement | RED |
+| T060 | test_merge_append_strategy | Append adds content to end | RED |
+| T070 | test_merge_insert_strategy | Insert adds content at line N | RED |
+| T080 | test_merge_extend_strategy | Extend merges class members | RED |
+| T090 | test_diff_shows_deletions | Diff correctly shows deleted lines | RED |
+| T100 | test_diff_shows_additions | Diff correctly shows added lines | RED |
 
 **Coverage Target:** ≥95% for all new code
 
@@ -371,16 +403,18 @@ flowchart TD
 
 | ID | Scenario | Type | Input | Expected Output | Pass Criteria |
 |----|----------|------|-------|-----------------|---------------|
-| 010 | New file creation | Auto | Path that doesn't exist | Write proceeds, no approval | File created |
-| 020 | Small file replacement | Auto | 50-line existing file | Write proceeds, no approval | File updated |
-| 030 | Large file replacement interactive | Auto | 270-line file, interactive mode | Approval prompt shown | Prompt displayed |
-| 040 | Large file replacement auto mode | Auto | 270-line file, --auto flag | Write blocked | Error state set |
-| 050 | Deletion preview generation | Auto | 270→56 line replacement | 214 lines in preview | Preview accurate |
-| 060 | Append merge strategy | Auto | Existing + new content | Combined content | Content appended |
-| 070 | Insert merge strategy | Auto | Content, line number | Content inserted | Correct position |
-| 080 | Extend class strategy | Auto | Class with new methods | Class extended | Methods added |
-| 090 | Decision audit trail | Auto | Approved write | Decision in state | State updated |
-| 100 | Rejection flow | Auto | User rejects | Write skipped | No file change |
+| 010 | New file creation | Auto | Non-existent path + content | File created | File exists with content |
+| 020 | Small existing file (<100 lines) | Auto | 50-line file + new content | File replaced | No approval prompt |
+| 030 | Large existing file (>100 lines) | Auto | 150-line file + new content | Approval requested | Prompt displayed |
+| 040 | Auto mode large file | Auto | --auto flag + 150-line file | SafeFileWriteError | Error raised |
+| 050 | Auto mode with --force | Auto | --auto --force + 150-line file | File replaced | File updated |
+| 060 | Merge append strategy | Auto | Existing + new, strategy=append | Combined content | New at end |
+| 070 | Merge insert at line 50 | Auto | Existing + new, line=50 | Combined content | New at line 50 |
+| 080 | Merge extend class | Auto | Class + new methods | Extended class | Methods added |
+| 090 | Diff generation deletions | Auto | 270-line → 56-line | Diff output | Shows -214 lines |
+| 100 | Diff generation additions | Auto | 50-line → 100-line | Diff output | Shows +50 lines |
+| 110 | Boundary: exactly 100 lines | Auto | 100-line file | No approval | Threshold is > not >= |
+| 120 | Boundary: exactly 101 lines | Auto | 101-line file | Approval required | Threshold triggered |
 
 ### 10.2 Test Commands
 
@@ -392,33 +426,33 @@ poetry run pytest tests/unit/test_safe_file_write.py tests/unit/test_merge_strat
 poetry run pytest tests/unit/test_safe_file_write.py -v -m "not live"
 
 # Run with coverage
-poetry run pytest tests/unit/test_safe_file_write.py --cov=src/workflow/nodes/safe_file_write --cov-report=term-missing
+poetry run pytest tests/unit/test_safe_file_write.py --cov=src/codegen/agents/tdd/nodes/safe_file_write --cov-report=term-missing
 ```
 
 ### 10.3 Manual Tests (Only If Unavoidable)
 
 | ID | Scenario | Why Not Automated | Steps |
 |----|----------|-------------------|-------|
-| M010 | Interactive approval UX | Requires human judgment on clarity | 1. Run TDD workflow on existing file 2. Verify diff is readable 3. Confirm deletion count visible |
+| M01 | Interactive merge prompt UX | Requires human evaluation of prompt clarity | 1. Run TDD on file >100 lines. 2. Verify prompt shows diff clearly. 3. Verify strategy options are understandable. |
 
 ## 11. Risks & Mitigations
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| False positives (blocking valid writes) | Med | Med | Allow user override, log for analysis |
-| Merge strategy produces invalid code | High | Low | Validate merged content syntax when possible |
-| Performance impact on large codebases | Low | Low | Lazy evaluation, only check files being written |
-| User frustration with approval prompts | Med | Med | Batch approval option for multiple files |
+| Users frustrated by approval prompts | Med | Med | Clear threshold documentation, --force flag |
+| Merge strategies produce invalid code | High | Low | Preview before write, user approval required |
+| Performance degradation with many files | Low | Low | Batch approval UI, parallel file reads |
+| False sense of security (100 lines = safe) | Med | Med | Document that threshold is heuristic, not guarantee |
 
 ## 12. Definition of Done
 
 ### Code
 - [ ] Implementation complete and linted
-- [ ] Code comments reference this LLD (#173)
+- [ ] Code comments reference this LLD
 
 ### Tests
 - [ ] All test scenarios pass
-- [ ] Test coverage ≥95%
+- [ ] Test coverage meets threshold (≥95%)
 
 ### Documentation
 - [ ] LLD updated with any deviations
@@ -439,6 +473,6 @@ poetry run pytest tests/unit/test_safe_file_write.py --cov=src/workflow/nodes/sa
 
 | Review | Date | Verdict | Key Issue |
 |--------|------|---------|-----------|
-| - | - | - | Awaiting initial review |
+| - | - | - | Awaiting review |
 
 **Final Status:** PENDING

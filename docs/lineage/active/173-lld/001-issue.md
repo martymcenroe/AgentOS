@@ -2,7 +2,7 @@
 repo: martymcenroe/AgentOS
 issue: 173
 url: https://github.com/martymcenroe/AgentOS/issues/173
-fetched: 2026-02-03T17:28:16.345922Z
+fetched: 2026-02-04T00:54:10.275171Z
 ---
 
 # Issue #173: feat: TDD workflow should merge into existing files, not overwrite
