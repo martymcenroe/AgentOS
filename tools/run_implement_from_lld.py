@@ -471,6 +471,20 @@ def main():
         return 130
 
     except Exception as e:
+        # Check if this is an ImplementationError (issue #272)
+        if type(e).__name__ == "ImplementationError":
+            print(f"\n{'='*60}")
+            print("IMPLEMENTATION FAILED")
+            print(f"{'='*60}")
+            print(f"File: {getattr(e, 'filepath', 'unknown')}")
+            print(f"Reason: {getattr(e, 'reason', str(e))}")
+            preview = getattr(e, 'response_preview', None)
+            if preview:
+                print(f"\nResponse preview:\n{preview[:500]}")
+            print(f"\nThis is a hard failure. The implementation node could not produce valid code.")
+            print("Check the LLD specification and try again.")
+            return 1
+
         print(f"\n[FATAL] Unexpected error: {e}")
         import traceback
         traceback.print_exc()

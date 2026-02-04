@@ -61,6 +61,7 @@ class TestingWorkflowState(TypedDict, total=False):
         # Test artifacts
         test_files: List of generated test file paths.
         implementation_files: List of generated implementation file paths.
+        completed_files: List of (filepath, content) tuples for context accumulation (#272).
         red_phase_output: Pytest output from red phase verification.
         green_phase_output: Pytest output from green phase verification.
         coverage_achieved: Actual coverage percentage achieved.
@@ -133,6 +134,7 @@ class TestingWorkflowState(TypedDict, total=False):
     # Test artifacts
     test_files: list[str]
     implementation_files: list[str]
+    completed_files: list[tuple[str, str]]  # Issue #272: (filepath, content) for context accumulation
     coverage_module: str  # Module path for coverage measurement (e.g., "agentos.workflows.scout")
     red_phase_output: str
     green_phase_output: str

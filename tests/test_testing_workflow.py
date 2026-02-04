@@ -1439,12 +1439,18 @@ __pycache__/
         assert len(written) == 0
 
     def test_implement_code_non_mock_error_handling(self, tmp_path):
-        """implement_code handles Claude errors gracefully."""
-        from agentos.workflows.testing.nodes.implement_code import implement_code
+        """implement_code raises ImplementationError when Claude returns API error."""
+        from agentos.workflows.testing.nodes.implement_code import (
+            implement_code,
+            ImplementationError,
+        )
 
         # Create audit directory
         audit_dir = tmp_path / "docs" / "lineage" / "active" / "42-testing"
         audit_dir.mkdir(parents=True)
+
+        # Create src directory
+        (tmp_path / "src").mkdir(parents=True, exist_ok=True)
 
         state: TestingWorkflowState = {
             "issue_number": 42,
@@ -1456,17 +1462,20 @@ __pycache__/
             "lld_content": "Test LLD",
             "test_files": [],
             "test_scenarios": [],
+            "files_to_modify": [
+                {"path": "src/module.py", "change_type": "Add", "description": "New module"},
+            ],
         }
 
-        # Mock call_claude_headless to return error
-        with patch("agentos.workflows.testing.nodes.implement_code.call_claude_headless") as mock_call:
+        # Mock call_claude_for_file to return error - should raise ImplementationError
+        with patch("agentos.workflows.testing.nodes.implement_code.call_claude_for_file") as mock_call:
             mock_call.return_value = ("", "Claude not available")
 
-            result = implement_code(state)
+            with pytest.raises(ImplementationError) as exc_info:
+                implement_code(state)
 
-        # Check that error_message is not empty (implementation failed)
-        assert result.get("error_message", "") != ""
-        assert "failed" in result.get("error_message", "").lower()
+        # Check that error is about Claude API
+        assert "Claude API error" in str(exc_info.value)
 
     def test_call_claude_headless_sdk_fallback(self):
         """call_claude_headless falls back to SDK when CLI unavailable."""
@@ -3055,6 +3064,9 @@ class TestImplementCodeFullCoverage:
         audit_dir = tmp_path / "docs" / "lineage" / "active" / "42-testing"
         audit_dir.mkdir(parents=True)
 
+        # Create src directory for the file
+        (tmp_path / "src").mkdir(parents=True, exist_ok=True)
+
         state: TestingWorkflowState = {
             "issue_number": 42,
             "repo_root": str(tmp_path),
@@ -3065,17 +3077,18 @@ class TestImplementCodeFullCoverage:
             "lld_content": "Test LLD",
             "test_files": [],
             "test_scenarios": [],
+            "files_to_modify": [
+                {"path": "src/module.py", "change_type": "Add", "description": "New module"},
+            ],
         }
 
-        # Mock successful Claude response
+        # Mock successful Claude response (file-by-file approach)
         mock_response = """```python
-# File: src/module.py
-
 def example():
     return True
 ```
 """
-        with patch("agentos.workflows.testing.nodes.implement_code.call_claude_headless") as mock_call:
+        with patch("agentos.workflows.testing.nodes.implement_code.call_claude_for_file") as mock_call:
             mock_call.return_value = (mock_response, "")
 
             result = implement_code(state)
@@ -3084,11 +3097,17 @@ def example():
         assert len(result.get("implementation_files", [])) > 0
 
     def test_implement_code_no_files_extracted(self, tmp_path):
-        """implement_code handles empty response."""
-        from agentos.workflows.testing.nodes.implement_code import implement_code
+        """implement_code raises ImplementationError when Claude gives no code."""
+        from agentos.workflows.testing.nodes.implement_code import (
+            implement_code,
+            ImplementationError,
+        )
 
         audit_dir = tmp_path / "docs" / "lineage" / "active" / "42-testing"
         audit_dir.mkdir(parents=True)
+
+        # Create src directory
+        (tmp_path / "src").mkdir(parents=True, exist_ok=True)
 
         state: TestingWorkflowState = {
             "issue_number": 42,
@@ -3100,15 +3119,19 @@ def example():
             "lld_content": "Test LLD",
             "test_files": [],
             "test_scenarios": [],
+            "files_to_modify": [
+                {"path": "src/module.py", "change_type": "Add", "description": "New module"},
+            ],
         }
 
-        # Mock empty response (no code blocks)
-        with patch("agentos.workflows.testing.nodes.implement_code.call_claude_headless") as mock_call:
+        # Mock empty response (no code blocks) - should raise ImplementationError
+        with patch("agentos.workflows.testing.nodes.implement_code.call_claude_for_file") as mock_call:
             mock_call.return_value = ("I cannot help with that.", "")
 
-            result = implement_code(state)
+            with pytest.raises(ImplementationError) as exc_info:
+                implement_code(state)
 
-        assert "No implementation" in result.get("error_message", "")
+        assert "No code block found" in str(exc_info.value)
 
     def test_parse_implementation_response_various_formats(self):
         """parse_implementation_response handles various formats."""
