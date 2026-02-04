@@ -7,29 +7,34 @@ I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
 PASSED
 
 ## Review Summary
-The LLD proposes a solid, configuration-driven approach to project structure management using standard JSON. The architecture is sound, leveraging the standard library to avoid dependencies. However, the LLD fails the strict 95% Requirement Coverage threshold because one requirement (documentation consistency) lacks an automated test. Additionally, the "Open Questions" section contains stale items that contradict or duplicate the proposed design decisions, indicating the document needs a final cleanup.
+The proposed design correctly identifies the need for a configuration-driven approach to project structure, using a JSON schema as the single source of truth. The architecture is sound and follows the standard pattern for this type of refactor. However, the Test Plan (Section 10) relies exclusively on synthetic fixtures, failing to validate that the *actual production schema file* meets the specific business requirements defined in Section 3.
+
+## Open Questions Resolved
+- [x] ~~Should the schema include file templates inline or reference external template files?~~ **RESOLVED: Reference external files.** Inline templates in JSON are difficult to maintain (no multiline string support, escaping issues) and bloat the schema. Store templates in a dedicated `templates/` directory or similar.
+- [x] ~~Should schema validation include content validation (e.g., CLAUDE.md must contain certain sections)?~~ **RESOLVED: No.** Limit this tool to *structural* validation (existence of files/directories). Content validation adds significant complexity and belongs in a separate linter or specific test suite (e.g., `test_documentation.py`).
 
 ## Requirement Coverage Analysis (MANDATORY)
 
 **Section 3 Requirements:**
 | # | Requirement | Test(s) | Status |
 |---|-------------|---------|--------|
-| 1 | A JSON schema file exists at `docs/standards/0009-structure-schema.json` | Test 100 (Schema includes lineage dirs - implies loading production schema) | ✓ Covered |
-| 2 | `new-repo-setup.py` reads directory structure from schema | Test 040, 060 | ✓ Covered |
-| 3 | `new-repo-setup.py --audit` validates against schema | Test 070, 080, 090 | ✓ Covered |
-| 4 | Standard 0009 markdown references schema as the authoritative source | - | **GAP** |
-| 5 | Schema includes `docs/lineage/` structure with `active/` and `done/` | Test 100 | ✓ Covered |
-| 6 | All existing functionality of `new-repo-setup.py` continues to work | Test 110 | ✓ Covered |
+| 1 | `docs/standards/0009-structure-schema.json` exists and defines complete project structure | - | **GAP** |
+| 2 | `new-repo-setup.py` reads structure from schema instead of hardcoded lists | T020, T040 | ✓ Covered |
+| 3 | `new-repo-setup.py --audit` validates against schema definitions | T080, T090, T100 | ✓ Covered |
+| 4 | Standard 0009 references schema as authoritative source | - | **GAP** |
+| 5 | Schema includes `docs/lineage/` structure with `active/` and `done/` subdirectories | - | **GAP** |
+| 6 | No hardcoded directory lists remain in new-repo-setup.py | T020 (Missing file exception proves dependency) | ✓ Covered |
 
-**Coverage Calculation:** 5 requirements covered / 6 total = **83.3%**
+**Coverage Calculation:** 3 requirements covered / 6 total = **50%**
 
-**Verdict:** **BLOCK** (Coverage < 95%)
+**Verdict:** **BLOCK**
 
 **Missing Test Scenarios:**
-*   **Req 4:** Add a test (e.g., `test_standard_references_schema`) that parses `docs/standards/0009-canonical-project-structure.md` and asserts it contains the string `0009-structure-schema.json`. This automates the check for drift between the standard text and the schema file location.
+- **For Req 1 & 5:** Add `test_production_schema_integrity`: Load the actual `docs/standards/0009-structure-schema.json` file (not a fixture) and assert it is valid JSON, contains required keys, and specifically contains the `docs/lineage` -> `children` -> `active` / `done` structure.
+- **For Req 4:** Add `test_standard_references_schema`: Read `docs/standards/0009-canonical-project-structure.md` and assert it contains a link or reference to the JSON schema file.
 
 ## Tier 1: BLOCKING Issues
-No blocking issues found. LLD is approved for implementation regarding Cost, Safety, Security, and Legal.
+No blocking issues found in Cost, Safety, Security, or Legal categories. LLD is approved on these fronts.
 
 ### Cost
 - [ ] No issues found.
@@ -52,15 +57,11 @@ No blocking issues found. LLD is approved for implementation regarding Cost, Saf
 - [ ] No issues found.
 
 ### Quality
-- [ ] **Requirement Coverage:** 83% < 95%. See Analysis above. The missing test for Requirement 4 must be added to Section 10 to ensure the "Single Source of Truth" objective is mechanically enforced.
-- [ ] **Stale Open Questions:** Section 1 "Open Questions" lists items that are resolved by the design in Section 2.
-    *   "Should we include file content templates...?" -> Resolved by Data Structures (uses `template` reference).
-    *   "What validation strictness...?" -> Resolved by Logic Flow (Audit Flow: Warning for optional).
-    *   **Action:** Remove resolved questions or update the design if these are still undecided. An approved LLD must represent a finalized design.
+- [ ] **Requirement Coverage:** Coverage is 50% (< 95%). The test plan focuses on testing the *engine* (loading/flattening logic) using fixtures but neglects to test the *configuration* (the actual schema file) against the business requirements. See "Missing Test Scenarios" above.
 
 ## Tier 3: SUGGESTIONS
-- **Schema Validation:** Consider explicitly testing for `..` traversal attempts in the "Invalid schema" test fixture (Test 030) to reinforce the Security mitigation mentioned in 7.1.
-- **Documentation:** Explicitly state in Section 2.5 (Logic Flow) that `new-repo-setup.py` will default to the standard schema location if no argument is provided.
+- **Recursion Limit:** While Python has a recursion limit, explicitly bounding the `flatten_directories` recursion (e.g., max depth 10) prevents potential stack overflows if the schema structure is malformed or circular (though unlikely in JSON).
+- **Schema Validation:** Consider adding a meta-schema (JSON Schema Draft 7) to validate the structure schema itself, ensuring `required` is a boolean, `children` is a dict, etc.
 
 ## Questions for Orchestrator
 1. None.
