@@ -1,4 +1,4 @@
-# LLD Review: 1100 - Feature: Lineage Workflow Integration
+# LLD Review: 1100-Feature: Lineage Workflow Integration
 
 ## Identity Confirmation
 I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
@@ -7,45 +7,50 @@ I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
 PASSED
 
 ## Review Summary
-The design for standardizing design review artifacts is sound, leveraging the existing filesystem-based pattern effectively. The choice of flat JSON and markdown artifacts ensures long-term auditability without database dependencies. However, the LLD fails the strict **Requirement Coverage** gate (77%) due to missing test scenarios for setup scripts and inter-process communication in the structured test table.
+The LLD proposes a solid filesystem-based approach for lineage tracking, which is robust and simple. However, the document fails the **Requirement Coverage** check (66% < 95%). The Test Plan currently focuses solely on the new `lineage.py` module, neglecting tests for the required changes in `lld-workflow.py` (CLI flags), `new-repo-setup.py` (directory creation), and specific filing metadata requirements. These must be added to Section 10 before approval.
+
+## Open Questions Resolved
+- [x] ~~Should we support resuming a partially-completed lineage folder (e.g., if workflow crashed after brief but before filing)?~~ **RESOLVED: Yes. Resumability is critical for workflow robustness and preventing orphaned folders.**
+- [x] ~~What happens if an issue is closed without filing (cancelled/abandoned)? Move to `done/` with special status or `abandoned/`?~~ **RESOLVED: Move to `docs/lineage/abandoned/` to distinguish them from shipped features. Ensure `new-repo-setup.py` creates this directory.**
 
 ## Requirement Coverage Analysis (MANDATORY)
 
 **Section 3 Requirements:**
 | # | Requirement | Test(s) | Status |
 |---|-------------|---------|--------|
-| 1 | Issue workflow creates `docs/lineage/active/{id}-{slug}/` folder at workflow start | 010 | ✓ Covered |
-| 2 | All briefs saved as `001-brief.md` in lineage folder | 020 | ✓ Covered |
-| 3 | All LLD drafts saved as `{NNN}-draft.md` with incrementing sequence | 030 | ✓ Covered |
-| 4 | All Gemini verdicts saved as `{NNN}-verdict.md` with incrementing sequence | 040 | ✓ Covered |
-| 5 | Filing metadata saved as final `{NNN}-filed.json` | 060 | ✓ Covered |
-| 6 | Folder moves from `active/` to `done/` on successful filing | 060 | ✓ Covered |
-| 7 | LLD workflow accepts lineage path when called as subprocess | - | **GAP** |
-| 8 | `new-repo-setup.py` creates both `docs/lineage/active/` and `docs/lineage/done/` | - | **GAP** |
-| 9 | Existing workflows continue functioning if lineage directories don't exist | 090 | ✓ Covered |
+| 1 | Issue workflow creates `docs/lineage/active/{id}-{slug}/` | T010 / Scen 010 | ✓ Covered |
+| 2 | All briefs saved as `001-brief.md` | T050 / Scen 050 | ✓ Covered |
+| 3 | All drafts saved as `{NNN}-draft.md` | T060 / Scen 060 | ✓ Covered |
+| 4 | All verdicts saved as `{NNN}-verdict.md` | T070 / Scen 070 | ✓ Covered |
+| 5 | Filing metadata saved as `{NNN}-filed.json` | - | **GAP** |
+| 6 | Folder moves to `docs/lineage/done/` on filing | T080 / Scen 080 | ✓ Covered |
+| 7 | LLD workflow accepts `--lineage-folder` flag | - | **GAP** |
+| 8 | `new-repo-setup.py` creates `active/` and `done/` | - | **GAP** |
+| 9 | Workflow can resume from existing active folder | T110 / Scen 110 | ✓ Covered |
 
-**Coverage Calculation:** 7 requirements covered / 9 total = **77.7%**
+**Coverage Calculation:** 6 requirements covered / 9 total = **66.6%**
 
-**Verdict:** **BLOCK** (< 95%)
+**Verdict:** **BLOCK**
 
 **Missing Test Scenarios:**
-1.  **Req 7**: Need a specific test scenario (e.g., ID 100) verifying the CLI argument parsing: `LLD workflow accepts --lineage-path argument`. (Current tests 030/040 test the save *logic*, but not the subprocess interface/argument passing).
-2.  **Req 8**: Need a specific test scenario (e.g., ID 110) in Table 10.1 for `new-repo-setup.py` execution. (Note: Section 10.2 lists a command, but the requirement is for a structured test scenario in Section 10.1).
+1.  **Test for Req 5:** Verify `save_artifact` handles JSON content correctly for filing metadata, or adds a specific test for metadata serialization.
+2.  **Test for Req 7:** Integration test or argument parsing test for `tools/lld-workflow.py` to verify it accepts and processes `--lineage-folder`.
+3.  **Test for Req 8:** Test for `tools/new-repo-setup.py` ensuring it creates the directory structure (including the `abandoned/` folder recommended in Open Questions).
 
 ## Tier 1: BLOCKING Issues
-No blocking issues found. LLD is approved for implementation regarding Cost, Safety, Security, and Legal tiers.
+No Tier 1 blocking issues found. LLD is approved for safety/cost/security/legal, but blocked on Quality (Tier 2).
 
 ### Cost
-- [ ] No issues found.
+- No issues found.
 
 ### Safety
-- [ ] No issues found.
+- No issues found. Worktree scope is respected.
 
 ### Security
-- [ ] No issues found.
+- No issues found. Path traversal mitigated via slugify (tested in T020).
 
 ### Legal
-- [ ] No issues found.
+- No issues found.
 
 ## Tier 2: HIGH PRIORITY Issues
 
@@ -56,11 +61,12 @@ No blocking issues found. LLD is approved for implementation regarding Cost, Saf
 - [ ] No issues found.
 
 ### Quality
-- [ ] **Requirement Coverage:** **BLOCK**. Coverage is 77.7% (Threshold 95%). Please add specific test scenarios to Section 10.1 for Requirements 7 (subprocess CLI args) and 8 (setup script).
+- [ ] **Requirement Coverage Failure:** Coverage is 66.6%, below the 95% threshold. See "Requirement Coverage Analysis" above for specific gaps.
+- [ ] **Missing Integration Tests:** The LLD modifies existing tools (`issue-workflow.py`, `lld-workflow.py`) but the test plan only covers the new `lineage.py` module. Add tests to verify the integration points work (e.g., CLI argument parsing).
 
 ## Tier 3: SUGGESTIONS
-- **Scenario 080**: This test ("Error on done/ exists") is excellent for safety but doesn't explicitly map to a numbered requirement in Section 3. Consider adding a requirement like "Prevent modification of already-filed issues" to make this coverage explicit.
-- **Recovery**: The "Recovery Strategy" mentions manual inspection. Consider adding a `tools/lineage-repair.py` in a future iteration if corruption becomes common, though not needed for MVP.
+- **Metadata Format:** Explicitly define the JSON schema for `{NNN}-filed.json` in Section 2.3 to ensure downstream tools can parse it reliably.
+- **Abandonment Workflow:** Update Section 2.1 (Files Changed) and 2.5 (Logic) to reflect the decision to use an `abandoned/` folder.
 
 ## Questions for Orchestrator
 1. None.
