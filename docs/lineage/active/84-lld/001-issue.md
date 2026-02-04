@@ -1,3 +1,10 @@
+---
+repo: martymcenroe/AgentOS
+issue: 84
+url: https://github.com/martymcenroe/AgentOS/issues/84
+fetched: 2026-02-04T07:56:06.120451Z
+---
+
 # Issue #84: Add [F]ile Option to Issue Workflow Exit
 
 # Add [F]ile Option to Issue Workflow Exit
