@@ -1,4 +1,4 @@
-# LLD Review: 160 - Feature: Track CVE-2026-0994: protobuf JSON recursion depth bypass
+# LLD Review: 160-Feature: CVE-2026-0994 protobuf JSON Recursion Depth Bypass Patch
 
 ## Identity Confirmation
 I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
@@ -7,28 +7,32 @@ I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
 PASSED
 
 ## Review Summary
-The LLD provides a clear risk assessment and plan for monitoring and upgrading the `protobuf` dependency. However, it fails the strict Requirement Coverage protocol (Tier 2) because Section 3 includes process/workflow steps that cannot be mapped to automated tests. These should be moved to "Definition of Done" to ensure the Requirements section contains only testable system constraints.
+The LLD provides a clear path for a critical security dependency upgrade. The structure is sound, and the rollback strategy is well-defined. However, there is a gap in testing the "No new vulnerabilities" requirement, and specific open questions need resolution before execution.
+
+## Open Questions Resolved
+- [x] ~~Are there any pinned protobuf version constraints in dependent packages (google-api-core, grpcio-status)?~~ **RESOLVED: `google-api-core` frequently pins protobuf upper bounds (e.g., `<6.0.0.dev0`). It is highly likely `poetry lock` will fail initially. You must be prepared to update `google-api-core` simultaneously if a compatible version exists.**
+- [x] ~~Do we have existing integration tests that exercise Gemini API calls end-to-end?~~ **RESOLVED: Rely on Test ID T020. If `pytest -m live` or similar markers do not exist in the codebase, you must verify the upgrade by manually running a script that calls the Gemini API (Scenario 050) before merging.**
 
 ## Requirement Coverage Analysis (MANDATORY)
 
 **Section 3 Requirements:**
 | # | Requirement | Test(s) | Status |
 |---|-------------|---------|--------|
-| 1 | Track CVE-2026-0994 until patch is available | - | **GAP (Process)** |
-| 2 | Upgrade protobuf when version >= 6.33.5 is released | Test 030 | ✓ Covered |
-| 3 | Verify upgrade does not introduce regressions | Test 010, Test 020 | ✓ Covered |
-| 4 | Close Dependabot alert after successful upgrade | - | **GAP (Process)** |
+| 1 | protobuf version is ≥6.33.5 in poetry.lock | T040 (Version check) | ✓ Covered |
+| 2 | All existing tests pass without modification | T010 (Full test suite) | ✓ Covered |
+| 3 | Gemini API calls function correctly | T020 (Mock), T050 (Live) | ✓ Covered |
+| 4 | No new security vulnerabilities introduced | - | **GAP** |
+| 5 | CVE-2026-0994 vulnerability is mitigated | T040 (Version check proxies mitigation) | ✓ Covered |
 
-**Coverage Calculation:** 2 requirements covered / 4 total = **50%**
+**Coverage Calculation:** 4 requirements covered / 5 total = **80%**
 
 **Verdict:** **BLOCK** (<95%)
 
 **Missing Test Scenarios:**
-- Requirements #1 and #4 are manual process steps (Tracking, Closing alerts) rather than software behaviors. They cannot be covered by the automated tests in Section 10.
-- **Remedy:** Move Requirements #1 and #4 to Section 1 (Context) or Section 12 (Definition of Done). Keep Section 3 focused strictly on testable system states (e.g., version constraints, regression pass).
+- **Requirement 4 (No new vulnerabilities):** Add a test scenario to run a vulnerability scanner (e.g., `poetry run pip-audit` or `safety check`) to confirm the new dependency tree is clean. If no scanner is available, remove the requirement or add a manual verification step in Section 10.3 checking PyPI advisories for the new transitive chain.
 
 ## Tier 1: BLOCKING Issues
-No blocking issues found. LLD is approved for implementation logic, pending structure fix.
+No blocking issues found in Cost, Safety, Security, or Legal categories.
 
 ### Cost
 - [ ] No issues found.
@@ -37,7 +41,7 @@ No blocking issues found. LLD is approved for implementation logic, pending stru
 - [ ] No issues found.
 
 ### Security
-- [ ] No issues found. Risk assessment regarding `ParseDict` usage and outbound-only traffic is accepted.
+- [ ] No issues found.
 
 ### Legal
 - [ ] No issues found.
@@ -51,10 +55,11 @@ No blocking issues found. LLD is approved for implementation logic, pending stru
 - [ ] No issues found.
 
 ### Quality
-- [ ] **Requirement Coverage:** 50%. The inclusion of workflow goals in Section 3 lowers the automated test coverage score below the 95% threshold. Please refactor Section 3 to contain only technical requirements that map to the tests in Section 10.
+- [ ] **Requirement Coverage:** Coverage is 80%. Please add a test scenario for Requirement 4 or remove the requirement if it cannot be verified.
 
 ## Tier 3: SUGGESTIONS
-- **Timeline:** Explicitly acknowledge that Test 030 (Version check) is expected to FAIL if run immediately, as the patch is not yet released. This LLD effectively serves as a "Wait" state.
+- **Architecture:** Be aware that jumping from protobuf 5.x to 6.x is a major breaking change. If `google-api-core` does not yet support 6.x, you may be blocked regardless of code changes. Check PyPI for `google-api-core` compatibility first.
+- **Testing:** Ensure `T040` (Version verification) specifically checks the *runtime* version (`google.protobuf.__version__`), not just the lock file, to ensure the environment is correctly synced.
 
 ## Questions for Orchestrator
 1. None.

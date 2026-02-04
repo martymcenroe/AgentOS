@@ -1,107 +1,117 @@
-# 160 - Feature: Track CVE-2026-0994: protobuf JSON recursion depth bypass
+# 160 - Feature: CVE-2026-0994 protobuf JSON Recursion Depth Bypass Patch
 
 <!-- Template Metadata
 Last Updated: 2026-02-02
-Updated By: Issue #117 fix
-Update Reason: Moved Verification & Testing to Section 10 (was Section 11) to match 0702c review prompt and testing workflow expectations
+Updated By: Issue #60 creation
+Update Reason: Initial LLD for protobuf security patch
 -->
 
 ## 1. Context & Goal
 * **Issue:** #60
-* **Objective:** Track and document CVE-2026-0994 (protobuf JSON recursion depth bypass) until a patched version is available, then upgrade.
-* **Status:** In Progress (Monitoring)
+* **Objective:** Upgrade protobuf from vulnerable version 5.29.5 to patched version 6.33.5 to address CVE-2026-0994 DoS vulnerability
+* **Status:** Draft
 * **Related Issues:** None
 
 ### Open Questions
+*Questions that need clarification before or during implementation. Remove when resolved.*
 
-- [x] Is protobuf used to parse untrusted user input? **No** - only used for outbound Gemini API calls
-- [ ] When will protobuf >= 6.33.5 be released with the fix?
+- [x] Are there any pinned protobuf version constraints in dependent packages (google-api-core, grpcio-status)? **RESOLVED: `google-api-core` frequently pins protobuf upper bounds (e.g., `<6.0.0.dev0`). Check PyPI for compatibility and be prepared to update `google-api-core` simultaneously if needed.**
+- [x] Do we have existing integration tests that exercise Gemini API calls end-to-end? **RESOLVED: Rely on Test ID T020 for mocked tests. Verify upgrade by running T050 (live Gemini API call) or a manual script before merging if no `pytest -m live` markers exist.**
 
 ## 2. Proposed Changes
 
-*This section is the **source of truth** for implementation. Describes the monitoring and eventual upgrade.*
+*This section is the **source of truth** for implementation. Describe exactly what will be built.*
 
 ### 2.1 Files Changed
 
 | File | Change Type | Description |
 |------|-------------|-------------|
-| `pyproject.toml` | Modify (future) | Bump protobuf version when patch released |
-| `poetry.lock` | Modify (future) | Lock file update after dependency bump |
+| `pyproject.toml` | Modify | Upgrade protobuf version constraint to ^6.33.5 |
+| `poetry.lock` | Modify | Regenerated lock file with new protobuf version |
 
 ### 2.2 Dependencies
 
+*New packages, APIs, or services required.*
+
 ```toml
-# pyproject.toml additions (when patch available)
-# No direct change - protobuf is transitive via:
-# - google-api-core
-# - googleapis-common-protos
-# - grpcio-status
-# - proto-plus
+# pyproject.toml modifications
+protobuf = "^6.33.5"  # Previously: ^5.29.5
 ```
 
-**Current State:**
-- protobuf 5.29.5 (vulnerable)
-- Patched version: Not yet released (expected >= 6.33.5)
+**Transitive Dependency Chain:**
+- google-api-core → protobuf
+- googleapis-common-protos → protobuf
+- grpcio-status → protobuf
+- proto-plus → protobuf
 
 ### 2.3 Data Structures
 
-N/A - No new data structures required. This is a dependency tracking issue.
+N/A - This is a dependency upgrade, no new data structures introduced.
 
 ### 2.4 Function Signatures
 
-N/A - No new functions required.
+N/A - This is a dependency upgrade, no new functions introduced.
 
 ### 2.5 Logic Flow (Pseudocode)
 
 ```
-1. Monitor protobuf releases for version >= 6.33.5
-2. WHEN patched version released:
-   a. Run: poetry update protobuf
-   b. Run test suite
-   c. Verify no regressions
-   d. Commit and close issue
-3. UNTIL then:
-   - Document risk assessment
-   - No code changes needed
+1. Check PyPI for google-api-core compatibility with protobuf 6.x
+2. Create worktree for isolated work
+3. Upgrade protobuf dependency to ^6.33.5
+4. IF google-api-core incompatible THEN
+   - Upgrade google-api-core to compatible version
+5. Run poetry lock to resolve dependencies
+6. Run full test suite
+7. Verify runtime protobuf version ≥6.33.5
+8. Run vulnerability scan (pip-audit)
+9. IF tests pass AND no new vulnerabilities THEN
+   - Create PR for review
+   ELSE
+   - Document issues
+   - Investigate fixes
+   - Re-run tests
+10. Merge when approved
 ```
 
 ### 2.6 Technical Approach
 
 * **Module:** N/A (dependency management)
-* **Pattern:** Dependency tracking and controlled upgrade
-* **Key Decisions:** 
-  - Accept risk as LOW given usage pattern (outbound calls only)
-  - No compensating controls needed given attack surface analysis
+* **Pattern:** Dependabot-style version bump with regression testing
+* **Key Decisions:** Direct upgrade rather than patching to avoid maintaining a fork
 
 ### 2.7 Architecture Decisions
 
 | Decision | Options Considered | Choice | Rationale |
 |----------|-------------------|--------|-----------|
-| Immediate action | Pin lower version, add workaround, wait for patch | Wait for patch | Vulnerability not exploitable in current usage pattern |
-| Risk acceptance | Block Gemini integration, accept risk | Accept risk | DoS only, no data breach, outbound-only usage |
+| Upgrade approach | Pin exact version vs constraint | Constraint (^6.33.5) | Allows future patch updates within major version |
+| Test strategy | Quick smoke vs full regression | Full regression | Major version bump warrants comprehensive testing |
+| Rollback plan | Revert commit vs pin old version | Revert commit | Clean history, easy recovery |
 
 **Architectural Constraints:**
-- Cannot remove protobuf - required for Gemini API integration
-- Cannot pin to non-existent patched version
+- Must maintain compatibility with google-api-core and other Google packages
+- Cannot break Gemini API integration
+- May require simultaneous google-api-core upgrade if 6.x upper bound exists
 
 ## 3. Requirements
 
-*Testable system requirements only. Process/workflow steps moved to Definition of Done (Section 12).*
+*What must be true when this is done. These become acceptance criteria.*
 
-1. Protobuf version must be >= 6.33.5 after upgrade
-2. All existing Gemini integration tests must pass after upgrade
-3. No new HIGH/CRITICAL vulnerabilities introduced by upgrade
+1. protobuf version is ≥6.33.5 in poetry.lock
+2. All existing tests pass without modification
+3. Gemini API calls function correctly (outbound requests, response parsing)
+4. No new security vulnerabilities introduced by transitive dependency changes
+5. CVE-2026-0994 vulnerability is mitigated
 
 ## 4. Alternatives Considered
 
 | Option | Pros | Cons | Decision |
 |--------|------|------|----------|
-| Wait for patch | No code changes, minimal effort | Temporary exposure | **Selected** |
-| Add recursion depth check wrapper | Immediate mitigation | Complexity, maintenance burden, may break API calls | Rejected |
-| Remove Gemini integration | Eliminates vulnerability | Loses critical functionality | Rejected |
-| Fork and patch protobuf | Immediate fix | Maintenance nightmare, version conflicts | Rejected |
+| Upgrade to 6.33.5 | Full CVE fix, future patches included | Major version jump, potential breaking changes | **Selected** |
+| Pin to exact 6.33.5 | Controlled, predictable | Miss future patches | Rejected |
+| Backport patch to 5.x | Minimal change | Maintenance burden, unsupported | Rejected |
+| Accept risk (no action) | Zero effort | Leaves vulnerability unpatched | Rejected |
 
-**Rationale:** The vulnerability requires attacker-controlled JSON input to `ParseDict()`. AgentOS only uses protobuf for outbound API calls to Gemini - we control the data being serialized, not parsed from untrusted sources. The attack surface is effectively zero.
+**Rationale:** The vulnerability is HIGH severity (CVSS 8.2) and a patch is readily available. While we primarily use protobuf for outbound calls (lower risk), the upgrade is straightforward and eliminates the attack surface entirely.
 
 ## 5. Data & Fixtures
 
@@ -109,35 +119,34 @@ N/A - No new functions required.
 
 | Attribute | Value |
 |-----------|-------|
-| Source | Dependabot security alerts, NVD, GitHub Security Advisories |
-| Format | Security advisory notifications |
-| Size | N/A |
-| Refresh | Automatic via Dependabot |
-| Copyright/License | N/A |
+| Source | PyPI (protobuf package) |
+| Format | Python wheel/sdist |
+| Size | ~1.5MB package |
+| Refresh | One-time upgrade |
+| Copyright/License | BSD-3-Clause (protobuf) |
 
 ### 5.2 Data Pipeline
 
 ```
-Dependabot Alert ──notification──► GitHub Issue #60 ──manual review──► Risk Assessment
-                                                                           │
-Patched Release ──notification──► poetry update ──CI tests──► Close Issue ◄┘
+PyPI ──poetry add──► poetry.lock ──poetry install──► venv
 ```
 
 ### 5.3 Test Fixtures
 
 | Fixture | Source | Notes |
 |---------|--------|-------|
-| N/A | N/A | No new test fixtures needed - existing Gemini integration tests sufficient |
+| Existing Gemini mocks | Already in test suite | Verify still compatible with protobuf 6.x |
+| CVE PoC payload | Not needed | We're upgrading, not testing vulnerability |
 
 ### 5.4 Deployment Pipeline
 
 Standard dependency update flow:
-1. `poetry update protobuf` (when patch available)
-2. Run full test suite
-3. Review changes in `poetry.lock`
-4. Commit, PR, merge
+1. Update in feature branch
+2. CI runs full test suite
+3. PR review and merge
+4. Production deploys with next release
 
-**If data source is external:** N/A - no external data utility needed.
+**If data source is external:** N/A - using standard PyPI
 
 ## 6. Diagram
 
@@ -146,55 +155,47 @@ Standard dependency update flow:
 - [x] **Simplicity:** Minimal components shown
 - [x] **No touching:** All elements have visual separation
 - [x] **No hidden lines:** All arrows fully visible
-- [x] **Readable:** Labels clear, flow direction obvious
-- [x] **Auto-inspected:** Diagram simple enough for text verification
+- [x] **Readable:** Labels clear
+- [ ] **Auto-inspected:** Pending agent render
 
 **Auto-Inspection Results:**
 ```
-- Touching elements: [x] None / [ ] Found: ___
-- Hidden lines: [x] None / [ ] Found: ___
-- Label readability: [x] Pass / [ ] Issue: ___
-- Flow clarity: [x] Clear / [ ] Issue: ___
+- Touching elements: [ ] None / [ ] Found: ___
+- Hidden lines: [ ] None / [ ] Found: ___
+- Label readability: [ ] Pass / [ ] Issue: ___
+- Flow clarity: [ ] Clear / [ ] Issue: ___
 ```
 
 ### 6.2 Diagram
 
 ```mermaid
-flowchart LR
+graph LR
     subgraph AgentOS
-        A[Agent Code]
-        B[Gemini Client]
+        A[Application Code]
+        G[Gemini Integration]
     end
     
     subgraph Dependencies
-        C[google-api-core]
-        D[protobuf 5.29.5]
+        GAC[google-api-core]
+        GCP[googleapis-common-protos]
+        GS[grpcio-status]
+        PP[proto-plus]
     end
     
-    subgraph External
-        E[Gemini API]
+    subgraph Target
+        PB[protobuf 6.33.5]
     end
     
-    A -->|outbound calls| B
-    B -->|uses| C
-    C -->|uses| D
-    B -->|API request| E
-    E -->|response| B
+    A --> G
+    G --> GAC
+    G --> GCP
+    GAC --> PB
+    GCP --> PB
+    GS --> PB
+    PP --> PB
     
-    style D fill:#ffcccc,stroke:#cc0000
-    
-    note1[CVE-2026-0994: ParseDict vulnerability]
-    note2[AgentOS does NOT call ParseDict with untrusted input]
-    
-    D -.-> note1
-    B -.-> note2
+    style PB fill:#90EE90,stroke:#228B22,stroke-width:3px
 ```
-
-**Key Points:**
-- protobuf is a transitive dependency (highlighted in red)
-- Data flows **outbound** from AgentOS to Gemini
-- Vulnerable function `ParseDict()` parses JSON **into** protobuf
-- AgentOS serializes **to** protobuf for API calls, doesn't parse untrusted JSON
 
 ## 7. Security & Safety Considerations
 
@@ -202,20 +203,24 @@ flowchart LR
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| CVE-2026-0994 DoS via recursion | Usage pattern analysis shows no exposure - outbound calls only | Addressed |
-| Future API response parsing | Monitor if Gemini SDK changes to parse responses via ParseDict | Monitoring |
+| CVE-2026-0994 DoS via JSON recursion | Upgrade to patched version 6.33.5 | Addressed |
+| New vulnerabilities in 6.x | Run pip-audit after upgrade (T050) | Addressed |
+| Supply chain attack | Verify PyPI package checksums via poetry.lock | Addressed |
 
 ### 7.2 Safety
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| False sense of security | Documented specific reasons why risk is LOW | Addressed |
-| Missed patch notification | Dependabot will alert when fix available | Addressed |
-| Upgrade regression | Full test suite run before closing issue | TODO |
+| Breaking changes crash application | Full regression test suite | Addressed |
+| Incompatible with Google API packages | Test Gemini integration specifically | Addressed |
+| Rollback difficulty | Git revert available, simple dependency change | Addressed |
 
-**Fail Mode:** N/A - This is a tracking issue, not a code change.
+**Fail Mode:** Fail Closed - If upgrade breaks functionality, revert to 5.29.5 and reassess
 
-**Recovery Strategy:** If exploit is discovered in our usage pattern, immediately disable Gemini integration until patched.
+**Recovery Strategy:** 
+1. Git revert the protobuf upgrade commit
+2. Re-run `poetry install` to restore 5.x
+3. Open follow-up issue to investigate compatibility
 
 ## 8. Performance & Cost Considerations
 
@@ -223,126 +228,154 @@ flowchart LR
 
 | Metric | Budget | Approach |
 |--------|--------|----------|
-| N/A | N/A | No performance impact - tracking issue only |
+| Serialization speed | No regression | Protobuf 6.x maintains performance parity |
+| Memory usage | No regression | No significant changes expected |
+| API call latency | No change | Transport layer unchanged |
 
-**Bottlenecks:** None - no code changes.
+**Bottlenecks:** None anticipated - this is a security patch, not a performance change
 
 ### 8.2 Cost Analysis
 
 | Resource | Unit Cost | Estimated Usage | Monthly Cost |
 |----------|-----------|-----------------|--------------|
-| Engineering time | ~$0 | 1-2 hours total | ~$0 |
+| CI time for testing | ~$0.01/min | ~30 min one-time | ~$0.30 |
+| Developer time | N/A | ~2 hours | N/A |
 
 **Cost Controls:**
-- [x] Minimal engineering time investment
-- [x] Automated Dependabot monitoring
+- [x] Standard CI pipeline, no additional resources
+- [x] One-time upgrade, not recurring cost
 
-**Worst-Case Scenario:** If vulnerability is actively exploited against AgentOS (unlikely given analysis), Gemini integration would need emergency disable. Cost: feature unavailability.
+**Worst-Case Scenario:** If upgrade causes issues, 2-4 hours additional debugging time
 
 ## 9. Legal & Compliance
 
 | Concern | Applies? | Mitigation |
 |---------|----------|------------|
-| PII/Personal Data | No | Vulnerability is DoS, not data exposure |
-| Third-Party Licenses | N/A | protobuf is BSD-3-Clause, compatible |
-| Terms of Service | N/A | No ToS implications |
-| Data Retention | N/A | No data handling changes |
-| Export Controls | N/A | No export control concerns |
+| PII/Personal Data | No | Dependency upgrade, no data handling changes |
+| Third-Party Licenses | Yes | BSD-3-Clause (unchanged from 5.x) |
+| Terms of Service | No | Standard PyPI distribution |
+| Data Retention | No | No data handling changes |
+| Export Controls | No | Not applicable |
 
-**Data Classification:** N/A
+**Data Classification:** N/A - dependency management
 
 **Compliance Checklist:**
-- [x] No PII risk from this vulnerability (DoS only)
-- [x] Third-party license (BSD-3-Clause) compatible
-- [x] No ToS implications
-- [x] No data retention changes
+- [x] No PII involved
+- [x] License compatible (BSD-3-Clause → BSD-3-Clause)
+- [x] PyPI ToS compliance (standard usage)
+- [x] No export control concerns
 
 ## 10. Verification & Testing
+
+### 10.0 Test Plan (TDD - Complete Before Implementation)
+
+**TDD Requirement:** For this security patch, we rely on existing tests rather than writing new ones. The test plan focuses on regression verification.
+
+| Test ID | Test Description | Expected Behavior | Status |
+|---------|------------------|-------------------|--------|
+| T010 | Existing unit tests | All pass with protobuf 6.x | RED |
+| T020 | Gemini integration tests | API calls succeed | RED |
+| T030 | Import verification | protobuf imports without error | RED |
+| T040 | Version verification (runtime) | `google.protobuf.__version__` ≥ 6.33.5 | RED |
+| T050 | Vulnerability scan | No new vulnerabilities in dependency tree | RED |
+| T060 | Live Gemini call (optional) | Real API request succeeds | RED |
+
+**Coverage Target:** Existing coverage maintained (no new code)
+
+**TDD Checklist:**
+- [x] Using existing test suite (no new tests needed for T010-T020)
+- [ ] Tests currently RED (not yet run against 6.x)
+- [x] Test IDs match scenario IDs in 10.1
+- [x] Existing test files cover protobuf usage
 
 ### 10.1 Test Scenarios
 
 | ID | Scenario | Type | Input | Expected Output | Pass Criteria |
 |----|----------|------|-------|-----------------|---------------|
-| 010 | Existing Gemini tests pass after upgrade | Auto | poetry update + pytest | All tests pass | Exit code 0 |
-| 020 | No new vulnerabilities introduced | Auto | poetry audit / pip-audit | No HIGH/CRITICAL | Clean report |
-| 030 | protobuf version >= 6.33.5 | Auto | poetry show protobuf | Version check | >= 6.33.5 |
-
-**Note on Test 030:** This test is expected to FAIL if run before the patch is released. This LLD represents a "wait" state until protobuf >= 6.33.5 becomes available.
+| 010 | Full test suite regression | Auto | `pytest tests/` | All tests pass | Exit code 0 |
+| 020 | Gemini API mock test | Auto | Mock API request | Response parsed correctly | Assertions pass |
+| 030 | Import smoke test | Auto | `import google.protobuf` | No ImportError | Module loads |
+| 040 | Version check (runtime) | Auto | `google.protobuf.__version__` | "6.33.5" or higher | Version comparison |
+| 050 | Vulnerability scan | Auto | `pip-audit` or `safety check` | No new vulnerabilities | Exit code 0, clean report |
+| 060 | Live Gemini call (optional) | Auto-Live | Real API request | Valid response | HTTP 200, valid JSON |
 
 ### 10.2 Test Commands
 
 ```bash
-# After patch is available:
-poetry update protobuf
+# Create worktree and upgrade
+git worktree add ../AgentOS-60 -b 60-protobuf-cve-patch
+cd ../AgentOS-60
+poetry add protobuf@^6.33.5
 
-# Verify version
-poetry show protobuf
+# Run all automated tests (Scenario 010)
+poetry run pytest tests/ -v
 
-# Run existing Gemini integration tests
-poetry run pytest tests/ -v -k gemini
+# Run only fast/mocked tests (exclude live)
+poetry run pytest tests/ -v -m "not live"
 
-# Check for other vulnerabilities
-poetry run pip-audit
+# Verify runtime version (Scenario 040)
+poetry run python -c "import google.protobuf; v = google.protobuf.__version__; print(f'protobuf version: {v}'); assert tuple(map(int, v.split('.')[:2])) >= (6, 33), f'Version {v} is below 6.33.5'"
+
+# Run vulnerability scan (Scenario 050)
+poetry run pip-audit --strict
+# OR if pip-audit not available:
+poetry run pip install safety && poetry run safety check
+
+# Run live integration tests (Scenario 060, optional)
+poetry run pytest tests/ -v -m live
 ```
 
 ### 10.3 Manual Tests (Only If Unavoidable)
 
-N/A - All scenarios automated.
+**If T060 (live test) cannot be automated:** Verify the upgrade by manually running a script that calls the Gemini API before merging.
+
+| ID | Scenario | Why Not Automated | Steps |
+|----|----------|-------------------|-------|
+| 060-fallback | Live Gemini API call | No existing `pytest -m live` infrastructure | 1. Activate venv with upgraded protobuf 2. Run `poetry run python -c "from src.gemini import client; print(client.test_connection())"` or equivalent 3. Verify response is valid |
+
+*Full test results recorded in Implementation Report (0103) or Test Report (0113).*
 
 ## 11. Risks & Mitigations
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| Vulnerability exploited before patch | Med (DoS only) | Very Low | Usage pattern doesn't expose vulnerable function |
-| Patch introduces breaking changes | Med | Low | Full test suite before deployment |
-| Long delay in patch release | Low | Med | Continue monitoring; accept risk given analysis |
-| False negative in risk assessment | High | Very Low | Documented reasoning for review; can reassess |
+| Breaking API changes in protobuf 6.x | High | Medium | Full regression testing, review changelog |
+| Google API packages incompatible | High | Medium | Check PyPI compatibility first, upgrade google-api-core if needed |
+| Serialization format changes | Medium | Low | Test all Gemini API interactions |
+| CI/CD pipeline failure | Low | Low | Standard tooling, well-tested process |
+| New vulnerabilities in 6.x | Medium | Low | Run pip-audit/safety check (Scenario 050) |
 
 ## 12. Definition of Done
 
 ### Code
-- [ ] protobuf upgraded to >= 6.33.5 (when available)
-- [ ] poetry.lock updated
+- [ ] `pyproject.toml` updated with protobuf ^6.33.5
+- [ ] `poetry.lock` regenerated successfully
+- [ ] No code changes required (ideal) or minimal compatibility fixes documented
 
 ### Tests
-- [ ] All existing tests pass after upgrade (Test 010)
-- [ ] No new security vulnerabilities introduced (Test 020)
-- [ ] Version verification passes (Test 030)
+- [ ] All existing tests pass with protobuf 6.x (T010)
+- [ ] Gemini integration verified working (T020)
+- [ ] Runtime version verified ≥6.33.5 (T040)
+- [ ] Vulnerability scan clean (T050)
 
 ### Documentation
-- [ ] This LLD updated with upgrade details
-- [ ] Dependabot alert resolved
+- [ ] LLD updated with any deviations
+- [ ] Implementation Report (0103) completed
+- [ ] Issue #60 closed with summary comment
 
 ### Review
-- [ ] Upgrade PR reviewed
-- [ ] Issue #60 closed after successful upgrade
-
-### Process Steps (Non-Testable)
-- [ ] Track CVE-2026-0994 until patch is available
-- [ ] Close Dependabot alert after successful upgrade
+- [ ] Code review completed (dependency change review)
+- [ ] Security team notified of CVE remediation
+- [ ] User approval before closing issue
 
 ---
 
 ## Appendix: Review Log
 
-### Initial Assessment
-
-**Timestamp:** 2026-XX-XX
-**Reviewer:** Security Analysis
-**Verdict:** MONITORING
-
-#### Analysis Summary
-
-| ID | Finding | Action |
-|----|---------|--------|
-| A1 | Vulnerable function is `ParseDict()` which parses JSON into protobuf | Documented |
-| A2 | AgentOS uses protobuf for outbound Gemini API calls | Confirmed low risk |
-| A3 | No untrusted JSON input flows to `ParseDict()` | Risk accepted |
-| A4 | DoS vulnerability, not data breach or RCE | Lower severity in context |
+*Track all review feedback with timestamps and implementation status.*
 
 ### Gemini Review #1 (REVISE)
 
-**Timestamp:** 2026-XX-XX
 **Reviewer:** Gemini 3 Pro
 **Verdict:** REVISE
 
@@ -350,82 +383,15 @@ N/A - All scenarios automated.
 
 | ID | Comment | Implemented? |
 |----|---------|--------------|
-| G1.1 | "Requirements #1 and #4 are manual process steps rather than software behaviors. Move to Definition of Done." | YES - Moved to Section 12 "Process Steps (Non-Testable)" |
-| G1.2 | "Test 030 is expected to FAIL if run immediately. Acknowledge this." | YES - Added note in Section 10.1 |
+| G1.1 | "Open questions about pinned constraints and integration tests need resolution" | YES - Resolved in Section 1 Open Questions |
+| G1.2 | "Requirement 4 (No new vulnerabilities) lacks test coverage - 80% coverage" | YES - Added T050 (vulnerability scan) in Section 10 |
+| G1.3 | "T040 should check runtime version, not just lock file" | YES - Updated T040 description and test command to verify `google.protobuf.__version__` |
+| G1.4 | "Be aware google-api-core may pin protobuf upper bounds" | YES - Added to Section 2.5 Logic Flow and Section 11 Risks |
 
 ### Review Summary
 
 | Review | Date | Verdict | Key Issue |
 |--------|------|---------|-----------|
-| Initial Assessment | 2026-XX-XX | MONITORING | Low risk - wait for patch |
-| Gemini #1 | 2026-XX-XX | REVISE | Process steps in Requirements section |
+| Gemini #1 | 2026-02-02 | REVISE | Missing vulnerability scan test for Requirement 4 |
 
 **Final Status:** PENDING
-<!-- Note: This field is auto-updated to APPROVED by the workflow when finalized -->
-
----
-
-## Appendix: CVE Details
-
-**CVE ID:** CVE-2026-0994
-**CVSS 4.0 Score:** 8.2 (High)
-**Vector:** Denial of Service via stack exhaustion
-**Attack Complexity:** Low (if attacker controls input)
-**Privileges Required:** None
-**User Interaction:** None
-
-**Affected Function:** `google.protobuf.json_format.ParseDict()`
-
-**Attack Mechanism:**
-1. Attacker crafts deeply nested `Any` messages in JSON
-2. JSON passed to `ParseDict()`
-3. Recursive parsing exhausts Python stack
-4. `RecursionError` crashes the application
-
-**Why AgentOS Is Not Affected:**
-- We use protobuf to serialize outbound API requests
-- We don't parse untrusted JSON via `ParseDict()`
-- Gemini API responses are handled by the SDK, not raw `ParseDict()` calls
-
-## Original GitHub Issue #60
-# Issue #60: Track CVE-2026-0994: protobuf JSON recursion depth bypass
-
-## Dependabot Alert #1
-
-**Package:** protobuf 5.29.5  
-**CVE:** [CVE-2026-0994](https://nvd.nist.gov/vuln/detail/CVE-2026-0994)  
-**Severity:** High (CVSS 4.0: 8.2)  
-**Type:** Denial of Service (DoS)  
-**Patched Version:** None available yet  
-
-## Vulnerability Details
-
-JSON recursion depth bypass in `google.protobuf.json_format.ParseDict()`. An attacker can supply deeply nested `Any` messages to exhaust Python's recursion stack and cause a `RecursionError`.
-
-## How It Enters AgentOS
-
-Transitive dependency via Google API packages:
-- google-api-core
-- googleapis-common-protos
-- grpcio-status
-- proto-plus
-
-These are used for Gemini API integration.
-
-## Risk Assessment: LOW
-
-- The vulnerable function parses JSON into protobuf messages
-- AgentOS uses protobuf for **outbound** API calls to Gemini, not for parsing untrusted user input
-- An attacker would need to control the JSON being parsed to exploit this
-- This is a DoS vulnerability, not data breach or RCE
-
-## Action
-
-Monitoring for patch release. Will update protobuf when a fixed version (likely >= 6.33.5) becomes available.
-
-## References
-
-- [Dependabot Alert](https://github.com/martymcenroe/AgentOS/security/dependabot/1)
-- [GHSA-7gcm-g887-7qv7](https://github.com/advisories/GHSA-7gcm-g887-7qv7)
-- [protobuf issue #25070](https://github.com/protocolbuffers/protobuf/issues/25070)
-- [protobuf PR #25239](https://github.com/protocolbuffers/protobuf/pull/25239)

@@ -1,4 +1,4 @@
-# LLD Review: 160-Feature: Track CVE-2026-0994: protobuf JSON recursion depth bypass
+# LLD Review: 160-Feature: CVE-2026-0994 protobuf JSON Recursion Depth Bypass Patch
 
 ## Identity Confirmation
 I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
@@ -7,18 +7,24 @@ I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
 PASSED
 
 ## Review Summary
-The LLD correctly structures a security compliance and dependency tracking task. It clearly defines the scope (monitoring), the trigger for action (patch release), and the verification criteria (version check + regression testing). The mapping between requirements and test scenarios is complete, and the risk assessment justifies the "wait" approach.
+The LLD provides a robust plan for remediating CVE-2026-0994 via a dependency upgrade. The test strategy is sound, relying on existing regression suites (T010) and targeted integration checks (T020, T040). Vulnerability scanning (T050) ensures the upgrade does not introduce new risks. The document is well-structured and ready for implementation.
+
+## Open Questions Resolved
+- [x] ~~Are there any pinned protobuf version constraints in dependent packages?~~ **RESOLVED: `google-api-core` frequently pins protobuf upper bounds (e.g., `<6.0.0.dev0`). Check PyPI for compatibility and be prepared to update `google-api-core` simultaneously if needed.**
+- [x] ~~Do we have existing integration tests that exercise Gemini API calls end-to-end?~~ **RESOLVED: Rely on Test ID T020 for mocked tests. Verify upgrade by running T050 (live Gemini API call) or a manual script before merging if no `pytest -m live` markers exist.**
 
 ## Requirement Coverage Analysis (MANDATORY)
 
 **Section 3 Requirements:**
 | # | Requirement | Test(s) | Status |
 |---|-------------|---------|--------|
-| 1 | Protobuf version must be >= 6.33.5 after upgrade | Test 030 | ✓ Covered |
-| 2 | All existing Gemini integration tests must pass after upgrade | Test 010 | ✓ Covered |
-| 3 | No new HIGH/CRITICAL vulnerabilities introduced by upgrade | Test 020 | ✓ Covered |
+| 1 | protobuf version is ≥6.33.5 in poetry.lock | T040 (Version verification) | ✓ Covered |
+| 2 | All existing tests pass without modification | T010 (Full test suite) | ✓ Covered |
+| 3 | Gemini API calls function correctly | T020 (Mock), T060 (Live) | ✓ Covered |
+| 4 | No new security vulnerabilities introduced | T050 (Vulnerability scan) | ✓ Covered |
+| 5 | CVE-2026-0994 vulnerability is mitigated | T040 (Version check implies fix) | ✓ Covered |
 
-**Coverage Calculation:** 3 requirements covered / 3 total = **100%**
+**Coverage Calculation:** 5 requirements covered / 5 total = **100%**
 
 **Verdict:** PASS
 
@@ -47,10 +53,11 @@ No high-priority issues found.
 - [ ] No issues found.
 
 ### Quality
-- [ ] **Requirement Coverage:** PASS (100%).
+- [ ] **Manual Fallback Assertions:** Section 10.3 (Scenario 060-fallback) relies on "Verify response is valid" via print output. To adhere strictly to "No Human Delegation," update the python one-liner to include an assertion (e.g., `assert response.status_code == 200` or `if not valid: exit(1)`). This ensures the step returns a definitive Pass/Fail exit code even if run manually.
 
 ## Tier 3: SUGGESTIONS
-- **Automation:** Consider adding a scheduled CI job (weekly) that runs `poetry show protobuf` and fails if the version is still vulnerable, to remind the team if Dependabot fails.
+- **Dependency Locking:** Be aware that `google-api-core` constraints might force a major version upgrade of that package as well, which increases the regression testing surface.
+- **Rollback:** Ensure `poetry.lock` is committed before the upgrade so the `git checkout .` or revert path is clean.
 
 ## Questions for Orchestrator
 1. None.
