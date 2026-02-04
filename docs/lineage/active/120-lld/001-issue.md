@@ -1,3 +1,10 @@
+---
+repo: martymcenroe/AgentOS
+issue: 120
+url: https://github.com/martymcenroe/AgentOS/issues/120
+fetched: 2026-02-04T07:54:17.817247Z
+---
+
 # Issue #120: chore: configure LangSmith project for tracing
 
 ## Task

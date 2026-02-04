@@ -1,22 +1,22 @@
 # 120 - Feature: Configure LangSmith Project for Tracing
 
 <!-- Template Metadata
-Last Updated: 2025-01-10
-Updated By: Issue #120 creation
-Update Reason: Initial LLD for LangSmith project configuration
+Last Updated: 2025-01-06
+Updated By: LLD creation for Issue #120
+Update Reason: Initial LLD creation for LangSmith project configuration
 -->
 
 ## 1. Context & Goal
 * **Issue:** #120
-* **Objective:** Create a dedicated "AgentOS" project in LangSmith and configure project-specific tracing for better trace organization.
+* **Objective:** Create a dedicated "AgentOS" project in LangSmith and enable project-specific tracing for better trace organization and analysis.
 * **Status:** Draft
 * **Related Issues:** None
 
 ### Open Questions
 *Questions that need clarification before or during implementation. Remove when resolved.*
 
-- [x] Is the LangSmith API key already configured? (Assumed yes - existing tracing works with default project)
-- [ ] Should we add validation that traces are appearing in the new project?
+- [ ] Is LangSmith already configured with API key in `~/.agentos/env`? (Assumed yes based on "currently using default project")
+- [ ] Should we add validation that traces are being sent correctly after configuration?
 
 ## 2. Proposed Changes
 
@@ -26,7 +26,7 @@ Update Reason: Initial LLD for LangSmith project configuration
 
 | File | Change Type | Description |
 |------|-------------|-------------|
-| `~/.agentos/env` | Modify | Uncomment `LANGCHAIN_PROJECT="AgentOS"` |
+| `~/.agentos/env` | Modify | Uncomment `LANGCHAIN_PROJECT` variable and set to "AgentOS" |
 
 ### 2.2 Dependencies
 
@@ -34,7 +34,7 @@ Update Reason: Initial LLD for LangSmith project configuration
 
 ```toml
 # pyproject.toml additions (if any)
-# None - LangSmith integration already configured
+# None - LangSmith integration already exists
 ```
 
 ### 2.3 Data Structures
@@ -52,20 +52,27 @@ Update Reason: Initial LLD for LangSmith project configuration
 ### 2.5 Logic Flow (Pseudocode)
 
 ```
-1. User creates "AgentOS" project in LangSmith web UI
-2. Edit ~/.agentos/env file
-3. Find commented LANGCHAIN_PROJECT line
-4. Uncomment and set value to "AgentOS"
-5. Restart shell or source the env file
-6. Run a workflow to generate traces
-7. Verify traces appear in AgentOS project
+1. Create "AgentOS" project in LangSmith UI
+   - Navigate to https://smith.langchain.com
+   - Go to Projects → New Project
+   - Enter name: "AgentOS"
+   - Save project
+2. Update environment configuration
+   - Open ~/.agentos/env
+   - Find commented LANGCHAIN_PROJECT line
+   - Uncomment and set to: export LANGCHAIN_PROJECT="AgentOS"
+   - Save file
+3. Verify configuration
+   - Source the env file or start new terminal
+   - Run an AgentOS workflow
+   - Check LangSmith AgentOS project for new traces
 ```
 
 ### 2.6 Technical Approach
 
-* **Module:** `~/.agentos/env` (shell configuration)
+* **Module:** N/A (configuration only)
 * **Pattern:** Environment variable configuration
-* **Key Decisions:** Using LangSmith's project feature for trace isolation rather than relying on tags or metadata filtering
+* **Key Decisions:** Using environment file approach maintains consistency with existing AgentOS configuration patterns
 
 ### 2.7 Architecture Decisions
 
@@ -73,30 +80,30 @@ Update Reason: Initial LLD for LangSmith project configuration
 
 | Decision | Options Considered | Choice | Rationale |
 |----------|-------------------|--------|-----------|
-| Project naming | "AgentOS", "agentos", "agent-os" | "AgentOS" | Matches project branding, consistent with repository name |
-| Configuration method | Hardcode in app, env var, config file | Environment variable | Standard LangChain pattern, allows per-environment override |
+| Project naming | "AgentOS", "agentos", "agent-os" | "AgentOS" | Matches official project name casing |
+| Configuration location | `~/.agentos/env`, `.env` in repo, hardcoded | `~/.agentos/env` | Issue specifies this location; keeps user-specific config separate from repo |
 
 **Architectural Constraints:**
-- Must use existing `~/.agentos/env` configuration mechanism
-- Cannot modify LangSmith SDK behavior, only configuration
+- Must use existing `~/.agentos/env` file structure
+- Cannot require code changes to AgentOS application
 
 ## 3. Requirements
 
 *What must be true when this is done. These become acceptance criteria.*
 
-1. An "AgentOS" project exists in LangSmith
-2. `LANGCHAIN_PROJECT` environment variable is set to "AgentOS" in `~/.agentos/env`
+1. AgentOS project exists in LangSmith dashboard
+2. `LANGCHAIN_PROJECT="AgentOS"` is set and exported in `~/.agentos/env`
 3. New workflow traces appear in the AgentOS project (not default project)
 
 ## 4. Alternatives Considered
 
 | Option | Pros | Cons | Decision |
 |--------|------|------|----------|
-| LangSmith project | Clean separation, easy filtering, built-in analytics | Requires web UI setup | **Selected** |
-| Tag-based filtering | No project creation needed | Harder to filter, traces mixed with others | Rejected |
-| Separate LangSmith org | Complete isolation | Overkill for single project | Rejected |
+| Environment file configuration | Consistent with existing setup; user-specific | Manual edit required | **Selected** |
+| Hardcode in application | No user action needed | Less flexible; requires code change | Rejected |
+| Use `.env` in repo | Version controlled | User-specific config in repo; security concern | Rejected |
 
-**Rationale:** LangSmith projects are the intended mechanism for organizing traces by application. This provides clean separation without additional overhead.
+**Rationale:** Using `~/.agentos/env` maintains the existing configuration pattern and keeps user-specific settings (like project names) separate from the codebase.
 
 ## 5. Data & Fixtures
 
@@ -106,76 +113,40 @@ Update Reason: Initial LLD for LangSmith project configuration
 
 | Attribute | Value |
 |-----------|-------|
-| Source | LangSmith web UI (smith.langchain.com) |
-| Format | Web-based configuration |
+| Source | LangSmith SaaS platform |
+| Format | Environment variable (string) |
 | Size | N/A |
-| Refresh | One-time setup |
-| Copyright/License | N/A - SaaS configuration |
+| Refresh | Static configuration |
+| Copyright/License | N/A |
 
 ### 5.2 Data Pipeline
 
 ```
-~/.agentos/env ──sourced by shell──► Environment Variables ──read by LangChain SDK──► LangSmith API
+~/.agentos/env ──sourced──► Shell Environment ──LANGCHAIN_PROJECT──► LangChain SDK ──traces──► LangSmith API
 ```
 
 ### 5.3 Test Fixtures
 
 | Fixture | Source | Notes |
 |---------|--------|-------|
-| N/A | N/A | No fixtures needed - configuration change only |
+| N/A | N/A | Configuration change; verification via live traces |
 
 ### 5.4 Deployment Pipeline
 
-Configuration is local to each developer machine. Each developer needs to:
-1. Create the project in their LangSmith account (if using personal)
-2. Update their local `~/.agentos/env`
+Configuration is local to each user's environment. No deployment pipeline required.
 
-**If data source is external:** N/A - uses existing LangSmith integration.
+**If data source is external:** N/A - LangSmith project creation is a one-time manual operation.
 
 ## 6. Diagram
+*N/A - Simple configuration change does not warrant an architecture diagram.*
 
 ### 6.1 Mermaid Quality Gate
 
-Before finalizing any diagram, verify in [Mermaid Live Editor](https://mermaid.live) or GitHub preview:
-
-- [x] **Simplicity:** Similar components collapsed (per 0006 §8.1)
-- [x] **No touching:** All elements have visual separation (per 0006 §8.2)
-- [x] **No hidden lines:** All arrows fully visible (per 0006 §8.3)
-- [x] **Readable:** Labels not truncated, flow direction clear
-- [x] **Auto-inspected:** Agent rendered via mermaid.ink and viewed (per 0006 §8.5)
-
-**Agent Auto-Inspection (MANDATORY):**
-
-**Auto-Inspection Results:**
-```
-- Touching elements: [x] None / [ ] Found: ___
-- Hidden lines: [x] None / [ ] Found: ___
-- Label readability: [x] Pass / [ ] Issue: ___
-- Flow clarity: [x] Clear / [ ] Issue: ___
-```
-
-*Reference: [0006-mermaid-diagrams.md](0006-mermaid-diagrams.md)*
+N/A - No diagram required for this configuration task.
 
 ### 6.2 Diagram
 
-```mermaid
-sequenceDiagram
-    participant Shell as Shell/Terminal
-    participant Env as ~/.agentos/env
-    participant SDK as LangChain SDK
-    participant LS as LangSmith API
-
-    Shell->>Env: source ~/.agentos/env
-    Env-->>Shell: LANGCHAIN_PROJECT=AgentOS
-    
-    Note over Shell,SDK: Workflow execution starts
-    
-    Shell->>SDK: Run workflow
-    SDK->>SDK: Read LANGCHAIN_PROJECT
-    SDK->>LS: POST /traces (project=AgentOS)
-    LS-->>SDK: Trace ID
-    SDK-->>Shell: Workflow result
-```
+N/A
 
 ## 7. Security & Safety Considerations
 
@@ -185,8 +156,8 @@ sequenceDiagram
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| API key exposure | Key already stored in ~/.agentos/env with appropriate permissions | Addressed |
-| Project access control | LangSmith project inherits organization permissions | Addressed |
+| API key exposure | API key already managed in env file; no changes to key handling | Addressed |
+| Project access control | LangSmith handles project-level access; uses existing org permissions | Addressed |
 
 ### 7.2 Safety
 
@@ -194,12 +165,12 @@ sequenceDiagram
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| Loss of existing traces | Existing traces remain in default project, only new traces go to AgentOS | Addressed |
-| Configuration error | If project doesn't exist, LangSmith SDK creates it automatically | Addressed |
+| Existing traces lost | Default project traces remain; this creates new project for future traces | Addressed |
+| Misconfigured variable | If LANGCHAIN_PROJECT is invalid, LangSmith SDK falls back gracefully | Addressed |
 
-**Fail Mode:** Fail Open - If project doesn't exist, traces go to auto-created project with specified name
+**Fail Mode:** Fail Open - If project name is invalid, traces go to default project (no data loss)
 
-**Recovery Strategy:** If traces are being sent to wrong project, simply update the environment variable and restart
+**Recovery Strategy:** If traces don't appear in AgentOS project, verify env variable is exported and restart terminal session
 
 ## 8. Performance & Cost Considerations
 
@@ -209,9 +180,9 @@ sequenceDiagram
 
 | Metric | Budget | Approach |
 |--------|--------|----------|
-| Latency | None | No change to trace latency |
-| Memory | None | No change to memory usage |
-| API Calls | Same | Same number of trace API calls |
+| Latency | No change | Configuration only; no runtime impact |
+| Memory | No change | Single environment variable |
+| API Calls | No change | Same traces, different project routing |
 
 **Bottlenecks:** None - this is a configuration change only
 
@@ -219,13 +190,13 @@ sequenceDiagram
 
 | Resource | Unit Cost | Estimated Usage | Monthly Cost |
 |----------|-----------|-----------------|--------------|
-| LangSmith traces | Per plan limits | No change | No change |
+| LangSmith | Existing plan | Same as current | No change |
 
 **Cost Controls:**
-- [x] No additional costs - using existing LangSmith subscription
-- [x] Project organization doesn't incur extra charges
+- [x] No additional cost - project organization is a free feature
+- [x] Trace volume unchanged
 
-**Worst-Case Scenario:** N/A - configuration change doesn't affect trace volume
+**Worst-Case Scenario:** N/A - configuration change only
 
 ## 9. Legal & Compliance
 
@@ -233,55 +204,71 @@ sequenceDiagram
 
 | Concern | Applies? | Mitigation |
 |---------|----------|------------|
-| PII/Personal Data | N/A | No change to what data is traced |
+| PII/Personal Data | No | Tracing content unchanged |
 | Third-Party Licenses | N/A | Using existing LangSmith service |
-| Terms of Service | Yes | Already compliant with LangSmith ToS |
-| Data Retention | N/A | Governed by existing LangSmith settings |
-| Export Controls | N/A | No change |
+| Terms of Service | Yes | Within normal LangSmith usage patterns |
+| Data Retention | N/A | Governed by existing LangSmith configuration |
+| Export Controls | N/A | No changes to data being sent |
 
-**Data Classification:** Internal (traces may contain workflow execution details)
+**Data Classification:** Internal (traces contain workflow execution data)
 
 **Compliance Checklist:**
-- [x] No PII stored without consent (no change to trace content)
-- [x] All third-party licenses compatible (using existing service)
+- [x] No PII stored without consent
+- [x] All third-party licenses compatible with project license
 - [x] External API usage compliant with provider ToS
-- [x] Data retention policy documented (per LangSmith account settings)
+- [x] Data retention policy documented (via LangSmith settings)
 
 ## 10. Verification & Testing
 
 *Ref: [0005-testing-strategy-and-protocols.md](0005-testing-strategy-and-protocols.md)*
 
-**Testing Philosophy:** This is a configuration change requiring manual verification in the LangSmith web UI.
+**Testing Philosophy:** This is a configuration task; verification is manual by necessity (requires UI interaction and live service).
+
+### 10.0 Test Plan (TDD - Complete Before Implementation)
+
+**TDD Requirement:** N/A - Configuration task, not code implementation.
+
+| Test ID | Test Description | Expected Behavior | Status |
+|---------|------------------|-------------------|--------|
+| T010 | Verify env file contains LANGCHAIN_PROJECT | Variable is uncommented and set to "AgentOS" | N/A |
+| T020 | Verify traces appear in LangSmith | New traces visible in AgentOS project | N/A |
+
+**Coverage Target:** N/A - Manual verification
+
+**TDD Checklist:**
+- [x] N/A - Configuration task, verification is inherently manual
 
 ### 10.1 Test Scenarios
 
 | ID | Scenario | Type | Input | Expected Output | Pass Criteria |
 |----|----------|------|-------|-----------------|---------------|
-| 010 | Project exists in LangSmith | Manual | Navigate to LangSmith Projects | AgentOS project visible | Project listed in project dropdown |
-| 020 | Environment variable set | Auto | `grep LANGCHAIN_PROJECT ~/.agentos/env` | Uncommented line with "AgentOS" | Line exists without leading `#` |
-| 030 | Traces appear in project | Manual | Run any workflow | Trace visible in AgentOS project | Trace appears with correct project label |
+| 010 | Project exists in LangSmith | Manual | Navigate to LangSmith | AgentOS project visible | Project listed in Projects view |
+| 020 | Env variable is set | Manual | `cat ~/.agentos/env \| grep LANGCHAIN_PROJECT` | `export LANGCHAIN_PROJECT="AgentOS"` | Line is uncommented and correct |
+| 030 | Traces route to project | Auto-Live | Run any AgentOS workflow | Trace appears in AgentOS project | Trace visible within 30 seconds |
 
 *Note: Use 3-digit IDs with gaps of 10 (010, 020, 030...) to allow insertions.*
 
 ### 10.2 Test Commands
 
 ```bash
-# Verify environment variable is set correctly
-grep -E "^export LANGCHAIN_PROJECT" ~/.agentos/env
+# Verify environment variable is set
+grep -v "^#" ~/.agentos/env | grep LANGCHAIN_PROJECT
 
-# Verify environment variable is loaded
+# Verify variable is exported in current shell
 echo $LANGCHAIN_PROJECT
 
-# Generate a test trace (run any workflow)
-# Then verify in LangSmith UI
+# Run a workflow to generate a trace (example)
+cd ~/agentos && poetry run python -c "from agentos import workflow; workflow.run_test()"
 ```
 
 ### 10.3 Manual Tests (Only If Unavoidable)
 
+**Justification:** LangSmith project creation requires browser-based UI interaction; verification requires viewing external dashboard.
+
 | ID | Scenario | Why Not Automated | Steps |
 |----|----------|-------------------|-------|
-| 010 | Project exists | Requires LangSmith web UI inspection | 1. Go to smith.langchain.com 2. Navigate to Projects 3. Verify "AgentOS" exists |
-| 030 | Traces in project | Requires LangSmith web UI to verify project association | 1. Run a workflow 2. Go to LangSmith 3. Select AgentOS project 4. Verify trace appears |
+| 010 | Create LangSmith project | Requires authenticated browser session and UI interaction | 1. Go to smith.langchain.com 2. Login 3. Navigate to Projects 4. Click New Project 5. Enter "AgentOS" 6. Save |
+| 030 | Verify trace appears | Requires visual confirmation in LangSmith UI | 1. Run workflow 2. Open LangSmith 3. Navigate to AgentOS project 4. Verify trace entry exists |
 
 *Full test results recorded in Implementation Report (0103) or Test Report (0113).*
 
@@ -289,27 +276,27 @@ echo $LANGCHAIN_PROJECT
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| Typo in project name | Low | Low | Copy-paste from LangSmith UI |
-| Forgot to source env | Low | Medium | Document in PR that shell restart needed |
-| LangSmith account doesn't have project feature | Med | Low | Verify plan includes project organization |
+| LangSmith project already exists with same name | Low | Low | Check existing projects before creating |
+| Env file syntax error after edit | Med | Low | Verify shell sources file correctly after edit |
+| Traces still going to default project | Low | Low | Verify env variable is exported, not just set |
 
 ## 12. Definition of Done
 
 ### Code
-- [x] Implementation complete and linted (N/A - config only)
-- [x] Code comments reference this LLD (N/A - config only)
+- [x] No code changes required
+- [x] N/A - Configuration only
 
 ### Tests
-- [ ] All test scenarios pass
-- [ ] Test coverage meets threshold (N/A - config only)
+- [ ] LangSmith project "AgentOS" exists
+- [ ] `~/.agentos/env` contains uncommented `LANGCHAIN_PROJECT="AgentOS"`
+- [ ] At least one trace appears in AgentOS project after workflow run
 
 ### Documentation
 - [ ] LLD updated with any deviations
 - [ ] Implementation Report (0103) completed
-- [ ] Test Report (0113) completed if applicable
 
 ### Review
-- [ ] Code review completed
+- [ ] Configuration verified by user
 - [ ] User approval before closing issue
 
 ---
@@ -322,7 +309,6 @@ echo $LANGCHAIN_PROJECT
 
 | Review | Date | Verdict | Key Issue |
 |--------|------|---------|-----------|
-| (pending) | - | - | - |
+| - | - | - | Awaiting review |
 
 **Final Status:** PENDING
-<!-- Note: This field is auto-updated to APPROVED by the workflow when finalized -->
