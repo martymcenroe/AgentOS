@@ -23,8 +23,11 @@ from agentos.workflows.testing.state import TestingWorkflowState, TestScenario
 def _extract_impl_module(files_to_modify: list[dict] | None) -> str | None:
     """Extract Python module path from files_to_modify.
 
-    Finds the first Python file that will be created/modified and converts
-    its path to a Python import path.
+    Prioritizes NEW files (change_type="Add") over existing files (change_type="Modify")
+    because new files won't exist yet, causing the import to fail (TDD RED phase).
+
+    Issue #261: Previously picked the first file regardless of change type,
+    which could be an existing "Modify" file that imports successfully.
 
     Args:
         files_to_modify: List of file dicts from LLD Section 2.1.
@@ -36,25 +39,46 @@ def _extract_impl_module(files_to_modify: list[dict] | None) -> str | None:
     if not files_to_modify:
         return None
 
+    def _path_to_module(path: str) -> str:
+        """Convert file path to Python module path."""
+        module = path.replace("/", ".").replace("\\", ".")
+        if module.endswith(".py"):
+            module = module[:-3]
+        # Remove src/ prefix if present
+        if module.startswith("src."):
+            module = module[4:]
+        # Skip __init__.py - import the package instead
+        if module.endswith(".__init__"):
+            module = module[:-9]
+        return module
+
+    # First pass: look for NEW files (Add) - these won't exist yet
     for file_info in files_to_modify:
         path = file_info.get("path", "")
         change_type = file_info.get("change_type", "").lower()
 
-        # Skip test files - we want implementation modules
+        # Skip test files and __init__.py
         if "test" in path.lower():
             continue
+        if path.endswith("__init__.py"):
+            continue
 
-        # Look for Python files being added or modified
-        if path.endswith(".py") and change_type in ("add", "modify"):
-            # Convert file path to module path
-            # e.g., "agentos/workflows/testing/nodes/foo.py" -> "agentos.workflows.testing.nodes.foo"
-            module = path.replace("/", ".").replace("\\", ".")
-            if module.endswith(".py"):
-                module = module[:-3]
-            # Remove src/ prefix if present
-            if module.startswith("src."):
-                module = module[4:]
-            return module
+        # Prioritize "Add" files - they don't exist yet
+        if path.endswith(".py") and change_type == "add":
+            return _path_to_module(path)
+
+    # Second pass: fall back to "Modify" files if no "Add" found
+    for file_info in files_to_modify:
+        path = file_info.get("path", "")
+        change_type = file_info.get("change_type", "").lower()
+
+        if "test" in path.lower():
+            continue
+        if path.endswith("__init__.py"):
+            continue
+
+        if path.endswith(".py") and change_type == "modify":
+            return _path_to_module(path)
 
     return None
 
@@ -265,16 +289,17 @@ def _generate_test_function(
     lines.append("    # TDD: Assert")
 
     # Convert assertion descriptions to actual assertions
+    # Issue #261: Use assert False as failsafe - tests MUST fail until implemented
     if assertions:
         for i, assertion in enumerate(assertions[:3]):
-            # Generate a real assertion based on the description
+            # Generate a failing assertion based on the description
             lines.append(f"    # {assertion}")
-            lines.append(f"    assert True, 'Placeholder for: {assertion}'")
+            lines.append(f"    assert False, 'TDD RED: {assertion}'")
         lines.append("")
     else:
         # Default assertion if no specific ones provided
         lines.append(f"    # Verify {name} works correctly")
-        lines.append(f"    assert True, '{name} executed successfully'")
+        lines.append(f"    assert False, 'TDD RED: {name} not implemented'")
         lines.append("")
 
     lines.append("")

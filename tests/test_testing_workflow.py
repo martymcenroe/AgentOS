@@ -37,6 +37,7 @@ from agentos.workflows.testing.nodes.review_test_plan import (
     extract_requirement_ids,
 )
 from agentos.workflows.testing.nodes.scaffold_tests import (
+    _extract_impl_module,
     generate_test_file_content,
 )
 from agentos.workflows.testing.state import TestScenario
@@ -5177,6 +5178,72 @@ class TestScaffoldTestsMoreGaps:
         assert "def test_first" in content
         assert "def test_second" in content
         assert "def test_third" in content
+
+
+class TestExtractImplModule:
+    """Tests for _extract_impl_module function.
+
+    Issue #261: Prioritize 'Add' files over 'Modify' files.
+    """
+
+    def test_prioritizes_add_over_modify(self):
+        """Add files should be selected before Modify files."""
+        files_to_modify = [
+            {"path": "agentos/existing/module.py", "change_type": "Modify"},
+            {"path": "agentos/new/parser.py", "change_type": "Add"},
+        ]
+        result = _extract_impl_module(files_to_modify)
+        assert result == "agentos.new.parser"
+
+    def test_returns_add_file_even_if_second(self):
+        """Add file should be returned even if listed after Modify."""
+        files_to_modify = [
+            {"path": "agentos/review.py", "change_type": "Modify"},
+            {"path": "agentos/finalize.py", "change_type": "Modify"},
+            {"path": "agentos/parsers/verdict_parser.py", "change_type": "Add"},
+        ]
+        result = _extract_impl_module(files_to_modify)
+        assert result == "agentos.parsers.verdict_parser"
+
+    def test_falls_back_to_modify_if_no_add(self):
+        """If no Add files, should return first Modify file."""
+        files_to_modify = [
+            {"path": "agentos/review.py", "change_type": "Modify"},
+            {"path": "agentos/finalize.py", "change_type": "Modify"},
+        ]
+        result = _extract_impl_module(files_to_modify)
+        assert result == "agentos.review"
+
+    def test_skips_test_files(self):
+        """Test files should be skipped."""
+        files_to_modify = [
+            {"path": "tests/test_parser.py", "change_type": "Add"},
+            {"path": "agentos/parser.py", "change_type": "Add"},
+        ]
+        result = _extract_impl_module(files_to_modify)
+        assert result == "agentos.parser"
+
+    def test_skips_init_files(self):
+        """__init__.py files should be skipped."""
+        files_to_modify = [
+            {"path": "agentos/parsers/__init__.py", "change_type": "Add"},
+            {"path": "agentos/parsers/verdict_parser.py", "change_type": "Add"},
+        ]
+        result = _extract_impl_module(files_to_modify)
+        assert result == "agentos.parsers.verdict_parser"
+
+    def test_returns_none_for_empty(self):
+        """Returns None for empty list."""
+        assert _extract_impl_module([]) is None
+        assert _extract_impl_module(None) is None
+
+    def test_handles_src_prefix(self):
+        """Removes src/ prefix from module path."""
+        files_to_modify = [
+            {"path": "src/mypackage/module.py", "change_type": "Add"},
+        ]
+        result = _extract_impl_module(files_to_modify)
+        assert result == "mypackage.module"
 
 
 class TestImplementCodeNoAuditDir:
