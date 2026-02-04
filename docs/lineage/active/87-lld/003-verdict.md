@@ -1,74 +1,64 @@
-# LLD Review: 187-Feature: TDD Enforcement & Context-Aware Code Generation Workflow
+# LLD Review: 187 - Feature: Implementation Workflow: TDD Enforcement & Context-Aware Code Generation
 
 ## Identity Confirmation
 I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
 
-## Pre-Flight Gate
-PASSED
+## Pre-Flight Gate: PASSED
+All required elements (Issue Link, Context, Proposed Changes) are present.
 
 ## Review Summary
-The LLD proposes a robust LangGraph-based workflow for TDD enforcement. The state machine logic is well-defined with appropriate routing based on pytest exit codes. Security considerations regarding path traversal and file limits are strong. However, the design is **BLOCKED** due to insufficient test coverage for the Governance Audit Log requirement (Requirement 15).
+The LLD provides a robust, safety-conscious design for a TDD-enforcing implementation workflow using LangGraph. The "Red-Green-Refactor" enforcement via exit codes is excellent, as is the isolation of privileged git operations. However, the design fails the strict 95% test coverage threshold because the Audit Logging requirement is not mapped to a test case. Additionally, the "timeout" behavior needs to align with the "Fail Closed" safety principle.
+
+## Open Questions Resolved
+- [x] ~~Should worktree cleanup preserve debug information on failure beyond the rollback state?~~ **RESOLVED: Yes.** The workflow must execute a `git reset --hard` to clean the worktree (Safety), but MUST persist the `ImplementationState` (including diffs/generated code) to a dedicated debug file (e.g., `.agentos/debug/<id>.json`) before cleaning up.
+- [x] ~~What is the preferred VS Code command for opening diffs (code --diff vs code -d)?~~ **RESOLVED: `code --diff <left> <right>`** is the explicit, preferred syntax for readability and reliability.
+- [x] ~~Should the 30-minute human review timeout auto-abort or auto-preserve state?~~ **RESOLVED: Auto-abort.** To adhere to "Fail Closed" safety principles, a timeout must be treated as a rejection. The workflow must rollback git changes (clean worktree) and exit. (Debug state can be saved as per Q1).
 
 ## Requirement Coverage Analysis (MANDATORY)
 
 **Section 3 Requirements:**
 | # | Requirement | Test(s) | Status |
 |---|-------------|---------|--------|
-| 1 | Tests MUST be written before implementation code | 010, 030 | ✓ Covered |
-| 2 | N2_TestGate_Fail MUST accept ONLY pytest exit code 1 as valid Red state | 020, 030, 040, 050 | ✓ Covered |
-| 3 | N2_TestGate_Fail MUST route to N1_Scaffold on exit codes 4 or 5 | 040, 050 | ✓ Covered |
-| 4 | N2_TestGate_Fail MUST route to N6_Human_Review on exit codes 2 or 3 | 060, 070 | ✓ Covered |
-| 5 | Maximum 3 retry attempts before human escalation | 080 | ✓ Covered |
-| 6 | Pytest subprocess calls MUST include 300-second timeout | 150 | ✓ Covered |
-| 7 | Paths with traversal sequences (`../`) MUST be rejected | 090, 100 | ✓ Covered |
-| 8 | Files matching secret patterns MUST be rejected | 110, 120 | ✓ Covered |
-| 9 | Individual files larger than 100KB MUST be rejected | 130 | ✓ Covered |
-| 10 | Total context exceeding 200k tokens MUST fail fast before API call | 140 | ✓ Covered |
-| 11 | AGENTOS_MOCK_LLM=1 MUST enable offline graph testing | 180 | ✓ Covered |
-| 12 | CLI MUST print data handling policy on startup | 200 | ✓ Covered |
-| 13 | Human review MUST accept "approve" or "abort" input | 160, 170 | ✓ Covered |
-| 14 | "abort" MUST trigger rollback and exit with code 2 | 170 | ✓ Covered |
-| 15 | All node transitions MUST be logged via GovernanceAuditLog | - | **GAP** |
+| 1 | Tests MUST be written before implementation code (Red-Green-Refactor) | T010, T020 | ✓ Covered |
+| 2 | N2_TestGate_Fail MUST verify pytest fails with exit code 1 specifically | T010 | ✓ Covered |
+| 3 | N2_TestGate_Fail MUST route to N1_Scaffold on exit codes 4 or 5 | T030 | ✓ Covered |
+| 4 | N4_TestGate_Pass MUST route to N3_Coder on pytest failure (retry loop) | T060 | ✓ Covered |
+| 5 | Maximum 3 retry attempts before human escalation | T070 | ✓ Covered |
+| 6 | Real subprocess execution—never ask LLM "did tests pass?" | T010, T050 (Implied) | ✓ Covered |
+| 7 | Pytest subprocess MUST include 300-second timeout | T140 | ✓ Covered |
+| 8 | Context files MUST be validated for path traversal attacks | T080 | ✓ Covered |
+| 9 | Secret file patterns MUST be rejected before transmission | T090 | ✓ Covered |
+| 10 | Files larger than 100KB MUST be rejected | T100 | ✓ Covered |
+| 11 | Total context exceeding 200k tokens MUST fail fast before API call | T110 | ✓ Covered |
+| 12 | Human review MUST support approve/abort interactive flow | T120, T130 | ✓ Covered |
+| 13 | Git cleanup MUST only execute after successful merge | T120, T130 | ✓ Covered |
+| 14 | All node transitions MUST be logged via GovernanceAuditLog | - | **GAP** |
 
-**Coverage Calculation:** 14 requirements covered / 15 total = **93.3%**
+**Coverage Calculation:** 13 requirements covered / 14 total = **92.8%**
 
-**Verdict:** **BLOCK** (Threshold is 95%)
+**Verdict:** **BLOCK** (Must be ≥95%)
 
 **Missing Test Scenario:**
-- **Requirement 15:** Needs a test scenario (e.g., ID 210) that explicitly mocks `GovernanceAuditLog` and verifies that entries are created during node transitions. Current tests verify the *routing* but not the *logging side effect*.
+- **T140 (Shift existing T140 down):** Verify that `GovernanceAuditLog` receives entries for node transitions (N1->N2, etc.).
 
 ## Tier 1: BLOCKING Issues
-No Tier 1 blocking issues found beyond the coverage gap.
-
-### Cost
-- No issues found. Retry limits and token budgets are well-defined.
-
-### Safety
-- No issues found. Worktree cleanup and human gates for destructive acts are present.
-
-### Security
-- No issues found. Path validation and secret pattern matching are addressed.
-
-### Legal
-- No issues found. Data policy is handled.
+No Tier 1 issues found. Safety and Security are well-handled.
 
 ## Tier 2: HIGH PRIORITY Issues
 
-### Architecture
-- No issues found.
-
-### Observability
-- No issues found.
-
 ### Quality
-- [ ] **Requirement Coverage:** **BLOCK**. Coverage is 93.3%. You must add a test case to Section 10 explicitly verifying that `GovernanceAuditLog` receives entries during workflow execution.
+- [ ] **Requirement Coverage Gap:** Coverage is 92.8%, below the 95% threshold. Requirement 14 (Audit Logging) is critical for governance but is not verified by any test scenario in Section 10.1. Add a test case to mock the logger and verify calls.
+- [ ] **Logic Flow Contradiction (Timeout):** Section 2.5 (Logic Flow) step 11.d states: `IF timeout (30 min) THEN preserve state, exit 2`. This contradicts the "Fail Closed" safety requirement and the Open Question resolution. Update logic to: `IF timeout... THEN rollback, save debug state, exit 2`.
+
+### Architecture
+- [ ] **Logging Implementation:** While `GovernanceAuditLog` is mentioned in requirements, the `ImplementationState` in Section 2.3 does not show a field for the logger instance, nor does the graph setup show injection of the logger. Ensure the logger is properly instantiated and accessible to nodes.
 
 ## Tier 3: SUGGESTIONS
-- **Documentation:** Ensure the Mermaid diagram in Section 6 is included in the updated `docs/wiki/workflows.md`.
-- **UX:** Consider making the 30-minute human review timeout configurable via a CLI flag (addressing Open Question 1).
+- **T030 Expansion:** Update T030 or add T031 to explicitly verify exit code 5 (internal error) also triggers the scaffold retry, ensuring full coverage of R3.
+- **Artifacts Directory:** Explicitly define where "debug information" goes (e.g., `.agentos/runs/` or similar) in the Data Structures section to support the Q1 resolution.
 
 ## Questions for Orchestrator
-1. Open Question 2: `code -d` is generally the correct command for VS Code diffs, but `code --diff` is the verbose equivalent. Recommend using the verbose flag for clarity in the codebase.
+1. None.
 
 ## Verdict
 [ ] **APPROVED** - Ready for implementation

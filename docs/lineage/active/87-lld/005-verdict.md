@@ -1,36 +1,38 @@
-# LLD Review: 187 - Feature: TDD Enforcement & Context-Aware Code Generation Workflow
+# LLD Review: 187-Feature-Implementation-Workflow
 
 ## Identity Confirmation
 I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
 
-## Pre-Flight Gate
-PASSED
+## Pre-Flight Gate: PASSED
+All required elements present.
 
 ## Review Summary
-The LLD is exceptionally well-structured and detailed. It clearly defines the state machine, addresses security concerns (path validation, secret detection), and enforces strict TDD mechanics (Red-Green-Refactor) via subprocess exit codes. The addition of the GovernanceAuditLog integration and associated tests fully addresses previous feedback. The test plan is comprehensive and achieves 100% requirement coverage.
+The LLD provides a robust, safety-first design for the TDD implementation workflow. It correctly addresses all previous feedback, particularly regarding audit logging, debug state persistence, and strict fail-closed timeout handling. The test plan is comprehensive, and the security controls for file access are well-defined.
+
+## Open Questions Resolved
+No open questions found in Section 1 (all marked resolved).
 
 ## Requirement Coverage Analysis (MANDATORY)
 
 **Section 3 Requirements:**
 | # | Requirement | Test(s) | Status |
 |---|-------------|---------|--------|
-| 1 | Tests MUST be written before implementation code (Red-Green-Refactor enforced) | 030, 020 | ✓ Covered |
-| 2 | N2_TestGate_Fail MUST accept ONLY pytest exit code 1 as valid Red state | 020 | ✓ Covered |
-| 3 | N2_TestGate_Fail MUST route to N1_Scaffold on exit codes 4 or 5 | 040, 050 | ✓ Covered |
-| 4 | N2_TestGate_Fail MUST route to N6_Human_Review on exit codes 2 or 3 | 060, 070 | ✓ Covered |
-| 5 | Maximum 3 retry attempts before human escalation | 080 | ✓ Covered |
-| 6 | Pytest subprocess calls MUST include 300-second timeout | 150 | ✓ Covered |
-| 7 | Paths with traversal sequences (`../`) MUST be rejected | 090, 100 | ✓ Covered |
-| 8 | Files matching secret patterns MUST be rejected | 110, 120 | ✓ Covered |
-| 9 | Individual files larger than 100KB MUST be rejected | 130 | ✓ Covered |
-| 10 | Total context exceeding 200k tokens MUST fail fast before API call | 140 | ✓ Covered |
-| 11 | `AGENTOS_MOCK_LLM=1` MUST enable offline graph testing | 180 | ✓ Covered |
-| 12 | CLI MUST print data handling policy on startup | 200 | ✓ Covered |
-| 13 | Human review MUST accept "approve" or "abort" input | 160, 170 | ✓ Covered |
-| 14 | "abort" MUST trigger rollback and exit with code 2 | 170 | ✓ Covered |
-| 15 | All node transitions MUST be logged via GovernanceAuditLog | 210 | ✓ Covered |
+| 1 | Tests MUST be written before implementation code (Red-Green-Refactor) | T020 (Rejects if pass on N2) | ✓ Covered |
+| 2 | N2_TestGate_Fail MUST verify pytest fails with exit code 1 specifically | T010 | ✓ Covered |
+| 3 | N2_TestGate_Fail MUST route to N1_Scaffold on exit codes 4 or 5 | T030, T031 | ✓ Covered |
+| 4 | N4_TestGate_Pass MUST route to N3_Coder on pytest failure (retry loop) | T060 | ✓ Covered |
+| 5 | Maximum 3 retry attempts before human escalation | T070 | ✓ Covered |
+| 6 | Real subprocess execution—never ask LLM "did tests pass?" | T150 (timeout implies subprocess), T170 (mock mode checks) | ✓ Covered |
+| 7 | Pytest subprocess MUST include 300-second timeout | T150 | ✓ Covered |
+| 8 | Context files MUST be validated for path traversal attacks | T080 | ✓ Covered |
+| 9 | Secret file patterns MUST be rejected before transmission | T090 | ✓ Covered |
+| 10 | Files larger than 100KB MUST be rejected | T100 | ✓ Covered |
+| 11 | Total context exceeding 200k tokens MUST fail fast before API call | T110 | ✓ Covered |
+| 12 | Human review MUST support approve/abort interactive flow | T120, T130 | ✓ Covered |
+| 13 | Git cleanup MUST only execute after successful merge (or safe rollback) | T120 (Merge path), T130 (Rollback path) | ✓ Covered |
+| 14 | All node transitions MUST be logged via GovernanceAuditLog | T160 | ✓ Covered |
 
-**Coverage Calculation:** 15 requirements covered / 15 total = **100%**
+**Coverage Calculation:** 14 requirements covered / 14 total = **100%**
 
 **Verdict:** PASS
 
@@ -38,33 +40,33 @@ The LLD is exceptionally well-structured and detailed. It clearly defines the st
 No blocking issues found. LLD is approved for implementation.
 
 ### Cost
-- [ ] No issues found. Token limits and retry caps are correctly defined.
+- No issues found. Retry limits and token budgets are explicitly defined.
 
 ### Safety
-- [ ] No issues found. Destructive operations are isolated to N7 and require human confirmation in N6.
+- No issues found. Fail Closed strategy, timeout auto-abort, and worktree cleanup are correctly designed.
 
 ### Security
-- [ ] No issues found. Path traversal and secret file checks are robust.
+- No issues found. Path traversal and secret protection are covered by validators and tests.
 
 ### Legal
-- [ ] No issues found. Data policy display is verified in tests.
+- No issues found.
 
 ## Tier 2: HIGH PRIORITY Issues
 No high-priority issues found.
 
 ### Architecture
-- [ ] No issues found. Files are correctly organized in `agentos/workflows/implementation/`.
+- No issues found. Structure matches project standards.
 
 ### Observability
-- [ ] No issues found. GovernanceAuditLog integration is explicitly designed and tested.
+- No issues found. GovernanceAuditLog is integrated.
 
 ### Quality
-- [ ] **Requirement Coverage:** PASS (100%).
-- [ ] Test scenarios are specific, automated, and cover all edge cases defined in the requirements.
+- **Requirement Coverage:** PASS (100%)
+- **Test Plan:** Comprehensive TDD plan included.
 
 ## Tier 3: SUGGESTIONS
-- **Timeout Configuration:** Regarding Open Question 1, consider hardcoding the 30-minute timeout for v1 to keep complexity low, but add a `TODO` comment in the code to make it configurable later.
-- **Manual Tests:** While M010 and M020 are listed as manual, ensure that the *logic* for these features (VS Code command string generation and timeout loop logic) is covered by unit tests, leaving manual steps strictly for visual verification.
+- **N7 Verification:** While T120 verifies routing to N7, ensure the implementation of N7 (Safe Merge) includes a check to verify the merge was successful before exiting with code 0.
+- **Diff Tooling:** Consider adding a fallback if `code` (VS Code) is not in the PATH, though `code --diff` is the specified requirement.
 
 ## Questions for Orchestrator
 1. None.

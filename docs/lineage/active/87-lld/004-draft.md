@@ -1,22 +1,24 @@
-# 187 - Feature: TDD Enforcement & Context-Aware Code Generation Workflow
+# 187 - Feature: Implementation Workflow: TDD Enforcement & Context-Aware Code Generation
 
 <!-- Template Metadata
 Last Updated: 2025-01-XX
-Updated By: Initial LLD Creation
-Update Reason: New implementation workflow for Issue #87
+Updated By: LLD Creation
+Update Reason: Revision addressing Gemini Review #1 feedback
 -->
 
 ## 1. Context & Goal
 * **Issue:** #87
-* **Objective:** Create a LangGraph-based implementation workflow that enforces Test-Driven Development, injects architectural context, and prevents LLM hallucination of test results by running real pytest commands.
+* **Objective:** Create a LangGraph-based implementation workflow that enforces Test-Driven Development, injects architectural context, and safely manages git operations outside of LLM control.
 * **Status:** Draft
-* **Related Issues:** #003 (LLD Workflow - prerequisite)
+* **Related Issues:** #003 (LLD Workflow - dependency)
 
 ### Open Questions
 
-- [ ] Should the human review timeout (30 min) be configurable via CLI flag?
-- [ ] What VS Code command should be used to open diffs (code --diff vs code -d)?
-- [ ] Should we support alternative test runners (e.g., unittest) in future versions?
+*All open questions resolved per Gemini Review #1:*
+
+- [x] ~~Should worktree cleanup preserve debug information on failure beyond the rollback state?~~ **RESOLVED: Yes.** The workflow must execute a `git reset --hard` to clean the worktree (Safety), but MUST persist the `ImplementationState` (including diffs/generated code) to a dedicated debug file (e.g., `.agentos/debug/<id>.json`) before cleaning up.
+- [x] ~~What is the preferred VS Code command for opening diffs (code --diff vs code -d)?~~ **RESOLVED: `code --diff <left> <right>`** is the explicit, preferred syntax for readability and reliability.
+- [x] ~~Should the 30-minute human review timeout auto-abort or auto-preserve state?~~ **RESOLVED: Auto-abort.** To adhere to "Fail Closed" safety principles, a timeout must be treated as a rejection. The workflow must rollback git changes (clean worktree) and exit. Debug state is saved before cleanup as per Q1 resolution.
 
 ## 2. Proposed Changes
 
@@ -26,38 +28,39 @@ Update Reason: New implementation workflow for Issue #87
 
 | File | Change Type | Description |
 |------|-------------|-------------|
-| `agentos/workflows/implementation/__init__.py` | Add | Package initialization, exports graph and state |
+| `agentos/workflows/implementation/__init__.py` | Add | Package init with exports |
 | `agentos/workflows/implementation/graph.py` | Add | Main StateGraph definition with all nodes and routing |
 | `agentos/workflows/implementation/state.py` | Add | ImplementationState TypedDict definition |
 | `agentos/workflows/implementation/nodes/__init__.py` | Add | Nodes subpackage init |
-| `agentos/workflows/implementation/nodes/context_loader.py` | Add | N0: Load LLD and context files with validation |
-| `agentos/workflows/implementation/nodes/scaffold.py` | Add | N1: Test scaffolding node |
-| `agentos/workflows/implementation/nodes/test_gates.py` | Add | N2 (must fail) and N4 (must pass) test gate nodes |
-| `agentos/workflows/implementation/nodes/coder.py` | Add | N3: Implementation writing node |
-| `agentos/workflows/implementation/nodes/lint_audit.py` | Add | N5: Static analysis node |
-| `agentos/workflows/implementation/nodes/human_review.py` | Add | N6: Interactive approval/abort with VS Code |
-| `agentos/workflows/implementation/nodes/safe_merge.py` | Add | N7: Privileged git operations |
+| `agentos/workflows/implementation/nodes/context_loader.py` | Add | N0 node - loads LLD and context files |
+| `agentos/workflows/implementation/nodes/scaffold.py` | Add | N1 node - test scaffolding |
+| `agentos/workflows/implementation/nodes/test_gates.py` | Add | N2 and N4 nodes - pytest execution and validation |
+| `agentos/workflows/implementation/nodes/coder.py` | Add | N3 node - implementation writing |
+| `agentos/workflows/implementation/nodes/lint_audit.py` | Add | N5 node - static analysis |
+| `agentos/workflows/implementation/nodes/human_review.py` | Add | N6 node - interactive approval/abort |
+| `agentos/workflows/implementation/nodes/safe_merge.py` | Add | N7 node - privileged git operations |
 | `agentos/workflows/implementation/path_validator.py` | Add | Centralized path security validation |
 | `agentos/workflows/implementation/context_validator.py` | Add | File size and token count validation |
 | `agentos/workflows/implementation/exit_code_router.py` | Add | Pytest exit code to node routing logic |
+| `agentos/workflows/implementation/debug_state.py` | Add | Debug state persistence utilities |
 | `agentos/workflows/implementation/mock_llm.py` | Add | Mock LLM responses for offline testing |
-| `tools/run_implementation_workflow.py` | Add | CLI entry point with data policy display |
+| `tools/run_implementation_workflow.py` | Add | CLI entry point |
 | `tests/workflows/implementation/__init__.py` | Add | Test package init |
 | `tests/workflows/implementation/test_graph.py` | Add | Graph routing tests |
 | `tests/workflows/implementation/test_nodes.py` | Add | Individual node unit tests |
 | `tests/workflows/implementation/test_path_validator.py` | Add | Path traversal security tests |
 | `tests/workflows/implementation/test_context_validator.py` | Add | File size and token limit tests |
 | `tests/workflows/implementation/test_exit_code_router.py` | Add | Exit code routing logic tests |
-| `tests/workflows/implementation/test_governance_audit.py` | Add | GovernanceAuditLog integration tests |
+| `tests/workflows/implementation/test_audit_logging.py` | Add | Audit logging verification tests |
 | `tests/fixtures/implementation/mock_responses.json` | Add | Static fixtures for mock LLM mode |
 | `docs/wiki/workflows.md` | Modify | Add Implementation Workflow section |
-| `docs/0003-file-inventory.md` | Modify | Add new files to inventory |
+| `docs/0003-file-inventory.md` | Modify | Add new files |
 
 ### 2.2 Dependencies
 
 ```toml
 # pyproject.toml additions (if any)
-# langgraph already in dependencies per issue spec
+# langgraph already in dependencies
 # No new dependencies required
 ```
 
@@ -69,224 +72,237 @@ class ImplementationState(TypedDict):
     issue_id: str                    # GitHub issue number
     lld_content: str                 # Loaded LLD markdown content
     context_content: str             # Concatenated context files
-    test_code: str                   # Generated test code
-    implementation_code: str         # Generated implementation code
-    test_output: str                 # Captured pytest stdout/stderr
-    test_exit_code: int              # Pytest exit code (0-5)
+    test_output: str                 # pytest stdout/stderr
+    test_exit_code: int              # pytest exit code (0-5)
     retry_count: int                 # Implementation retry counter (max 3)
     scaffold_retry_count: int        # Test scaffold retry counter
-    changed_files: list[str]         # Files modified by workflow
-    human_decision: str              # "approve" | "abort" | None
-    error_history: list[str]         # Accumulated error messages for escalation
-    current_node: str                # Current node name for logging
-    worktree_path: str               # Path to git worktree if used
+    changed_files: list[str]         # Files modified during workflow
+    human_decision: str | None       # "approve" | "abort" | None
+    current_node: str                # Current node for logging
+    error_history: list[dict]        # Error context for escalation
+    audit_logger: GovernanceAuditLog # Logger instance for node transitions
+```
 
-class PytestResult(TypedDict):
-    exit_code: int                   # 0-5 per pytest spec
-    stdout: str                      # Captured stdout
-    stderr: str                      # Captured stderr
-    duration_seconds: float          # Execution time
-
+```python
 class PathValidationResult(TypedDict):
-    valid: bool                      # Whether path is safe
-    resolved_path: str               # Absolute resolved path
-    rejection_reason: str | None     # Why rejected if invalid
+    valid: bool
+    resolved_path: str | None
+    error: str | None
+    rejection_reason: str | None     # "traversal" | "secret" | "size" | "outside_root"
+```
 
+```python
 class ContextValidationResult(TypedDict):
-    valid: bool                      # Whether context is within limits
-    total_bytes: int                 # Total size of all files
-    estimated_tokens: int            # Rough token estimate
-    rejection_reason: str | None     # Why rejected if invalid
+    valid: bool
+    total_size_bytes: int
+    estimated_tokens: int
+    files_checked: list[str]
+    error: str | None
+```
+
+```python
+class DebugStateRecord(TypedDict):
+    """Persisted debug state for post-failure analysis."""
+    issue_id: str
+    timestamp: str
+    final_node: str
+    exit_reason: str
+    state_snapshot: dict             # Full ImplementationState at failure
+    generated_diffs: list[str]       # Diffs of generated code
+    error_history: list[dict]
 ```
 
 ### 2.4 Function Signatures
 
 ```python
-# State module
-def create_initial_state(issue_id: str, lld_path: str) -> ImplementationState:
-    """Create initial state for workflow execution."""
-    ...
-
-# Path validator module
+# path_validator.py
 def validate_path(path: str, project_root: Path) -> PathValidationResult:
-    """Validate a file path for security concerns."""
+    """Validate a path is safe for context loading."""
     ...
 
-def is_secret_file(path: str) -> bool:
+def is_secret_file(filename: str) -> bool:
     """Check if filename matches secret file patterns."""
     ...
 
-# Context validator module
-def validate_file_size(path: Path, max_bytes: int = 102400) -> tuple[bool, str]:
-    """Validate individual file is under size limit (100KB default)."""
+# context_validator.py
+def validate_file_size(path: Path, max_size_kb: int = 100) -> tuple[bool, str | None]:
+    """Check if file is under size limit."""
     ...
 
-def validate_total_tokens(content: str, max_tokens: int = 200000) -> tuple[bool, int]:
-    """Estimate token count and validate under limit."""
+def estimate_tokens(content: str) -> int:
+    """Estimate token count for content (approx 4 chars per token)."""
     ...
 
-def estimate_tokens(text: str) -> int:
-    """Rough token estimation (chars / 4)."""
+def validate_total_context(files: list[Path], max_tokens: int = 200_000) -> ContextValidationResult:
+    """Validate total context size before API call."""
     ...
 
-# Exit code router module
-def route_by_exit_code(state: ImplementationState) -> str:
-    """Determine next node based on pytest exit code."""
+# debug_state.py
+def persist_debug_state(state: ImplementationState, exit_reason: str) -> Path:
+    """Save state to .agentos/debug/<issue_id>_<timestamp>.json for debugging."""
     ...
 
-def is_valid_red_state(exit_code: int) -> bool:
-    """Check if exit code represents valid TDD 'Red' phase (exit code 1 only)."""
+def get_debug_directory() -> Path:
+    """Return and ensure .agentos/debug/ directory exists."""
     ...
 
-# Node functions
+# exit_code_router.py
+def route_by_exit_code(exit_code: int, current_node: str) -> str:
+    """Map pytest exit code to next node name."""
+    ...
+
+# nodes/context_loader.py
 def n0_context_loader(state: ImplementationState) -> ImplementationState:
-    """Load LLD and context files, validate paths and sizes."""
+    """Load and validate LLD and context files."""
     ...
 
+# nodes/scaffold.py
 def n1_scaffold(state: ImplementationState) -> ImplementationState:
-    """Generate failing test scaffolds from LLD spec."""
+    """Generate failing test files based on LLD spec."""
     ...
 
+# nodes/test_gates.py
 def n2_test_gate_fail(state: ImplementationState) -> ImplementationState:
-    """Run pytest, verify tests fail with exit code 1."""
-    ...
-
-def n3_coder(state: ImplementationState) -> ImplementationState:
-    """Generate implementation code using context."""
+    """Verify tests fail with exit code 1 (Red phase)."""
     ...
 
 def n4_test_gate_pass(state: ImplementationState) -> ImplementationState:
-    """Run pytest, verify tests pass."""
+    """Verify tests pass (Green phase)."""
     ...
 
+def run_pytest(test_paths: list[str], timeout: int = 300) -> tuple[int, str, str]:
+    """Execute pytest and return (exit_code, stdout, stderr)."""
+    ...
+
+# nodes/coder.py
+def n3_coder(state: ImplementationState) -> ImplementationState:
+    """Write implementation code using context."""
+    ...
+
+# nodes/lint_audit.py
 def n5_lint_audit(state: ImplementationState) -> ImplementationState:
-    """Run linting and audit checks."""
+    """Run static analysis checks."""
     ...
 
+# nodes/human_review.py
 def n6_human_review(state: ImplementationState) -> ImplementationState:
-    """Interactive review with VS Code, get approve/abort decision."""
+    """Interactive approval/abort with VS Code integration."""
     ...
 
+def open_vscode_diff(left_path: str, right_path: str) -> None:
+    """Open VS Code with diff view using 'code --diff <left> <right>'."""
+    ...
+
+# nodes/safe_merge.py
 def n7_safe_merge(state: ImplementationState) -> ImplementationState:
-    """Commit changes and cleanup worktree."""
+    """Execute privileged git operations."""
     ...
 
-# Test execution
-def run_pytest(test_path: str, timeout: int = 300) -> PytestResult:
-    """Execute pytest with timeout, return structured result."""
+# graph.py
+def build_implementation_graph(audit_logger: GovernanceAuditLog) -> StateGraph:
+    """Construct the implementation workflow graph with injected logger."""
     ...
 
-# Governance logging
-def log_node_transition(
-    from_node: str,
-    to_node: str,
-    state: ImplementationState,
-    audit_log: GovernanceAuditLog
-) -> None:
+def get_next_node(state: ImplementationState) -> str:
+    """Conditional routing based on state."""
+    ...
+
+def log_node_transition(audit_logger: GovernanceAuditLog, from_node: str, to_node: str, state: ImplementationState) -> None:
     """Log node transition to GovernanceAuditLog."""
-    ...
-
-# CLI
-def print_data_policy() -> None:
-    """Print data handling policy reminder to console."""
-    ...
-
-def parse_args() -> argparse.Namespace:
-    """Parse CLI arguments."""
     ...
 ```
 
 ### 2.5 Logic Flow (Pseudocode)
 
 ```
-1. CLI receives --issue, --lld, optional --context files
+1. CLI receives --issue, --lld, --context flags
 2. Print data handling policy reminder
-3. Validate all paths (security check, size limits)
-4. IF any path invalid THEN
-   - Print error, exit with code 1
-5. Initialize ImplementationState
-6. Initialize GovernanceAuditLog
-7. Execute StateGraph:
+3. Initialize GovernanceAuditLog instance
+4. IF --dry-run THEN
+   - Enable mock LLM mode
+   - Print execution path only
+5. Initialize ImplementationState with audit_logger
 
-   N0_ContextLoader:
-   - Log transition via GovernanceAuditLog
-   - Load LLD content
-   - Load and concatenate context files
-   - Validate total token count
-   - Route to N1_Scaffold
+6. N0_ContextLoader:
+   a. Log transition: START -> N0
+   b. FOR each context file:
+      - Validate path (no traversal, not secret, within root)
+      - Validate size (<100KB)
+      - IF invalid THEN exit with error
+   c. Load LLD content
+   d. Load and concatenate context files
+   e. Validate total tokens (<200k)
+   f. IF over limit THEN exit with error
 
-   N1_Scaffold:
-   - Log transition via GovernanceAuditLog
-   - Generate test files using LLM
-   - Inject LLD spec and context
-   - Route to N2_TestGate_Fail
+7. N1_Scaffold:
+   a. Log transition: N0 -> N1
+   b. Call LLM with LLD + context to generate test files
+   c. Write test files to disk
+   d. Track changed_files
 
-   N2_TestGate_Fail:
-   - Log transition via GovernanceAuditLog
-   - Run pytest with 300s timeout
-   - Capture exit code and output
-   - IF exit_code == 1 THEN
-     - Valid Red state, route to N3_Coder
-   - ELSE IF exit_code == 0 THEN
-     - Tests pass = violation, reject with message
-     - Route back to N1_Scaffold
-   - ELSE IF exit_code in [4, 5] THEN
-     - Syntax/collection error, route to N1_Scaffold
-   - ELSE IF exit_code in [2, 3] THEN
-     - Internal error, route to N6_Human_Review
-   - END IF
+8. N2_TestGate_Fail:
+   a. Log transition: N1 -> N2
+   b. Run pytest with 300s timeout
+   c. Capture exit_code, stdout, stderr
+   d. IF exit_code == 1 THEN
+      - Proceed to N3_Coder (valid Red state)
+   e. ELIF exit_code == 0 THEN
+      - Reject: "Tests must fail first"
+      - Return to N1_Scaffold
+   f. ELIF exit_code in [4, 5] THEN
+      - Increment scaffold_retry_count
+      - IF scaffold_retry_count > 3 THEN escalate to N6
+      - Return to N1_Scaffold
+   g. ELIF exit_code in [2, 3] THEN
+      - Escalate to N6_Human_Review
 
-   N3_Coder:
-   - Log transition via GovernanceAuditLog
-   - Generate implementation using LLM
-   - Inject test output, LLD, and context
-   - Route to N4_TestGate_Pass
+9. N3_Coder:
+   a. Log transition: N2 -> N3
+   b. Inject test_output into context if retry
+   c. Call LLM with LLD + context + test errors
+   d. Write implementation files to disk
+   e. Track changed_files
 
-   N4_TestGate_Pass:
-   - Log transition via GovernanceAuditLog
-   - Run pytest with 300s timeout
-   - IF exit_code == 0 THEN
-     - Route to N5_LintAudit
-   - ELSE
-     - Increment retry_count
-     - IF retry_count > 3 THEN
-       - Route to N6_Human_Review (escalation)
-     - ELSE
-       - Inject test output into state
-       - Route back to N3_Coder
-     - END IF
-   - END IF
+10. N4_TestGate_Pass:
+    a. Log transition: N3 -> N4
+    b. Run pytest with 300s timeout
+    c. IF exit_code == 0 THEN
+       - Proceed to N5_LintAudit
+    d. ELSE
+       - Increment retry_count
+       - Add error to error_history
+       - IF retry_count > 3 THEN
+          - Escalate to N6_Human_Review
+       - ELSE
+          - Return to N3_Coder
 
-   N5_LintAudit:
-   - Log transition via GovernanceAuditLog
-   - Run linting (ruff, mypy)
-   - Run project audit checks
-   - Log results
-   - Route to N6_Human_Review
+11. N5_LintAudit:
+    a. Log transition: N4 -> N5
+    b. Run linting/audit checks
+    c. IF pass THEN proceed to N6
+    d. ELSE add warnings to state
 
-   N6_Human_Review:
-   - Log transition via GovernanceAuditLog
-   - Display changed files
-   - Open VS Code with diff view
-   - Prompt: "Type 'approve' or 'abort': "
-   - Wait for input (30 min timeout)
-   - IF input == "approve" THEN
-     - Route to N7_SafeMerge
-   - ELSE IF input == "abort" THEN
-     - Trigger rollback
-     - Exit with code 2
-   - ELSE IF timeout THEN
-     - Preserve state, exit with warning
-   - END IF
+12. N6_Human_Review:
+    a. Log transition: previous -> N6
+    b. Display changed files
+    c. Open VS Code with diffs using 'code --diff <left> <right>'
+    d. Prompt: "Type 'approve' or 'abort'"
+    e. IF timeout (30 min) THEN
+       - Persist debug state to .agentos/debug/
+       - Rollback uncommitted changes (git reset --hard)
+       - Exit with code 2
+    f. IF "approve" THEN proceed to N7
+    g. IF "abort" THEN
+       - Persist debug state to .agentos/debug/
+       - Rollback uncommitted changes (git reset --hard)
+       - Exit with code 2
 
-   N7_SafeMerge:
-   - Log transition via GovernanceAuditLog
-   - Commit changes with message
-   - Cleanup worktree if used
-   - Log completion to GovernanceAuditLog
-   - Exit with code 0
-
-8. Handle interrupts gracefully (preserve state)
+13. N7_Safe_Merge:
+    a. Log transition: N6 -> N7
+    b. Commit changes with issue reference
+    c. Merge to target branch
+    d. Clean up worktree
+    e. Exit with code 0
 ```
 
 ### 2.6 Technical Approach
@@ -294,63 +310,63 @@ def parse_args() -> argparse.Namespace:
 * **Module:** `agentos/workflows/implementation/`
 * **Pattern:** LangGraph StateGraph with conditional routing
 * **Key Decisions:**
-  - Nodes are pure functions that transform state
-  - Routing is deterministic based on pytest exit codes (no LLM interpretation)
-  - All subprocess calls use explicit argument lists (no shell=True)
-  - Privileged operations (rm, git worktree remove) only in N7_SafeMerge
-  - All node transitions logged via GovernanceAuditLog for auditability
+  - Pytest exit codes drive routing, not LLM interpretation
+  - Separate retry counters for scaffold vs implementation
+  - Human review as explicit gate, not automatic merge
+  - Mock LLM mode for testing graph logic without API costs
+  - GovernanceAuditLog injected at graph construction time
+  - Debug state persisted to `.agentos/debug/` before any cleanup
 
 ### 2.7 Architecture Decisions
 
 | Decision | Options Considered | Choice | Rationale |
 |----------|-------------------|--------|-----------|
-| State management | Dict, dataclass, TypedDict | TypedDict | Type hints without runtime overhead, matches LangGraph patterns |
-| Pytest execution | LLM interpretation, subprocess | subprocess | LLM cannot be trusted to interpret test results accurately |
-| Exit code routing | Single condition, lookup table | Dedicated router function | Centralized, testable, matches pytest spec exactly |
-| Mock LLM mode | Env var, CLI flag, both | Both (env var + --dry-run) | Flexibility for CI (env) and interactive use (flag) |
-| Human interaction | GUI, web, CLI | CLI input() | Simplest, works everywhere, VS Code opened separately |
-| Timeout handling | signal, threading, asyncio | signal.alarm | Standard approach, clean timeout exception |
-| VS Code diff command | code -d, code --diff | code --diff | Verbose flag for clarity in codebase (per Gemini feedback) |
+| State Management | Pydantic, TypedDict, dataclass | TypedDict | LangGraph native, simple, typed |
+| Pytest Execution | Direct import, subprocess | subprocess | Isolation, real exit codes, timeout support |
+| Exit Code Routing | LLM decides, deterministic | Deterministic | Reliability, no hallucination |
+| Human Review | Auto-merge, approval gate | Approval gate | Safety, reversibility |
+| Mock Mode | Separate mock graph, env flag | Env flag | Single graph, realistic testing |
+| Timeout Behavior | Preserve state, Auto-abort | Auto-abort | Fail Closed safety principle |
+| Logger Injection | Global singleton, constructor | Constructor injection | Testability, explicit dependency |
+| VS Code Diff Command | code -d, code --diff | code --diff | Explicit, readable syntax |
 
 **Architectural Constraints:**
-- Must integrate with existing GovernanceAuditLog
-- Must use langgraph package already in dependencies
-- Cannot introduce new external dependencies
+- Must integrate with existing `GovernanceAuditLog` for node transition logging
+- Cannot introduce new external dependencies beyond langgraph
+- Must preserve existing git worktree patterns from project
+- Audit logger must be injected, not globally instantiated
 
 ## 3. Requirements
 
-*What must be true when this is done. These become acceptance criteria.*
-
-1. Tests MUST be written before implementation code (Red-Green-Refactor enforced)
-2. N2_TestGate_Fail MUST accept ONLY pytest exit code 1 as valid Red state
+1. Tests MUST be written before implementation code (Red-Green-Refactor)
+2. N2_TestGate_Fail MUST verify pytest fails with exit code 1 specifically
 3. N2_TestGate_Fail MUST route to N1_Scaffold on exit codes 4 or 5
-4. N2_TestGate_Fail MUST route to N6_Human_Review on exit codes 2 or 3
+4. N4_TestGate_Pass MUST route to N3_Coder on pytest failure (retry loop)
 5. Maximum 3 retry attempts before human escalation
-6. Pytest subprocess calls MUST include 300-second timeout
-7. Paths with traversal sequences (`../`) MUST be rejected
-8. Files matching secret patterns MUST be rejected
-9. Individual files larger than 100KB MUST be rejected
-10. Total context exceeding 200k tokens MUST fail fast before API call
-11. `AGENTOS_MOCK_LLM=1` MUST enable offline graph testing
-12. CLI MUST print data handling policy on startup
-13. Human review MUST accept "approve" or "abort" input
-14. "abort" MUST trigger rollback and exit with code 2
-15. All node transitions MUST be logged via GovernanceAuditLog
+6. Real subprocess execution—never ask LLM "did tests pass?"
+7. Pytest subprocess MUST include 300-second timeout
+8. Context files MUST be validated for path traversal attacks
+9. Secret file patterns MUST be rejected before transmission
+10. Files larger than 100KB MUST be rejected
+11. Total context exceeding 200k tokens MUST fail fast before API call
+12. Human review MUST support approve/abort interactive flow
+13. Git cleanup MUST only execute after successful merge
+14. All node transitions MUST be logged via GovernanceAuditLog
 
 ## 4. Alternatives Considered
 
 | Option | Pros | Cons | Decision |
 |--------|------|------|----------|
-| LLM interprets test results | Simpler architecture | Hallucination risk, unreliable | **Rejected** |
-| Subprocess pytest execution | Reliable, verifiable | More complexity | **Selected** |
-| Single retry with escalation | Faster escalation | Misses recoverable failures | **Rejected** |
-| 3 retries then escalation | Handles transient issues | More token usage | **Selected** |
-| All exit codes = valid Red | Simpler routing | Masks broken tests | **Rejected** |
-| Exit code 1 only = valid Red | Precise TDD enforcement | More routing logic | **Selected** |
-| Config file for paths | More flexible | Adds complexity | **Rejected** |
-| CLI flags for context | Simple, explicit | Requires command-line args | **Selected** |
+| LLM interprets test results | Flexible, can handle edge cases | Hallucination risk, unreliable | **Rejected** |
+| Subprocess pytest execution | Reliable, real exit codes | More complex subprocess handling | **Selected** |
+| Auto-merge on test pass | Faster workflow | No human safety check | **Rejected** |
+| Approval gate before merge | Human oversight, reversible | Adds latency | **Selected** |
+| Single retry counter | Simpler state | Can't distinguish scaffold vs code failures | **Rejected** |
+| Separate scaffold/code counters | Better error handling | Slightly more complex | **Selected** |
+| Timeout preserves state | Less disruptive | Violates Fail Closed principle | **Rejected** |
+| Timeout auto-aborts | Consistent safety behavior | May lose work | **Selected** |
 
-**Rationale:** The subprocess approach with precise exit code handling prevents LLM hallucination entirely. The 3-retry limit balances cost against giving the agent reasonable chances to self-correct.
+**Rationale:** Reliability and safety over speed. TDD enforcement requires real test execution, and human review provides essential safety checkpoint. Fail Closed on timeout ensures consistent safety behavior.
 
 ## 5. Data & Fixtures
 
@@ -358,47 +374,50 @@ def parse_args() -> argparse.Namespace:
 
 | Attribute | Value |
 |-----------|-------|
-| Source | Local files (LLD markdown, Python source files via --context) |
+| Source | Local filesystem (LLD files, context files) |
 | Format | Markdown (.md), Python (.py) |
-| Size | <100KB per file, <200k tokens total |
-| Refresh | Manual (user-provided) |
-| Copyright/License | User responsibility per data policy |
+| Size | Typically <50KB per file, <500KB total |
+| Refresh | Manual (user provides paths) |
+| Copyright/License | User's project code, no external data |
 
 ### 5.2 Data Pipeline
 
 ```
-LLD File ──read──► Context Builder ──concat──► Master Prompt
-Context Files ──validate──► Context Builder ──estimate tokens──► LLM API
+User CLI ──--context──► Path Validator ──valid paths──► Context Loader ──content──► LLM API
+                                                                                       │
+                                                                                       ▼
+                                                                              Generated Code
+                                                                                       │
+                                                                                       ▼
+Filesystem ◄──write──────────────────────────────────────────────────────────── Test Files
 ```
 
 ### 5.3 Test Fixtures
 
 | Fixture | Source | Notes |
 |---------|--------|-------|
-| Mock LLM responses | Generated | Static JSON in tests/fixtures/implementation/ |
-| Sample LLD files | Hardcoded | Test-specific markdown |
-| Pytest output samples | Generated | Captured from real pytest runs |
-| Path traversal attempts | Hardcoded | Security test vectors |
+| Mock LLD content | Hardcoded | Minimal valid LLD for graph testing |
+| Mock LLM responses | Hardcoded JSON | Deterministic responses per node |
+| Mock pytest output | Hardcoded | Sample stdout/stderr for each exit code |
+| Traversal paths | Generated | Test vectors for path validation |
+| Secret file patterns | Hardcoded | .env, *.key, etc. for rejection tests |
+| Mock GovernanceAuditLog | Mock class | Verifies logging calls in tests |
 
 ### 5.4 Deployment Pipeline
 
-Local development only. No deployment pipeline required for this workflow.
+Local development only - no deployment pipeline. Workflow runs entirely on developer machine.
 
-**External data sources:** None. All inputs are local files provided by user.
+**If data source is external:** N/A - all data is local filesystem.
 
 ## 6. Diagram
 
 ### 6.1 Mermaid Quality Gate
 
-Before finalizing any diagram, verify in [Mermaid Live Editor](https://mermaid.live) or GitHub preview:
-
-- [x] **Simplicity:** Similar components collapsed (per 0006 §8.1)
-- [x] **No touching:** All elements have visual separation (per 0006 §8.2)
-- [x] **No hidden lines:** All arrows fully visible (per 0006 §8.3)
+- [x] **Simplicity:** Similar components collapsed
+- [x] **No touching:** All elements have visual separation
+- [x] **No hidden lines:** All arrows fully visible
 - [x] **Readable:** Labels not truncated, flow direction clear
-- [ ] **Auto-inspected:** Agent rendered via mermaid.ink and viewed (per 0006 §8.5)
-
-**Agent Auto-Inspection (MANDATORY):**
+- [ ] **Auto-inspected:** Agent rendered via mermaid.ink and viewed
 
 **Auto-Inspection Results:**
 ```
@@ -408,35 +427,64 @@ Before finalizing any diagram, verify in [Mermaid Live Editor](https://mermaid.l
 - Flow clarity: [ ] Clear / [ ] Issue: ___
 ```
 
-*To be completed during implementation phase*
-
 ### 6.2 Diagram
 
 ```mermaid
-stateDiagram-v2
-    [*] --> N0_ContextLoader: Start
+flowchart TD
+    subgraph Input
+        CLI[CLI Entry Point]
+        LLD[LLD File]
+        CTX[Context Files]
+    end
 
-    N0_ContextLoader --> N1_Scaffold: Context loaded
+    subgraph Validation
+        N0[N0: Context Loader]
+        PV[Path Validator]
+        CV[Context Validator]
+    end
 
-    N1_Scaffold --> N2_TestGate_Fail: Tests scaffolded
+    subgraph TDD_Cycle["TDD Cycle"]
+        N1[N1: Scaffold Tests]
+        N2{N2: Test Gate Fail}
+        N3[N3: Coder]
+        N4{N4: Test Gate Pass}
+    end
 
-    N2_TestGate_Fail --> N3_Coder: exit_code=1 (Red)
-    N2_TestGate_Fail --> N1_Scaffold: exit_code=0 (violation)
-    N2_TestGate_Fail --> N1_Scaffold: exit_code=4,5 (syntax)
-    N2_TestGate_Fail --> N6_Human_Review: exit_code=2,3 (error)
+    subgraph Quality
+        N5[N5: Lint/Audit]
+    end
 
-    N3_Coder --> N4_TestGate_Pass: Code written
+    subgraph Review
+        N6[N6: Human Review]
+        N7[N7: Safe Merge]
+    end
 
-    N4_TestGate_Pass --> N5_LintAudit: exit_code=0 (Green)
-    N4_TestGate_Pass --> N3_Coder: exit_code!=0, retry<3
-    N4_TestGate_Pass --> N6_Human_Review: exit_code!=0, retry>=3
-
-    N5_LintAudit --> N6_Human_Review: Checks complete
-
-    N6_Human_Review --> N7_SafeMerge: approve
-    N6_Human_Review --> [*]: abort (rollback)
-
-    N7_SafeMerge --> [*]: Success
+    CLI --> N0
+    LLD --> N0
+    CTX --> PV
+    PV --> CV
+    CV --> N0
+    
+    N0 --> N1
+    N1 --> N2
+    
+    N2 -->|exit=1 Red| N3
+    N2 -->|exit=0 Reject| N1
+    N2 -->|exit=4,5 Syntax| N1
+    N2 -->|exit=2,3 Error| N6
+    
+    N3 --> N4
+    
+    N4 -->|exit=0 Green| N5
+    N4 -->|exit=1 Retry| N3
+    N4 -->|max retries| N6
+    
+    N5 --> N6
+    
+    N6 -->|approve| N7
+    N6 -->|abort/timeout| ROLLBACK[Save Debug + Rollback + Exit]
+    
+    N7 --> SUCCESS[Success Exit 0]
 ```
 
 ## 7. Security & Safety Considerations
@@ -445,29 +493,26 @@ stateDiagram-v2
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| Path traversal attack | validate_path() rejects `../` and out-of-root paths | Addressed |
-| Secret file exposure | is_secret_file() pattern matching | Addressed |
-| Shell injection | All subprocess calls use explicit arg lists, no shell=True | Addressed |
-| Symlink escape | Path.resolve() before validation | Addressed |
-| Malicious test code | Pytest runs in subprocess with timeout | Addressed |
-| Token budget attack | File size (100KB) and token (200k) limits | Addressed |
+| Path traversal attack | Resolve paths, validate within project root | Addressed |
+| Secret file exposure | Pattern matching rejection (.env, *.key, etc.) | Addressed |
+| Code injection via context | Subprocess with arg list, no shell=True | Addressed |
+| Token budget attack | File size limits, token estimation | Addressed |
+| Symlink escape | Resolve symlinks before validation | Addressed |
 
 ### 7.2 Safety
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| Infinite retry loop | retry_count caps at 3, then escalation | Addressed |
+| Infinite retry loop | Max 3 retries, then human escalation | Addressed |
 | Hanging tests | 300-second subprocess timeout | Addressed |
-| Accidental file deletion | rm -rf only in N7_SafeMerge, after human approval | Addressed |
-| Data loss on abort | Rollback reverts uncommitted changes, preserves worktree | Addressed |
-| Runaway LLM cost | Token estimation, max retries, context limits | Addressed |
+| Data loss on abort | Debug state saved to `.agentos/debug/` before rollback | Addressed |
+| Accidental merge | Human approval required before N7 | Addressed |
+| Runaway costs | Token limits, retry caps | Addressed |
+| Timeout leaves dirty state | Auto-abort with rollback on timeout | Addressed |
 
-**Fail Mode:** Fail Closed - On any unexpected error, workflow halts and preserves state for human review.
+**Fail Mode:** Fail Closed - On any unexpected error or timeout, save debug state, rollback changes, escalate to human review without making permanent changes.
 
-**Recovery Strategy:** 
-- On interrupt: State preserved, can resume manually
-- On abort: Rollback uncommitted changes, worktree preserved for debugging
-- On timeout: Escalate to human review with full error history
+**Recovery Strategy:** On failure, persist `ImplementationState` to `.agentos/debug/<issue_id>_<timestamp>.json`, then `git reset --hard` to clean worktree, exit with code 2 for human intervention. Debug files enable post-mortem analysis.
 
 ## 8. Performance & Cost Considerations
 
@@ -475,164 +520,179 @@ stateDiagram-v2
 
 | Metric | Budget | Approach |
 |--------|--------|----------|
-| Pytest execution | < 300s per run | Subprocess timeout |
-| File loading | < 1s total | Reject files > 100KB |
-| Token estimation | < 100ms | Simple chars/4 heuristic |
-| Total workflow | < 30 min typical | Retry limits, timeouts |
+| Workflow latency | < 10 minutes typical | Parallel-free linear graph |
+| Pytest timeout | 300 seconds max | Subprocess timeout parameter |
+| Memory | < 512MB | Stream file content, no full repo in memory |
+| LLM calls | 2-5 per run | N1 + N3 + retries |
 
-**Bottlenecks:** 
-- LLM API latency (external, unavoidable)
-- Pytest execution time (test-dependent)
+**Bottlenecks:** LLM response time dominates. Pytest execution is secondary.
 
 ### 8.2 Cost Analysis
 
 | Resource | Unit Cost | Estimated Usage | Monthly Cost |
 |----------|-----------|-----------------|--------------|
-| LLM API (input tokens) | ~$3/1M tokens | ~50k per run | Varies by usage |
-| LLM API (output tokens) | ~$15/1M tokens | ~4k per run | Varies by usage |
-| Retry loop (3 max) | ~$0.30 per retry | ~1-3 retries typical | Varies by usage |
+| LLM API (input) | ~$3/1M tokens | ~50k tokens/run × 50 runs | ~$7.50 |
+| LLM API (output) | ~$15/1M tokens | ~4k tokens/run × 50 runs | ~$3.00 |
+| Retry overhead | +20k input/retry | ~1 retry avg × 50 runs | ~$3.00 |
 
-**Per-run cost estimate:** $0.50-$1.00 typical, $2.00 max (with all retries)
+**Estimated monthly cost:** ~$13.50 for 50 feature implementations
 
 **Cost Controls:**
-- [x] Maximum 3 retries before escalation
-- [x] Token estimation before API calls
-- [x] Context size limits prevent budget blowout
-- [x] --dry-run flag for testing without API calls
+- [x] Retry count capped at 3
+- [x] Token estimation before API call
+- [x] Context size limits prevent oversized requests
 
-**Worst-Case Scenario:** 
-- 3 retries = ~$2.00 per implementation attempt
-- Human escalation stops infinite loops
-- Context limits prevent token budget attacks
+**Worst-Case Scenario:** 3 retries on every run = ~$40/month for 50 runs. Acceptable.
 
 ## 9. Legal & Compliance
 
 | Concern | Applies? | Mitigation |
 |---------|----------|------------|
-| PII/Personal Data | Yes | Data policy reminder, user responsibility |
-| Third-Party Licenses | Yes | User must ensure --context files are appropriately licensed |
-| Terms of Service | Yes | User must comply with LLM provider ToS |
-| Data Retention | N/A | No persistent storage of transmitted data |
-| Export Controls | N/A | No restricted algorithms |
+| PII/Personal Data | Yes | User responsible for --context content; policy printed on startup |
+| Third-Party Licenses | No | No external data sources |
+| Terms of Service | Yes | Standard Anthropic API usage |
+| Data Retention | N/A | No data persisted beyond session |
+| Export Controls | No | No restricted algorithms |
 
-**Data Classification:** Internal (user code transmitted to LLM provider)
+**Data Classification:** Internal (user's own code)
 
 **Compliance Checklist:**
-- [x] Data handling policy printed on startup
-- [x] User warned about PII/secrets responsibility
-- [x] Secret file pattern rejection as safety net
-- [x] No persistent storage of API-transmitted data
+- [x] Data handling policy printed on CLI startup
+- [x] User warned about PII/secrets in context
+- [x] Basic secret file pattern rejection
+- [x] No data persisted to external services
 
 ## 10. Verification & Testing
 
-**Testing Philosophy:** Strive for 100% automated test coverage. Mock LLM mode enables testing graph routing without API calls.
+### 10.0 Test Plan (TDD - Complete Before Implementation)
+
+| Test ID | Test Description | Expected Behavior | Status |
+|---------|------------------|-------------------|--------|
+| T010 | Graph routes N2 to N3 on exit code 1 | Valid Red state proceeds | RED |
+| T020 | Graph routes N2 to N1 on exit code 0 | Tests must fail first rejection | RED |
+| T030 | Graph routes N2 to N1 on exit code 4 | Syntax error retry | RED |
+| T031 | Graph routes N2 to N1 on exit code 5 | No tests collected retry | RED |
+| T040 | Graph routes N2 to N6 on exit code 3 | Internal error escalation | RED |
+| T050 | Graph routes N4 to N5 on exit code 0 | Valid Green state proceeds | RED |
+| T060 | Graph routes N4 to N3 on exit code 1 | Retry implementation | RED |
+| T070 | Graph escalates after 3 retries | Human escalation | RED |
+| T080 | Path validator rejects traversal | Error on ../ paths | RED |
+| T090 | Path validator rejects secrets | Error on .env files | RED |
+| T100 | Context validator rejects >100KB | Error with size message | RED |
+| T110 | Context validator rejects >200k tokens | Error before API call | RED |
+| T120 | Human review accepts approve | Proceeds to N7 | RED |
+| T130 | Human review accepts abort | Save debug, rollback, exit 2 | RED |
+| T140 | Human review timeout | Save debug, rollback, exit 2 | RED |
+| T150 | Pytest subprocess timeout | exit after 300s | RED |
+| T160 | Audit logger records transitions | GovernanceAuditLog receives calls | RED |
+
+**Coverage Target:** ≥95% for all new code
+
+**TDD Checklist:**
+- [ ] All tests written before implementation
+- [ ] Tests currently RED (failing)
+- [ ] Test IDs match scenario IDs in 10.1
+- [ ] Test file created at: `tests/workflows/implementation/`
 
 ### 10.1 Test Scenarios
 
 | ID | Scenario | Type | Input | Expected Output | Pass Criteria |
 |----|----------|------|-------|-----------------|---------------|
-| 010 | Happy path - full TDD cycle | Auto | Valid LLD, passing implementation | Exit code 0, files committed | Tests pass, merge succeeds |
-| 020 | Exit code 1 routes to N3_Coder | Auto | Mock pytest exit 1 | State routes to coder | route_by_exit_code returns "N3_Coder" |
-| 030 | Exit code 0 rejects (tests must fail) | Auto | Mock pytest exit 0 | State routes to N1_Scaffold | Rejection message in state |
-| 040 | Exit code 4 routes to N1_Scaffold | Auto | Mock pytest exit 4 | State routes to scaffold | route_by_exit_code returns "N1_Scaffold" |
-| 050 | Exit code 5 routes to N1_Scaffold | Auto | Mock pytest exit 5 | State routes to scaffold | route_by_exit_code returns "N1_Scaffold" |
-| 060 | Exit code 2 routes to human review | Auto | Mock pytest exit 2 | State routes to human | route_by_exit_code returns "N6_Human_Review" |
-| 070 | Exit code 3 routes to human review | Auto | Mock pytest exit 3 | State routes to human | route_by_exit_code returns "N6_Human_Review" |
-| 080 | Retry count caps at 3 | Auto | 4 failed attempts | Escalation to human | retry_count == 3, human review triggered |
-| 090 | Path traversal rejected | Auto | `../etc/passwd` | Validation error | PathValidationResult.valid == False |
-| 100 | Absolute path rejected | Auto | `/etc/passwd` | Validation error | PathValidationResult.valid == False |
-| 110 | Secret file rejected (.env) | Auto | `.env` file path | Validation error | is_secret_file returns True |
-| 120 | Secret file rejected (.key) | Auto | `server.key` path | Validation error | is_secret_file returns True |
-| 130 | File >100KB rejected | Auto | 150KB file | Size error | validate_file_size returns False |
-| 140 | Total tokens >200k rejected | Auto | Large concatenated content | Token error | validate_total_tokens returns False |
-| 150 | Pytest timeout (300s) | Auto | Mock hanging test | Timeout exception | PytestResult includes timeout info |
-| 160 | Human review approve | Auto | Mock input "approve" | Routes to N7_SafeMerge | human_decision == "approve" |
-| 170 | Human review abort | Auto | Mock input "abort" | Rollback, exit 2 | human_decision == "abort", exit code 2 |
-| 180 | Mock LLM mode | Auto | AGENTOS_MOCK_LLM=1 | Uses fixtures | No API calls made |
-| 190 | --dry-run prints path | Auto | --dry-run flag | Execution path printed | No API calls, path output |
-| 200 | Data policy printed | Auto | Normal execution | Policy in stdout | Policy text in captured output |
-| 210 | GovernanceAuditLog records transitions | Auto | Execute workflow with mocked audit log | Audit entries created for each node | Mock audit_log.log() called for each transition |
+| 010 | N2 routes to N3 on exit 1 | Auto | state with exit_code=1 | next_node="n3_coder" | Routing correct |
+| 020 | N2 rejects on exit 0 | Auto | state with exit_code=0 | next_node="n1_scaffold" | Rejection message |
+| 030 | N2 retries scaffold on exit 4 | Auto | state with exit_code=4 | next_node="n1_scaffold" | scaffold_retry_count++ |
+| 031 | N2 retries scaffold on exit 5 | Auto | state with exit_code=5 | next_node="n1_scaffold" | scaffold_retry_count++ |
+| 040 | N2 escalates on exit 3 | Auto | state with exit_code=3 | next_node="n6_human_review" | Error in history |
+| 050 | N4 passes on exit 0 | Auto | state with exit_code=0 | next_node="n5_lint_audit" | Routing correct |
+| 060 | N4 retries on exit 1 | Auto | state with exit_code=1 | next_node="n3_coder" | retry_count++ |
+| 070 | Max retries escalates | Auto | state with retry_count=3 | next_node="n6_human_review" | Escalation triggered |
+| 080 | Traversal path rejected | Auto | path="../../../etc/passwd" | PathValidationResult.valid=False | Error message clear |
+| 090 | Secret file rejected | Auto | path=".env" | PathValidationResult.valid=False | rejection_reason="secret" |
+| 100 | Large file rejected | Auto | 150KB file | error="exceeds 100KB" | Size in message |
+| 110 | Token limit exceeded | Auto | 250k token content | error="exceeds 200k" | Fails before API |
+| 120 | Human approves | Auto | human_decision="approve" | next_node="n7_safe_merge" | Proceeds |
+| 130 | Human aborts | Auto | human_decision="abort" | debug saved, exit_code=2 | Rollback called, debug file exists |
+| 140 | Human review timeout | Auto | 30 min timeout triggered | debug saved, exit_code=2 | Rollback called, debug file exists |
+| 150 | Pytest timeout | Auto | hanging test | exit after 300s | Timeout error |
+| 160 | Audit log records transitions | Auto | state transitions N0->N1->N2 | logger.log called 2+ times | Mock logger verify |
+| 170 | Mock LLM mode | Auto | AGENTOS_MOCK_LLM=1 | No API calls | Fixtures used |
+| 180 | Dry run mode | Auto | --dry-run flag | Execution path printed | No API calls |
 
 ### 10.2 Test Commands
 
 ```bash
-# Run all automated tests
-poetry run pytest tests/workflows/implementation/ -v
-
-# Run only unit tests (fast, mocked)
-poetry run pytest tests/workflows/implementation/ -v -m "not integration"
-
-# Run with mock LLM
+# Run all automated tests (uses mock mode)
 AGENTOS_MOCK_LLM=1 poetry run pytest tests/workflows/implementation/ -v
 
-# Run specific test module
-poetry run pytest tests/workflows/implementation/test_exit_code_router.py -v
-
-# Run path security tests
+# Run path validation tests
 poetry run pytest tests/workflows/implementation/test_path_validator.py -v
 
-# Run governance audit log tests
-poetry run pytest tests/workflows/implementation/test_governance_audit.py -v
+# Run exit code routing tests
+poetry run pytest tests/workflows/implementation/test_exit_code_router.py -v
+
+# Run audit logging tests
+AGENTOS_MOCK_LLM=1 poetry run pytest tests/workflows/implementation/test_audit_logging.py -v
+
+# Run graph routing tests
+AGENTOS_MOCK_LLM=1 poetry run pytest tests/workflows/implementation/test_graph.py -v
+
+# Run with coverage
+AGENTOS_MOCK_LLM=1 poetry run pytest tests/workflows/implementation/ -v --cov=agentos/workflows/implementation
 ```
 
 ### 10.3 Manual Tests (Only If Unavoidable)
 
 | ID | Scenario | Why Not Automated | Steps |
 |----|----------|-------------------|-------|
-| M010 | VS Code diff opens correctly | Requires VS Code installed and visual confirmation | 1. Run workflow to N6_Human_Review 2. Verify VS Code opens with correct diff 3. Verify file paths are correct |
-| M020 | Interactive prompt timeout | 30-minute timeout impractical in CI | 1. Run workflow to N6_Human_Review 2. Wait without input 3. Verify timeout message after 30 min |
+| M010 | VS Code diff opens | Requires GUI verification | 1. Run to N6 2. Verify VS Code opens 3. Verify diff visible |
+| M020 | Interactive prompt | Requires stdin interaction | 1. Run to N6 2. Type "approve" 3. Verify proceeds |
 
 ## 11. Risks & Mitigations
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| LLM generates syntactically broken tests | Med | Med | Exit code 4/5 detection routes back to scaffold |
-| Pytest hangs indefinitely | High | Low | 300-second timeout on all subprocess calls |
-| Infinite retry loop burns tokens | High | Low | Hard cap at 3 retries, then human escalation |
-| Path traversal allows secret access | High | Low | Strict path validation before file load |
-| Token estimation inaccurate | Med | Med | Conservative 200k limit with buffer |
-| VS Code not installed for review | Med | Low | Clear error message, fallback to terminal diff |
-| Human abandons review | Med | Med | 30-minute timeout with state preservation |
+| LLM generates broken test syntax | Med | Med | Exit code 4 routes back to N1 |
+| Pytest hangs indefinitely | High | Low | 300s timeout, subprocess kill |
+| User passes sensitive file | High | Med | Secret pattern rejection, startup warning |
+| Context too large for model | Med | Low | 100KB file limit, 200k token limit |
+| Human review timeout | Low | Low | Auto-abort with debug state preservation |
+| Infinite scaffold retries | Med | Low | Separate scaffold_retry_count, cap at 3 |
+| Audit logger not called | Med | Low | T160 verifies logger integration |
 
 ## 12. Definition of Done
 
 ### Code
 - [ ] All nodes implemented in `agentos/workflows/implementation/nodes/`
-- [ ] StateGraph wired in `graph.py` with all routing
-- [ ] Path validator rejects traversal and secret files
-- [ ] Context validator enforces size limits
-- [ ] Exit code router handles all pytest codes
-- [ ] GovernanceAuditLog integration for all node transitions
-- [ ] Mock LLM mode functional for offline dev
-- [ ] CLI argument parsing complete
-- [ ] Data policy printed on startup
-- [ ] Human review interactive flow works
-- [ ] Code comments reference this LLD (Issue #87)
+- [ ] Graph wired in `graph.py` with conditional routing
+- [ ] GovernanceAuditLog injected and used for all transitions
+- [ ] Path validator with traversal and secret detection
+- [ ] Context validator with size and token limits
+- [ ] Exit code router with all pytest codes handled
+- [ ] Debug state persistence in `debug_state.py`
+- [ ] Mock LLM mode functional
+- [ ] CLI with --issue, --lld, --context, --dry-run flags
+- [ ] Data handling policy printed on startup
+- [ ] VS Code diff uses `code --diff <left> <right>` syntax
 
 ### Tests
-- [ ] All 21 test scenarios pass (including 210 for GovernanceAuditLog)
-- [ ] Test coverage > 90% for workflow modules
-- [ ] Path security tests comprehensive
-- [ ] Exit code routing tests cover all codes
-- [ ] GovernanceAuditLog transition tests verify requirement 15
+- [ ] All 18 test scenarios pass (T010-T180)
+- [ ] Test coverage ≥95% for new code
+- [ ] Mock mode tests run without API calls
+- [ ] Path validation security tests comprehensive
+- [ ] Audit logging tests verify GovernanceAuditLog integration
 
 ### Documentation
-- [ ] `docs/wiki/workflows.md` updated with Implementation Workflow section (including Mermaid diagram)
-- [ ] Architecture diagram added to wiki
-- [ ] Retry behavior documented
-- [ ] Exit code handling documented
-- [ ] Human review interaction documented
-- [ ] New files added to `docs/0003-file-inventory.md`
-- [ ] Data transmission policy documented
-
-### Reports
-- [ ] `docs/reports/087/implementation-report.md` created
-- [ ] `docs/reports/087/test-report.md` created
+- [ ] LLD updated with any deviations
+- [ ] `docs/wiki/workflows.md` updated with Implementation Workflow
+- [ ] `docs/0003-file-inventory.md` updated with new files
+- [ ] Architecture diagram rendered and verified
+- [ ] Implementation Report (0103) completed
+- [ ] Test Report (0113) completed
 
 ### Review
+- [ ] Code review completed
 - [ ] 0809 Security Audit - PASS
 - [ ] 0817 Wiki Alignment Audit - PASS
-- [ ] Code review completed
 - [ ] User approval before closing issue
 
 ---
@@ -643,7 +703,6 @@ poetry run pytest tests/workflows/implementation/test_governance_audit.py -v
 
 ### Gemini Review #1 (REVISE)
 
-**Timestamp:** 2025-01-XX
 **Reviewer:** Gemini 3 Pro
 **Verdict:** REVISE
 
@@ -651,16 +710,17 @@ poetry run pytest tests/workflows/implementation/test_governance_audit.py -v
 
 | ID | Comment | Implemented? |
 |----|---------|--------------|
-| G1.1 | "Coverage is 93.3%. You must add a test case to Section 10 explicitly verifying that GovernanceAuditLog receives entries during workflow execution." | YES - Added test scenario 210 in Section 10.1 |
-| G1.2 | "Ensure the Mermaid diagram in Section 6 is included in the updated docs/wiki/workflows.md." | YES - Added explicit note in Section 12 Documentation checklist |
-| G1.3 | "Consider making the 30-minute human review timeout configurable via a CLI flag (addressing Open Question 1)." | PENDING - Kept as Open Question for future consideration |
-| G1.4 | "code --diff is the verbose equivalent. Recommend using the verbose flag for clarity in the codebase." | YES - Updated Section 2.7 Architecture Decisions to specify code --diff |
+| G1.1 | "Requirement Coverage Gap: Coverage is 92.8%, below the 95% threshold. Requirement 14 (Audit Logging) is not verified by any test scenario." | YES - Added T160 and scenario 160 for audit logging verification |
+| G1.2 | "Logic Flow Contradiction (Timeout): Section 2.5 step 11.d states timeout preserves state, contradicts Fail Closed." | YES - Updated 2.5 step 12.e to save debug then rollback on timeout |
+| G1.3 | "Logging Implementation: GovernanceAuditLog not shown in ImplementationState or graph setup." | YES - Added audit_logger field to state, log_node_transition function, injected logger in build_implementation_graph |
+| G1.4 | "T030 Expansion: Add coverage for exit code 5." | YES - Added T031 and scenario 031 for exit code 5 |
+| G1.5 | "Artifacts Directory: Define where debug information goes." | YES - Added debug_state.py, DebugStateRecord, .agentos/debug/ directory |
+| G1.6 | "Open Questions Resolution" | YES - Marked all 3 questions resolved with answers |
 
 ### Review Summary
 
 | Review | Date | Verdict | Key Issue |
 |--------|------|---------|-----------|
-| Gemini #1 | 2025-01-XX | REVISE | Missing GovernanceAuditLog test coverage (Requirement 15) |
+| Gemini #1 | (auto) | REVISE | Coverage gap (92.8% < 95%), timeout contradicts Fail Closed |
 
 **Final Status:** PENDING
-<!-- Note: This field is auto-updated to APPROVED by the workflow when finalized -->
