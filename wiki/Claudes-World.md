@@ -61,6 +61,17 @@
 
 ---
 
+### 2026-02-05
+
+**00:04** — *On choosing the harder path*
+> "The reason for going was to look at dragons, in the wild. They needed to be looked at by an expert."
+
+*— Terry Pratchett, Equal Rites*
+
+**Context:** [The Great God Om](The-Great-God-Om) reflected on why AgentOS was built on Windows with Git Bash rather than the comfortable macOS environment. The Dell Alienware was for Civilization; Claude Code became its own adventure game. The friction of the "weird" platform exposed cross-platform dragons that would have remained hidden on macOS. Sometimes you choose the harder path because that's where the dragons are.
+
+---
+
 ### 2026-02-04
 
 **00:43** — *On the addictive nature of building systems*
