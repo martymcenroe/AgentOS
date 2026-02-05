@@ -6,6 +6,7 @@ Tests for Issue #311: TDD workflow path tracking functions.
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -175,15 +176,12 @@ def test_track_test_file_move_rejects_path_traversal(temp_project_dir, base_stat
     old_path = "tests/test_issue_999.py"
     malicious_path = "../../../etc/passwd"
     base_state["test_file_path"] = old_path
-    
-    # Create malicious file (for existence check)
-    malicious_file = Path(temp_project_dir).parent.parent.parent / "etc" / "passwd"
-    malicious_file.parent.mkdir(parents=True, exist_ok=True)
-    malicious_file.touch()
-    
-    # Act & Assert
-    with pytest.raises(ValueError, match="must be within project directory"):
-        track_test_file_move(base_state, old_path, malicious_path)
+
+    # Mock os.path.exists to return True (skip existence check, test path traversal)
+    with patch("agentos.core.tdd_path_tracking.os.path.exists", return_value=True):
+        # Act & Assert
+        with pytest.raises(ValueError, match="must be within project directory"):
+            track_test_file_move(base_state, old_path, malicious_path)
 
 
 def test_cleanup_stale_scaffold_removes_file(temp_project_dir, base_state):
