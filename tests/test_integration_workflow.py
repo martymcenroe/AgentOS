@@ -2,8 +2,11 @@
 
 These tests actually run subprocess commands - they will fail
 if the environment isn't set up correctly. That's the point.
+
+SKIPPED BY DEFAULT: Set RUN_INTEGRATION_TESTS=1 to run these tests.
 """
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -11,8 +14,14 @@ from pathlib import Path
 
 import pytest
 
-# Mark all tests in this module as integration tests
-pytestmark = pytest.mark.integration
+# Skip all tests in this module unless RUN_INTEGRATION_TESTS is set
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not os.environ.get("RUN_INTEGRATION_TESTS"),
+        reason="Integration tests skipped by default. Set RUN_INTEGRATION_TESTS=1 to run."
+    ),
+]
 
 class TestVSCodeIntegration:
     """Test actual VS Code launching - no mocks."""
