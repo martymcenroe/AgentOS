@@ -35,6 +35,7 @@ Quick reference for the orchestrator (Marty) on how to run tools, commands, agen
 | 0914 | [Fix Implementation Workflow Archiving](0914-fix-implementation-workflow-should-archive-lld-and-reports-to-done--on-completion.md) | Manual | Post-merge | - |
 | 0915 | [Backfill Audit Directories](0915-backfill-audit-directories.md) | Manual | One-time | - |
 | 0916 | [Batch Workflow Runner](0916-batch-workflow-runner.md) | Manual | Unattended batch | Claude |
+| 0917 | [Audit Skill Runbook](0917-audit-skill-runbook.md) | Manual | Per audit run | Varies |
 
 ## Model Selection Guide
 
