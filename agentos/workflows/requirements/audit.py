@@ -670,12 +670,17 @@ def generate_slug(brief_file: str) -> str:
 
 
 class ExistingLLDInfo(TypedDict):
-    """Information about existing LLD and lineage for an issue."""
+    """Information about existing LLD and lineage for an issue.
+
+    Note: lineage_path is always returned (even if directory doesn't exist yet)
+    so that validation can create it to save error files. Use lineage_exists
+    to check if the directory already exists.
+    """
 
     lld_exists: bool
     lineage_exists: bool
     lld_path: Path | None
-    lineage_path: Path | None
+    lineage_path: Path  # Always returned - Issue #341
 
 
 def check_existing_lld(issue_number: int, target_repo: Path) -> ExistingLLDInfo:
@@ -699,7 +704,9 @@ def check_existing_lld(issue_number: int, target_repo: Path) -> ExistingLLDInfo:
         "lld_exists": lld_path.exists(),
         "lineage_exists": lineage_path.exists(),
         "lld_path": lld_path if lld_path.exists() else None,
-        "lineage_path": lineage_path if lineage_path.exists() else None,
+        # Issue #341: Always return lineage_path so validation can create
+        # the directory and save error files for new LLDs
+        "lineage_path": lineage_path,
     }
 
 

@@ -795,15 +795,21 @@ class TestCheckExistingLLD:
     """Tests for check_existing_lld function."""
 
     def test_returns_false_when_nothing_exists(self, tmp_path):
-        """Test returns all false when no LLD or lineage exists."""
-        from agentos.workflows.requirements.audit import check_existing_lld
+        """Test returns all false when no LLD or lineage exists.
+
+        Issue #341: lineage_path is always returned (even when dir doesn't exist)
+        so validation can create it to save error files.
+        """
+        from agentos.workflows.requirements.audit import check_existing_lld, AUDIT_ACTIVE_DIR
 
         result = check_existing_lld(42, tmp_path)
 
         assert result["lld_exists"] is False
         assert result["lineage_exists"] is False
         assert result["lld_path"] is None
-        assert result["lineage_path"] is None
+        # Issue #341: lineage_path always returned, even if doesn't exist yet
+        expected_lineage = tmp_path / AUDIT_ACTIVE_DIR / "42-lld"
+        assert result["lineage_path"] == expected_lineage
 
     def test_detects_existing_lld_file(self, tmp_path):
         """Test detects existing LLD file."""
