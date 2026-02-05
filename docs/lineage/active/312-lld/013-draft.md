@@ -10,7 +10,7 @@ Previous: Added sections based on 80 blocking issues from 164 governance verdict
 ## 1. Context & Goal
 * **Issue:** #312
 * **Objective:** Reduce false positive warnings in mechanical LLD validation by making the validator smarter about distinguishing function references from approach-style mitigations
-* **Status:** Approved (gemini-3-pro-preview, 2026-02-04)
+* **Status:** Draft
 * **Related Issues:** N/A
 
 ### Open Questions
@@ -498,12 +498,6 @@ Mechanical validation automatically checks:
 
 ---
 
-## Reviewer Suggestions
-
-*Non-blocking recommendations from the reviewer.*
-
-- **Regex Comments:** When implementing Section 2.4, ensure the regex patterns include comments explaining the syntax (e.g., what `[^)]+` matches) to aid future maintainability.
-
 ## Appendix: Review Log
 
 *Track all review feedback with timestamps and implementation status.*
@@ -558,5 +552,5 @@ Mechanical validation automatically checks:
 | Gemini #2 | - | REVISE | Missing test for Requirement #5 (performance) |
 | Gemini #3 | - | REVISE | Logic contradiction for mixed content in Section 2.5 |
 
-**Final Status:** APPROVED
+**Final Status:** PENDING
 <!-- Note: This field is auto-updated to APPROVED by the workflow when finalized -->

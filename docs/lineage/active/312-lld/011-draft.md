@@ -10,7 +10,7 @@ Previous: Added sections based on 80 blocking issues from 164 governance verdict
 ## 1. Context & Goal
 * **Issue:** #312
 * **Objective:** Reduce false positive warnings in mechanical LLD validation by making the validator smarter about distinguishing function references from approach-style mitigations
-* **Status:** Approved (gemini-3-pro-preview, 2026-02-04)
+* **Status:** Draft
 * **Related Issues:** N/A
 
 ### Open Questions
@@ -75,10 +75,6 @@ FUNCTION_REFERENCE_PATTERNS: List[re.Pattern]
 - Backticks: `function_name`
 - Parentheses: function_name()
 - Explicit phrases: 'in function_name', 'via function_name'
-
-Examples:
-- r'`[a-zA-Z_][a-zA-Z0-9_]*`' matches `validate_input`
-- r'[a-zA-Z_][a-zA-Z0-9_]*\(\)' matches validate_input()
 """
 
 APPROACH_MITIGATION_PATTERNS: List[re.Pattern]
@@ -86,28 +82,20 @@ APPROACH_MITIGATION_PATTERNS: List[re.Pattern]
 - Complexity: O(n), O(1), O(log n)
 - Encoding: UTF-8, encoding, codec
 - Practices: opt-in, default unchanged, explicitly
-
-Examples:
-- r'O\([^)]+\)' matches O(n), O(1), O(log n)
-- r'UTF-8|encoding|codec' matches encoding references
-- r'opt-in|default unchanged|explicitly' matches practice descriptions
 """
 
-def contains_explicit_function_reference(mitigation_text: str) -> tuple[bool, List[str]]:
+def contains_function_reference(mitigation_text: str) -> bool:
     """Check if mitigation contains explicit function reference syntax.
     
-    Returns tuple of (has_reference, matched_references).
-    True if text contains backticks around identifier or parentheses after identifier.
-    
-    Note: Returns the actual matched references for prioritization logic.
+    Returns True if text contains backticks, parentheses after identifiers,
+    or explicit function reference phrases.
     """
     ...
 
-def is_approach_mitigation(mitigation_text: str) -> tuple[bool, List[str]]:
+def is_approach_mitigation(mitigation_text: str) -> bool:
     """Check if mitigation describes an approach rather than function.
     
-    Returns tuple of (is_approach, matched_patterns).
-    True if text describes algorithmic complexity, encoding practices,
+    Returns True if text describes algorithmic complexity, encoding practices,
     configuration flags, or other coding practices.
     """
     ...
@@ -122,17 +110,11 @@ def classify_mitigation(mitigation_text: str) -> MitigationClassification:
 def should_warn_missing_function(mitigation_text: str, matched_functions: List[str]) -> bool:
     """Determine if missing function match warrants a warning.
     
-    Logic (addressing G3 mixed content issue):
-    1. If mitigation contains explicit function reference (backticks/parens):
-       - Extract the specific referenced function names
-       - If ANY referenced function is NOT in matched_functions, WARN
-       - Approach patterns do NOT suppress warnings for explicit references
-    2. If mitigation has NO explicit function reference:
-       - If it matches approach patterns, SKIP warning
-       - Otherwise, SKIP warning (plain description)
+    Only warns when:
+    1. Mitigation contains explicit function reference AND
+    2. No matching function found in Section 2.4
     
-    This ensures explicit function references ALWAYS trigger warnings if unmatched,
-    even when approach patterns are also present (mixed content case).
+    Does NOT warn for approach-style mitigations.
     """
     ...
 
@@ -152,24 +134,16 @@ def log_skipped_mitigation(mitigation_text: str, matched_patterns: List[str]) ->
 2. Extract keywords (existing behavior)
 3. Check for function matches in Section 2.4 (existing behavior)
 4. IF no function matches found THEN
-   a. Check for explicit function references (backticks, parens)
-      - Extract specific function names from references
-   b. IF contains_explicit_function_reference THEN
-      - Add warning (function reference found but not matched)
-      - NOTE: Approach patterns do NOT suppress this warning
-   c. ELSE (no explicit function reference)
+   a. Classify mitigation:
+      - Check for explicit function references (backticks, parens)
       - Check for approach patterns (complexity, encoding, flags)
-      - IF is_approach_mitigation THEN
-        - Skip warning (approach-style mitigation, no function expected)
-        - Log at DEBUG level for traceability via log_skipped_mitigation()
-      - ELSE
-        - Skip warning (plain description, no function syntax)
-        - Log at DEBUG level
+   b. IF contains_function_reference AND NOT is_approach_mitigation THEN
+      - Add warning (function reference found but not matched)
+   c. ELSE
+      - Skip warning (approach-style mitigation, no function expected)
+      - Log at DEBUG level for traceability via log_skipped_mitigation()
 5. Return validation result
 ```
-
-**Key Design Decision (Addressing G3 Feedback):**
-Explicit function references (backticks, parentheses) ALWAYS take priority over approach patterns. If a mitigation contains `` `parse_utf8()` with O(1) lookup ``, the backticked function reference triggers a warning if `parse_utf8` is not found, regardless of the `O(1)` approach pattern. This ensures Requirement #1 is satisfied and Test Scenario 090 passes.
 
 ### 2.6 Technical Approach
 
@@ -179,7 +153,6 @@ Explicit function references (backticks, parentheses) ALWAYS take priority over 
   - Use regex patterns for detection (fast, maintainable)
   - Classify before warning rather than filtering after
   - Preserve existing behavior for function-referencing mitigations
-  - **Explicit references take priority over approach patterns** (per G3 feedback)
 
 ### 2.7 Architecture Decisions
 
@@ -192,13 +165,11 @@ Explicit function references (backticks, parentheses) ALWAYS take priority over 
 | Pattern storage | Hardcoded vs config file | Hardcoded constants | Patterns are stable, config adds complexity |
 | Warning behavior | Suppress entirely vs demote to DEBUG | Demote to DEBUG | Maintains traceability while reducing noise |
 | Case sensitivity | Case-sensitive vs insensitive | Case-insensitive (`re.IGNORECASE`) | Handles variations like "UTF-8" vs "utf-8" |
-| Mixed content handling | Approach suppresses all vs Explicit takes priority | **Explicit takes priority** | Per G3 feedback: ensures Req #1 and T090 are satisfied |
 
 **Architectural Constraints:**
 - Must integrate with existing `trace_mitigations_to_functions()` flow
 - Cannot introduce new external dependencies
 - Must maintain backward compatibility (existing function references still warn)
-- **Explicit function references must always warn when unmatched, even with approach patterns present**
 
 ## 3. Requirements
 
@@ -247,7 +218,7 @@ LLD Markdown ──parse──► Risk Mitigations ──classify──► Warni
 |---------|--------|-------|
 | Function-reference mitigations | Hardcoded | e.g., `` `validate_input()` handles this `` |
 | Approach-style mitigations | Hardcoded from issue examples | e.g., "O(n) transformation, tested with 500+ rows" |
-| Mixed mitigations | Hardcoded | e.g., `` Use `parse_utf8()` with O(1) lookup `` |
+| Mixed mitigations | Hardcoded | e.g., `` Use `parse_utf8()` with explicit encoding `` |
 
 ### 5.4 Deployment Pipeline
 
@@ -285,15 +256,14 @@ Before finalizing any diagram, verify in [Mermaid Live Editor](https://mermaid.l
 flowchart TD
     A[Mitigation Text] --> B{Function<br/>Match Found?}
     B -->|Yes| C[No Warning<br/>Trace Recorded]
-    B -->|No| D{Contains Explicit<br/>Function Reference?}
-    D -->|Yes| G[Emit Warning<br/>Function Not Found]
-    D -->|No| F{Is Approach<br/>Style?}
-    F -->|Yes| E[Skip Warning<br/>Log DEBUG]
-    F -->|No| H[Skip Warning<br/>Plain Description]
+    B -->|No| D{Contains Function<br/>Reference?}
+    D -->|No| E[Skip Warning<br/>Log DEBUG]
+    D -->|Yes| F{Is Approach<br/>Style?}
+    F -->|Yes| E
+    F -->|No| G[Emit Warning<br/>Function Not Found]
     
     style C fill:#90EE90
     style E fill:#90EE90
-    style H fill:#90EE90
     style G fill:#FFB6C1
 ```
 
@@ -314,8 +284,8 @@ flowchart TD
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| False negatives (missing real issues) | Conservative patterns; explicit function refs always warn | Addressed |
-| Over-suppression | Only suppress when NO explicit function reference; log all decisions | Addressed |
+| False negatives (missing real issues) | Conservative patterns; explicit function refs still warn | Addressed |
+| Over-suppression | Only suppress clear approach patterns; log all decisions | Addressed |
 
 **Fail Mode:** Fail Open - If classification is uncertain, emit warning (existing behavior preserved)
 
@@ -388,8 +358,7 @@ flowchart TD
 | T060 | test_should_warn_for_unmatched_function_ref | Warns when `` `missing_func` `` not found | RED |
 | T070 | test_should_not_warn_for_approach_mitigation | No warning for "O(n) transformation" | RED |
 | T080 | test_mixed_mitigation_with_function_ref | Warns when func ref present but unmatched | RED |
-| T090 | test_mixed_content_explicit_ref_takes_priority | Warns for `` `parse_utf8()` with O(1) lookup `` when parse_utf8 not found | RED |
-| T095 | test_existing_behavior_preserved | Matched functions still trace correctly | RED |
+| T090 | test_existing_behavior_preserved | Matched functions still trace correctly | RED |
 | T100 | test_performance_no_regression | 100 mitigations classified in < 50ms | RED |
 
 **Coverage Target:** ≥95% for all new code
@@ -415,8 +384,7 @@ flowchart TD
 | 060 | Plain description | Auto | `This handles the edge case properly` | Both flags False | No warning emitted |
 | 070 | Unmatched function reference | Auto | `` `nonexistent_func()` `` with no match | Warning emitted | Warning contains function name |
 | 080 | Matched function reference | Auto | `` `existing_func` `` with match | No warning | Trace recorded |
-| 090 | Mixed content - explicit ref takes priority | Auto | `` `parse_utf8()` with O(1) lookup `` | Warning emitted (parse_utf8 not found) | Explicit ref triggers warning despite approach pattern |
-| 095 | Existing behavior preserved | Auto | Function reference with valid match | No warning, trace recorded | Backward compatibility maintained |
+| 090 | Mixed approach with func ref | Auto | `` `parse_utf8()` with O(1) lookup `` | `has_function_reference=True` | Warning if func not found |
 | 100 | Performance benchmark | Auto | 100 synthetic mitigations (mixed types) | All classified in < 50ms | `time.perf_counter()` delta < 0.05s |
 
 *Note: Use 3-digit IDs with gaps of 10 (010, 020, 030...) to allow insertions.*
@@ -436,9 +404,6 @@ poetry run pytest tests/unit/test_validate_mechanical.py -v --cov=agentos/workfl
 # Run DEBUG log test specifically
 poetry run pytest tests/unit/test_validate_mechanical.py -v -k "test_approach_mitigation_logs_debug"
 
-# Run mixed content priority test (G3 fix verification)
-poetry run pytest tests/unit/test_validate_mechanical.py -v -k "test_mixed_content_explicit_ref_takes_priority"
-
 # Run performance benchmark test
 poetry run pytest tests/unit/test_validate_mechanical.py -v -k "test_performance_no_regression"
 ```
@@ -451,11 +416,10 @@ N/A - All scenarios automated.
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| Patterns too aggressive (false negatives) | Med | Low | Conservative patterns, explicit refs always warn via `contains_explicit_function_reference()` |
+| Patterns too aggressive (false negatives) | Med | Low | Conservative patterns, only suppress clear approach styles |
 | Patterns too conservative (still noisy) | Low | Med | Iterative refinement based on real-world usage |
 | Regex performance issues | Low | Low | Use compiled patterns, benchmark in tests (T100) |
-| Breaking existing validation | High | Low | Comprehensive test coverage of existing behavior (T095) |
-| Mixed content logic error | Med | Low | Explicit refs take priority per `should_warn_missing_function()` logic |
+| Breaking existing validation | High | Low | Comprehensive test coverage of existing behavior |
 
 ## 12. Definition of Done
 
@@ -487,22 +451,15 @@ Mechanical validation automatically checks:
 
 | Risk Mitigation | Traced To |
 |-----------------|-----------|
-| Conservative patterns, explicit refs always warn | `contains_explicit_function_reference()`, `should_warn_missing_function()` |
+| Conservative patterns | `is_approach_mitigation()`, `should_warn_missing_function()` |
 | Iterative refinement | Pattern constants (configurable in future) |
 | Compiled patterns | `FUNCTION_REFERENCE_PATTERNS`, `APPROACH_MITIGATION_PATTERNS` |
-| Comprehensive test coverage | Test scenarios 010-100, specifically T095 |
+| Comprehensive test coverage | Test scenarios 010-100 |
 | Performance benchmark | T100 test case |
-| Mixed content logic | `should_warn_missing_function()` with explicit ref priority |
 
 **If files are missing from Section 2.1, the LLD is BLOCKED.**
 
 ---
-
-## Reviewer Suggestions
-
-*Non-blocking recommendations from the reviewer.*
-
-- **Regex Comments:** When implementing Section 2.4, ensure the regex patterns include comments explaining the syntax (e.g., what `[^)]+` matches) to aid future maintainability.
 
 ## Appendix: Review Log
 
@@ -520,7 +477,7 @@ Mechanical validation automatically checks:
 | ID | Comment | Implemented? |
 |----|---------|--------------|
 | G1.1 | "Requirement #4 (logging) is not mapped to a test case in Section 10" | YES - Added T035 test case for DEBUG log verification |
-| G1.2 | "Consider adding a comment block in validate_mechanical.py near the constants explicitly listing examples for each pattern" | YES - Added to Definition of Done checklist and Section 2.4 |
+| G1.2 | "Consider adding a comment block in validate_mechanical.py near the constants explicitly listing examples for each pattern" | YES - Added to Definition of Done checklist |
 | G1.3 | "Adding a simple benchmark or ensuring the existing test suite runtime doesn't spike would be a good safety net" | YES - Added T100 performance benchmark test |
 
 ### Gemini Review #2 (REVISE)
@@ -536,18 +493,6 @@ Mechanical validation automatically checks:
 | G2.2 | "Consider compiling regex patterns at module level but ensure re.IGNORECASE is handled if mitigations vary in casing" | YES - Added case sensitivity decision to Section 2.7 Architecture Decisions |
 | G2.3 | "Ensure TypedDict imports from typing (or typing_extensions for older Python)" | PENDING - Implementation detail, will address during coding |
 
-### Gemini Review #3 (REVISE)
-
-**Reviewer:** Gemini 3 Pro
-**Verdict:** REVISE
-
-#### Comments
-
-| ID | Comment | Implemented? |
-|----|---------|--------------|
-| G3.1 | "Logic Contradiction in Section 2.5: Mixed content (explicit ref + approach pattern) incorrectly suppresses warnings" | YES - Redesigned logic flow in Section 2.5 to prioritize explicit function references. Updated `should_warn_missing_function()` signature and documentation in Section 2.4. Added T090 test case for mixed content. Updated diagram in Section 6.2. |
-| G3.2 | "Consider adding a 'Dry Run' CLI flag" | DEFERRED - Future enhancement, not in scope for this issue |
-
 ### Review Summary
 
 <!-- Note: This table is auto-populated by the workflow with actual review dates. -->
@@ -556,7 +501,6 @@ Mechanical validation automatically checks:
 |--------|------|---------|-----------|
 | Gemini #1 | - | REVISE | Missing test for Requirement #4 (logging) |
 | Gemini #2 | - | REVISE | Missing test for Requirement #5 (performance) |
-| Gemini #3 | - | REVISE | Logic contradiction for mixed content in Section 2.5 |
 
-**Final Status:** APPROVED
+**Final Status:** PENDING
 <!-- Note: This field is auto-updated to APPROVED by the workflow when finalized -->
