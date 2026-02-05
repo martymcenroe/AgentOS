@@ -190,11 +190,64 @@ def parse_files_changed_table(lld_content: str) -> tuple[list[dict], list[Valida
     return files, errors
 
 
+def find_similar_files(filename: str, repo_root: Path, max_results: int = 3) -> list[str]:
+    """Find files with similar names in the repository.
+
+    Issue #300: Help drafter fix invalid paths by suggesting alternatives.
+
+    Args:
+        filename: The filename to search for (e.g., "new_repo_setup.py").
+        repo_root: Path to repository root.
+        max_results: Maximum number of suggestions to return.
+
+    Returns:
+        List of relative paths to similar files.
+    """
+    suggestions = []
+
+    # Normalize filename: convert underscores to hyphens and vice versa
+    base_name = Path(filename).stem  # e.g., "new_repo_setup"
+    extension = Path(filename).suffix  # e.g., ".py"
+
+    # Generate variants to search for
+    variants = {
+        base_name,
+        base_name.replace("_", "-"),  # new_repo_setup -> new-repo-setup
+        base_name.replace("-", "_"),  # new-repo-setup -> new_repo_setup
+    }
+
+    # Search common code directories (limit depth to avoid slowness)
+    search_dirs = ["tools", "agentos", "scripts", "src", "lib", "tests"]
+
+    for search_dir in search_dirs:
+        dir_path = repo_root / search_dir
+        if not dir_path.exists():
+            continue
+
+        # Use glob to find matching files (limit depth)
+        for pattern_base in variants:
+            pattern = f"**/{pattern_base}{extension}"
+            try:
+                for match in dir_path.glob(pattern):
+                    if match.is_file():
+                        rel_path = str(match.relative_to(repo_root)).replace("\\", "/")
+                        if rel_path not in suggestions:
+                            suggestions.append(rel_path)
+                            if len(suggestions) >= max_results:
+                                return suggestions
+            except (OSError, ValueError):
+                continue
+
+    return suggestions
+
+
 def validate_file_paths(
     files: list[dict],
     repo_root: Path,
 ) -> list[ValidationError]:
     """Check that Modify/Delete files exist, Add files have valid parents.
+
+    Issue #300: Include file path suggestions when files don't exist.
 
     Args:
         files: List of file dicts with path and change_type.
@@ -212,11 +265,24 @@ def validate_file_paths(
 
         if change_type in ("Modify", "Delete"):
             if not full_path.exists():
+                # Issue #300: Find similar files to suggest
+                filename = Path(path).name
+                suggestions = find_similar_files(filename, repo_root)
+
+                if suggestions:
+                    suggestion_text = ", ".join(f"`{s}`" for s in suggestions)
+                    message = (
+                        f"File marked {change_type} but does not exist: {path}. "
+                        f"Did you mean: {suggestion_text}?"
+                    )
+                else:
+                    message = f"File marked {change_type} but does not exist: {path}"
+
                 errors.append(
                     ValidationError(
                         severity=ValidationSeverity.ERROR,
                         section="2.1",
-                        message=f"File marked {change_type} but does not exist: {path}",
+                        message=message,
                         file_path=path,
                     )
                 )
