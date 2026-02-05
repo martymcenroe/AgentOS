@@ -33,6 +33,10 @@ from agentos.workflows.testing.state import TestingWorkflowState
 # Issue #309: Maximum retry attempts per file
 MAX_FILE_RETRIES = 3
 
+# Issue #324: Large file thresholds for diff-based generation
+LARGE_FILE_LINE_THRESHOLD = 500  # Lines
+LARGE_FILE_BYTE_THRESHOLD = 15000  # Bytes (~15KB)
+
 
 class ImplementationError(Exception):
     """Raised when implementation fails mechanically.
@@ -163,6 +167,314 @@ def estimate_context_tokens(lld_content: str, completed_files: list[tuple[str, s
         total_chars += len(filepath) + len(content) + 50  # 50 for formatting
 
     return total_chars // 4
+
+
+# =============================================================================
+# Issue #324: Diff-Based Generation for Large Files
+# =============================================================================
+
+
+def is_large_file(content: str) -> bool:
+    """Check if file content exceeds size thresholds.
+
+    Issue #324: Large files (500+ lines OR 15KB+) should use diff mode
+    instead of full file regeneration.
+
+    Args:
+        content: The file content to check.
+
+    Returns:
+        True if file exceeds either threshold.
+    """
+    if not content:
+        return False
+
+    # Check line count (500+ lines = large)
+    line_count = len(content.split("\n"))
+    if line_count > LARGE_FILE_LINE_THRESHOLD:
+        return True
+
+    # Check byte size (15KB+ = large)
+    byte_count = len(content.encode("utf-8"))
+    if byte_count > LARGE_FILE_BYTE_THRESHOLD:
+        return True
+
+    return False
+
+
+def select_generation_strategy(change_type: str, existing_content: str | None) -> str:
+    """Select code generation strategy based on change type and file size.
+
+    Issue #324: Use diff mode for large file modifications.
+
+    Args:
+        change_type: "Add", "Modify", or "Delete".
+        existing_content: Current file content (None for new files).
+
+    Returns:
+        "standard" or "diff".
+    """
+    # Add and Delete always use standard mode
+    if change_type.lower() in ("add", "delete"):
+        return "standard"
+
+    # Modify: check file size
+    if existing_content and is_large_file(existing_content):
+        return "diff"
+
+    return "standard"
+
+
+def build_diff_prompt(
+    lld_content: str,
+    existing_content: str,
+    test_content: str,
+    file_path: str,
+) -> str:
+    """Build prompt requesting FIND/REPLACE diff format.
+
+    Issue #324: For large files, request targeted changes instead of
+    full file regeneration.
+
+    Args:
+        lld_content: The LLD specification.
+        existing_content: Current file content.
+        test_content: Test code that must pass.
+        file_path: Path to the file being modified.
+
+    Returns:
+        Prompt string for diff-based generation.
+    """
+    prompt = f"""# Modification Request: {file_path}
+
+## Task
+
+Modify the existing file using FIND/REPLACE blocks. Do NOT output the entire file.
+
+## LLD Specification
+
+{lld_content}
+
+## Current File Content
+
+```python
+{existing_content}
+```
+
+"""
+
+    if test_content:
+        prompt += f"""## Tests That Must Pass
+
+```python
+{test_content}
+```
+
+"""
+
+    prompt += """## Output Format
+
+Output ONLY the changes using this FIND/REPLACE format:
+
+### CHANGE 1: Brief description of what this change does
+FIND:
+```python
+exact code to find
+```
+
+REPLACE WITH:
+```python
+replacement code
+```
+
+### CHANGE 2: Next change description
+FIND:
+```python
+...
+```
+
+REPLACE WITH:
+```python
+...
+```
+
+CRITICAL RULES:
+1. Do NOT output the entire file - only the FIND/REPLACE blocks
+2. Each FIND block must match EXACTLY in the current file
+3. Include enough context in FIND to be unambiguous (unique match)
+4. Number your changes: CHANGE 1, CHANGE 2, etc.
+5. Describe what each change does in the header
+"""
+
+    return prompt
+
+
+def parse_diff_response(response: str) -> dict:
+    """Parse FIND/REPLACE diff response from Claude.
+
+    Issue #324: Extract change blocks from diff-format response.
+
+    Args:
+        response: Claude's response with FIND/REPLACE blocks.
+
+    Returns:
+        Dict with keys:
+        - success: bool
+        - error: str | None
+        - changes: list[dict] with keys: description, find_block, replace_block
+    """
+    changes = []
+
+    # Pattern to match CHANGE headers
+    # Matches: ### CHANGE N: description
+    change_pattern = re.compile(
+        r"###\s*CHANGE\s*\d+\s*:\s*(.+?)(?=\n)",
+        re.IGNORECASE
+    )
+
+    # Pattern to match FIND/REPLACE blocks
+    # FIND: ```...``` REPLACE WITH: ```...```
+    find_replace_pattern = re.compile(
+        r"FIND:\s*```\w*\s*\n(.*?)```\s*\n+REPLACE\s+WITH:\s*```\w*\s*\n(.*?)```",
+        re.DOTALL | re.IGNORECASE
+    )
+
+    # Split response into change sections
+    sections = re.split(r"(###\s*CHANGE\s*\d+\s*:)", response, flags=re.IGNORECASE)
+
+    # Process pairs: (header_marker, content)
+    i = 1  # Skip text before first CHANGE
+    while i < len(sections) - 1:
+        header_marker = sections[i]  # "### CHANGE N:"
+        content = sections[i + 1] if i + 1 < len(sections) else ""
+
+        # Extract description from the content (first line after header)
+        desc_match = re.match(r"\s*(.+?)(?=\n)", content)
+        description = desc_match.group(1).strip() if desc_match else "Unknown change"
+
+        # Find the FIND/REPLACE block in this section
+        fr_match = find_replace_pattern.search(content)
+
+        if not fr_match:
+            return {
+                "success": False,
+                "error": f"CHANGE missing REPLACE WITH section: {description[:50]}",
+                "changes": [],
+            }
+
+        find_block = fr_match.group(1).strip()
+        replace_block = fr_match.group(2).strip()
+
+        changes.append({
+            "description": description,
+            "find_block": find_block,
+            "replace_block": replace_block,
+        })
+
+        i += 2
+
+    if not changes:
+        return {
+            "success": False,
+            "error": "No FIND/REPLACE changes found in response",
+            "changes": [],
+        }
+
+    return {
+        "success": True,
+        "error": None,
+        "changes": changes,
+    }
+
+
+def apply_diff_changes(
+    content: str,
+    changes: list[dict],
+) -> tuple[str, list[str]]:
+    """Apply FIND/REPLACE changes to file content.
+
+    Issue #324: Apply each change sequentially, with error detection.
+
+    Args:
+        content: Original file content.
+        changes: List of change dicts with find_block/replace_block.
+
+    Returns:
+        Tuple of (modified_content, error_list).
+    """
+    errors = []
+    result = content
+
+    for change in changes:
+        find_block = change.get("find_block", "")
+        replace_block = change.get("replace_block", "")
+        description = change.get("description", "")
+
+        if not find_block:
+            errors.append(f"Empty FIND block for change: {description}")
+            continue
+
+        # Count occurrences
+        count = result.count(find_block)
+
+        if count == 0:
+            # Try whitespace-normalized matching
+            normalized_result = _normalize_whitespace(result)
+            normalized_find = _normalize_whitespace(find_block)
+
+            if normalized_find in normalized_result:
+                # Found with normalization - but we can't reliably replace
+                # so we report a whitespace-specific error
+                errors.append(
+                    f"FIND block has whitespace mismatch for: {description[:50]}. "
+                    f"Exact match not found but similar code exists."
+                )
+            else:
+                errors.append(f"FIND block not found in file: {description[:50]}")
+            continue
+
+        if count > 1:
+            errors.append(
+                f"Ambiguous FIND block (matches {count} locations): {description[:50]}"
+            )
+            continue
+
+        # Single match - safe to replace
+        result = result.replace(find_block, replace_block, 1)
+
+    return result, errors
+
+
+def _normalize_whitespace(text: str) -> str:
+    """Normalize whitespace for fuzzy matching.
+
+    Collapses multiple spaces and normalizes indentation.
+    """
+    # Replace tabs with spaces
+    text = text.replace("\t", "    ")
+    # Collapse multiple spaces (but preserve newlines)
+    lines = text.split("\n")
+    normalized_lines = []
+    for line in lines:
+        # Strip trailing whitespace, normalize internal spaces
+        line = line.rstrip()
+        normalized_lines.append(line)
+    return "\n".join(normalized_lines)
+
+
+def detect_truncation(response: object) -> bool:
+    """Detect if response was truncated due to max_tokens.
+
+    Issue #324: Check stop_reason to detect truncation.
+
+    Args:
+        response: Claude API response object with stop_reason attribute.
+
+    Returns:
+        True if response was truncated.
+    """
+    stop_reason = getattr(response, "stop_reason", None)
+    return stop_reason == "max_tokens"
 
 
 # =============================================================================
