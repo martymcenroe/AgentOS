@@ -1,12 +1,13 @@
 """N4: Implement Code node for TDD Testing Workflow.
 
 Issue #272: File-by-file prompting with mechanical validation.
+Issue #309: Add retry logic on validation failure (up to 3 attempts).
 
 Key changes from original:
 - Iterate through files_to_modify one at a time (not batch)
 - Accumulate context: each file sees LLD + previously completed files
 - Mechanical validation: code block exists, not empty, parses
-- Hard failure: first validation failure kills workflow
+- RETRY on validation failure: up to 3 attempts with error feedback
 - WE control the file path, not Claude
 """
 
@@ -27,6 +28,10 @@ from agentos.workflows.testing.audit import (
     save_audit_file,
 )
 from agentos.workflows.testing.state import TestingWorkflowState
+
+
+# Issue #309: Maximum retry attempts per file
+MAX_FILE_RETRIES = 3
 
 
 class ImplementationError(Exception):
@@ -349,6 +354,171 @@ If you output anything other than a code block, the build will fail."""
 
 
 # =============================================================================
+# Issue #309: Retry Logic
+# =============================================================================
+
+
+def build_retry_prompt(base_prompt: str, validation_error: str, attempt: int) -> str:
+    """Augment the base prompt with error context from previous attempt.
+
+    Issue #309: Include validation error to help Claude self-correct.
+
+    Args:
+        base_prompt: The original prompt for this file.
+        validation_error: Error message from the failed attempt.
+        attempt: Current attempt number (1-indexed for display).
+
+    Returns:
+        Modified prompt with error feedback section.
+    """
+    error_section = f"""
+
+## Previous Attempt Failed (Attempt {attempt}/{MAX_FILE_RETRIES})
+
+Your previous response had an error:
+
+```
+{validation_error}
+```
+
+Please fix this issue and provide the corrected, complete file contents.
+IMPORTANT: Output the ENTIRE file, not just the fix.
+"""
+
+    # Insert error section before the Output Format section
+    if "## Output Format" in base_prompt:
+        parts = base_prompt.split("## Output Format")
+        return parts[0] + error_section + "\n## Output Format" + parts[1]
+    else:
+        return base_prompt + error_section
+
+
+def generate_file_with_retry(
+    filepath: str,
+    base_prompt: str,
+    audit_dir: Path | None = None,
+    max_retries: int = MAX_FILE_RETRIES,
+) -> tuple[str, bool]:
+    """Generate code for a single file with retry on validation failure.
+
+    Issue #309: Retry up to max_retries times on API or validation errors,
+    including error context in subsequent prompts.
+
+    Args:
+        filepath: Path to the file being generated.
+        base_prompt: The initial prompt for code generation.
+        audit_dir: Optional directory for audit logs.
+        max_retries: Maximum number of attempts (default: 3).
+
+    Returns:
+        Tuple of (generated_code, success_flag).
+
+    Raises:
+        ImplementationError: Only after exhausting all retry attempts.
+    """
+    last_error = ""
+    prompt = base_prompt
+
+    for attempt in range(max_retries):
+        attempt_num = attempt + 1  # 1-indexed for display
+
+        # Build retry prompt if this isn't the first attempt
+        if attempt > 0:
+            prompt = build_retry_prompt(base_prompt, last_error, attempt_num)
+            print(f"        [RETRY {attempt_num}/{max_retries}] {last_error[:80]}...")
+
+        # Save prompt to audit
+        if audit_dir and audit_dir.exists():
+            file_num = next_file_number(audit_dir)
+            suffix = f"-retry{attempt_num}" if attempt > 0 else ""
+            save_audit_file(
+                audit_dir,
+                file_num,
+                f"prompt-{filepath.replace('/', '-')}{suffix}.md",
+                prompt
+            )
+
+        # Call Claude
+        response, api_error = call_claude_for_file(prompt)
+
+        # Check for API error
+        if api_error:
+            last_error = f"API error: {api_error}"
+            if attempt < max_retries - 1:
+                print(f"        [RETRY {attempt_num}/{max_retries}] {last_error}")
+                continue
+            else:
+                raise ImplementationError(
+                    filepath=filepath,
+                    reason=f"API error after {max_retries} attempts: {api_error}",
+                    response_preview=None
+                )
+
+        # Save response to audit
+        if audit_dir and audit_dir.exists():
+            file_num = next_file_number(audit_dir)
+            suffix = f"-retry{attempt_num}" if attempt > 0 else ""
+            save_audit_file(
+                audit_dir,
+                file_num,
+                f"response-{filepath.replace('/', '-')}{suffix}.md",
+                response
+            )
+
+        # Detect summary response (fast rejection)
+        if detect_summary_response(response):
+            last_error = "Claude gave a summary instead of code"
+            if attempt < max_retries - 1:
+                continue
+            else:
+                raise ImplementationError(
+                    filepath=filepath,
+                    reason=f"Summary response after {max_retries} attempts",
+                    response_preview=response[:500]
+                )
+
+        # Extract code block
+        code = extract_code_block(response)
+
+        if code is None:
+            last_error = "No code block found in response"
+            if attempt < max_retries - 1:
+                continue
+            else:
+                raise ImplementationError(
+                    filepath=filepath,
+                    reason=f"No code block after {max_retries} attempts",
+                    response_preview=response[:500]
+                )
+
+        # Validate code mechanically
+        valid, validation_error = validate_code_response(code, filepath)
+
+        if not valid:
+            last_error = f"Validation failed: {validation_error}"
+            if attempt < max_retries - 1:
+                continue
+            else:
+                raise ImplementationError(
+                    filepath=filepath,
+                    reason=f"Validation failed after {max_retries} attempts: {validation_error}",
+                    response_preview=code[:500]
+                )
+
+        # Success!
+        if attempt > 0:
+            print(f"        [SUCCESS] Retry {attempt_num} succeeded")
+        return code, True
+
+    # Should not reach here, but just in case
+    raise ImplementationError(
+        filepath=filepath,
+        reason=f"Failed after {max_retries} attempts: {last_error}",
+        response_preview=None
+    )
+
+
+# =============================================================================
 # Main Implementation Loop
 # =============================================================================
 
@@ -450,54 +620,16 @@ def implement_code(state: TestingWorkflowState) -> dict[str, Any]:
             previous_error=green_phase_output if iteration_count > 0 else "",
         )
 
-        # Save prompt to audit
-        if audit_dir.exists():
-            file_num = next_file_number(audit_dir)
-            save_audit_file(audit_dir, file_num, f"prompt-{filepath.replace('/', '-')}.md", prompt)
-
-        # Call Claude
+        # Call Claude with retry logic (Issue #309)
         print(f"        Calling Claude...")
-        response, error = call_claude_for_file(prompt)
-
-        if error:
-            raise ImplementationError(
-                filepath=filepath,
-                reason=f"Claude API error: {error}",
-                response_preview=None
-            )
-
-        # Save response to audit
-        if audit_dir.exists():
-            file_num = next_file_number(audit_dir)
-            save_audit_file(audit_dir, file_num, f"response-{filepath.replace('/', '-')}.md", response)
-
-        # Detect summary response (fast rejection)
-        if detect_summary_response(response):
-            raise ImplementationError(
-                filepath=filepath,
-                reason="Claude gave a summary instead of code",
-                response_preview=response[:500]
-            )
-
-        # Extract code block
-        code = extract_code_block(response)
-
-        if code is None:
-            raise ImplementationError(
-                filepath=filepath,
-                reason="No code block found in response",
-                response_preview=response[:500]
-            )
-
-        # Validate code mechanically
-        valid, validation_error = validate_code_response(code, filepath)
-
-        if not valid:
-            raise ImplementationError(
-                filepath=filepath,
-                reason=f"Validation failed: {validation_error}",
-                response_preview=code[:500]
-            )
+        code, success = generate_file_with_retry(
+            filepath=filepath,
+            base_prompt=prompt,
+            audit_dir=audit_dir if audit_dir.exists() else None,
+            max_retries=MAX_FILE_RETRIES,
+        )
+        # Note: generate_file_with_retry raises ImplementationError on failure,
+        # so if we get here, code is valid
 
         # Write file (atomic: write to temp, then rename)
         temp_path = target_path.with_suffix(target_path.suffix + ".tmp")
