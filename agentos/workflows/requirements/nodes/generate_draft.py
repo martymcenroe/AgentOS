@@ -16,6 +16,7 @@ from typing import Any
 
 from agentos.core.llm_provider import get_provider
 from agentos.workflows.requirements.audit import (
+    get_repo_structure,
     load_template,
     next_file_number,
     save_audit_file,
@@ -194,6 +195,7 @@ def _build_prompt(
         revision_context = ""
 
         # Issue #294: Include mechanical validation errors FIRST (highest priority)
+        # Issue #339: Include repo structure so drafter knows what directories exist
         if validation_errors:
             revision_context += "## MECHANICAL VALIDATION ERRORS (MUST FIX FIRST)\n\n"
             revision_context += "The following errors were found by automated validation. "
@@ -201,10 +203,22 @@ def _build_prompt(
             for error in validation_errors:
                 revision_context += f"- **ERROR:** {error}\n"
             revision_context += "\n"
-            revision_context += "**CRITICAL:** Check that all file paths in Section 2.1 are correct:\n"
-            revision_context += "- 'Modify' files MUST exist in the repository\n"
-            revision_context += "- 'Add' files must have existing parent directories\n"
-            revision_context += "- Use actual file names from the codebase, not generic names\n\n"
+
+            # Issue #339: Show actual repo structure so drafter can use real paths
+            target_repo = state.get("target_repo", "")
+            if target_repo:
+                repo_structure = get_repo_structure(target_repo)
+                revision_context += "## ACTUAL REPOSITORY STRUCTURE\n\n"
+                revision_context += "**Use ONLY these existing directories** (or explicitly Add new ones):\n\n"
+                revision_context += f"```\n{repo_structure}\n```\n\n"
+                revision_context += "**To add files in a NEW directory:**\n"
+                revision_context += "1. First add the directory itself with Change Type: `Add (Directory)`\n"
+                revision_context += "2. Then add files inside it with Change Type: `Add`\n\n"
+            else:
+                revision_context += "**CRITICAL:** Check that all file paths in Section 2.1 are correct:\n"
+                revision_context += "- 'Modify' files MUST exist in the repository\n"
+                revision_context += "- 'Add' files must have existing parent directories\n"
+                revision_context += "- Use actual file names from the codebase, not generic names\n\n"
 
         if verdict_history:
             revision_context += "## ALL Gemini Review Feedback (CUMULATIVE)\n\n"

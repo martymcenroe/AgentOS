@@ -35,6 +35,141 @@ LLD_STATUS_FILE = Path("docs/lld/lld-status.json")
 IDEAS_ACTIVE_DIR = Path("ideas/active")
 IDEAS_DONE_DIR = Path("ideas/done")
 
+# Directories to exclude from repo structure listings
+EXCLUDED_DIRS = {
+    ".git",
+    ".github",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "node_modules",
+    ".venv",
+    "venv",
+    ".env",
+    ".tox",
+    "dist",
+    "build",
+    "*.egg-info",
+    ".agentos",
+    ".claude",
+    ".idea",
+    ".vscode",
+}
+
+
+# =============================================================================
+# Repository Structure
+# =============================================================================
+
+
+def get_repo_structure(
+    repo_path: str | Path,
+    max_depth: int = 3,
+    focus_dirs: list[str] | None = None,
+) -> str:
+    """Generate a tree view of repository directory structure.
+
+    Used to provide context to the drafter when validation fails,
+    so it can see what directories actually exist.
+
+    Args:
+        repo_path: Path to the repository root.
+        max_depth: Maximum depth to traverse (default 3).
+        focus_dirs: If provided, only show these top-level directories
+                   (e.g., ["src", "tests"]). If None, shows all.
+
+    Returns:
+        Tree-formatted string showing directory structure.
+
+    Example output:
+        src/
+          __init__.py
+          main.py
+          elementizer/
+            __init__.py
+          output/
+            __init__.py
+        tests/
+          __init__.py
+          fixtures/
+          unit/
+    """
+    repo = Path(repo_path)
+    if not repo.exists():
+        return f"(Repository not found: {repo_path})"
+
+    lines: list[str] = []
+
+    def should_exclude(name: str) -> bool:
+        """Check if directory/file should be excluded."""
+        if name.startswith("."):
+            return name in EXCLUDED_DIRS or name.startswith(".")
+        return name in EXCLUDED_DIRS or name.endswith(".egg-info")
+
+    def add_tree(path: Path, prefix: str = "", depth: int = 0) -> None:
+        """Recursively add directory tree."""
+        if depth > max_depth:
+            return
+
+        try:
+            entries = sorted(path.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+        except PermissionError:
+            return
+
+        # Separate dirs and files
+        dirs = [e for e in entries if e.is_dir() and not should_exclude(e.name)]
+        files = [e for e in entries if e.is_file() and not should_exclude(e.name)]
+
+        # Show directories first
+        for d in dirs:
+            lines.append(f"{prefix}{d.name}/")
+            add_tree(d, prefix + "  ", depth + 1)
+
+        # Show key files (only at depth 0-1 to avoid noise)
+        if depth <= 1:
+            # Show Python files and important config files
+            important_files = [
+                f for f in files
+                if f.suffix in (".py", ".toml", ".yaml", ".yml", ".json", ".md")
+                and f.name not in ("poetry.lock", "package-lock.json")
+            ]
+            # Limit to avoid overwhelming output
+            for f in important_files[:10]:
+                lines.append(f"{prefix}{f.name}")
+            if len(important_files) > 10:
+                lines.append(f"{prefix}... and {len(important_files) - 10} more files")
+
+    # Get top-level entries
+    try:
+        top_entries = sorted(repo.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+    except PermissionError:
+        return "(Permission denied reading repository)"
+
+    top_dirs = [e for e in top_entries if e.is_dir() and not should_exclude(e.name)]
+
+    # Filter to focus dirs if specified
+    if focus_dirs:
+        top_dirs = [d for d in top_dirs if d.name in focus_dirs]
+
+    # If no focus dirs specified, prioritize src/tests but include others
+    if not focus_dirs:
+        priority = {"src", "tests", "lib", "app", "pkg"}
+        priority_dirs = [d for d in top_dirs if d.name in priority]
+        other_dirs = [d for d in top_dirs if d.name not in priority]
+
+        # Show priority dirs first, then up to 3 others
+        top_dirs = priority_dirs + other_dirs[:3]
+
+    for d in top_dirs:
+        lines.append(f"{d.name}/")
+        add_tree(d, "  ", 1)
+
+    if not lines:
+        return "(No relevant directories found)"
+
+    return "\n".join(lines)
+
 
 # =============================================================================
 # Path Resolution
