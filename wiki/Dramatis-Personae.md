@@ -548,6 +548,39 @@ Open The Luggage and you'll find whatever you need—fresh clothes, weapons, sna
 
 ---
 
+### Ponder Stibbons — The Compositor
+**Source:** *Moving Pictures*, *Lords and Ladies*, the Unseen University series
+
+**Potential Role:** Mechanical Auto-Fix Layer
+
+**Philosophy:** Someone has to do the actual work while the faculty argues about it.
+
+> *"Ponder Stibbons was the only one who did any real work."*
+
+[Ponder Stibbons](https://wiki.lspace.org/Ponder_Stibbons) is the Reader in Invisible Writings at Unseen University—he sees what's there but shouldn't be. While the Archchancellor and senior wizards debate philosophy over dinner, Ponder quietly manages Hex (the thinking engine), runs the actual experiments, and fixes things so the institution keeps functioning.
+
+He's the youngest faculty member but the most senior in terms of actual knowledge. He's learned that the best way to get things done is to do them yourself and present the results as a fait accompli.
+
+**Why He Fits Auto-Fix:**
+- Does the real work while others argue about methodology
+- Manages Hex—understands mechanical systems
+- "Reader in Invisible Writings"—sees errors others miss
+- Fixes things quietly so the system keeps running
+- Presents corrected results, not complaints
+
+**Potential Responsibilities:**
+- Auto-fix title issue numbers
+- Normalize section header formats
+- Apply path corrections from validation suggestions
+- Standardize formatting (whitespace, checkboxes, code fences)
+- Clean drafts before they reach review
+
+**Issue:** [#307 - Ponder Stibbons - The Compositor](https://github.com/martymcenroe/AgentOS/issues/307)
+
+> *"The senior wizards had long since learned that the best way to get Ponder to do something was to tell him it was impossible."*
+
+---
+
 ### Other Candidates
 
 | Character | Potential Role | Notes |
@@ -560,6 +593,10 @@ Open The Luggage and you'll find whatever you need—fresh clothes, weapons, sna
 | **Nobby Nobbs** | Edge Case Handling | Carries papers proving he's human (technically qualifies) |
 | **Gaspode** | Debug Logging | The cynical talking dog who comments on everything |
 | **Cohen the Barbarian** | Legacy System Support | 90 years old, still deadly, "back in my day..." |
+| **Igorina** | Precision Fixes | Female Igor at The Times, surgical precision on text |
+| **The Compositors** | Print-Ready Formatting | Typesetters at The Times, make copy publish-ready |
+| **Tiffany Aching** | Onboarding / Training | Young witch who learns by doing, trains the next generation |
+| **Nanny Ogg** | User Experience | Makes everyone comfortable, knows what people *actually* want |
 
 ---
 
