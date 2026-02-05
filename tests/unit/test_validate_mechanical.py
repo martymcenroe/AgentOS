@@ -232,7 +232,10 @@ def lld_with_dod_mismatch():
 
 @pytest.fixture
 def lld_with_untraced_mitigation():
-    """LLD with risk mitigation that has no matching function."""
+    """LLD with risk mitigation that has explicit function reference not in 2.4.
+
+    Issue #312: Only explicit function references (backticks, parens) trigger warnings.
+    """
     return """# 1001 - Feature: Test
 
 ### 2.1 Files Changed
@@ -253,7 +256,7 @@ def do_something():
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| Token exhaustion | High | Med | Track token count and implement rate limiting |
+| Token exhaustion | High | Med | Call `track_token_count()` to implement rate limiting |
 
 ## 12. Definition of Done
 
@@ -497,8 +500,12 @@ class TestTraceMitigationsToFunctions:
         assert len(warnings) == 0
 
     def test_mitigation_without_matching_function_returns_warning(self):
-        """T120: Mitigation without matching function returns WARNING."""
-        mitigations = ["Track token count and implement rate limiting"]
+        """T120: Mitigation with explicit function reference not in 2.4 returns WARNING.
+
+        Issue #312: Only explicit function references (backticks, parens) trigger warnings.
+        """
+        # Use explicit function reference (backticks) to trigger warning
+        mitigations = ["Call `track_token_count()` to implement rate limiting"]
         functions = ["do_something", "validate_input"]
 
         warnings = trace_mitigations_to_functions(mitigations, functions)
@@ -515,6 +522,113 @@ class TestTraceMitigationsToFunctions:
 
         # "validation" should match "validate" via keyword extraction
         assert len(warnings) == 0
+
+    def test_approach_mitigation_no_warning(self):
+        """Issue #312: Approach-style mitigations don't trigger warnings."""
+        mitigations = ["O(n) transformation, tested with 500+ rows"]
+        functions = ["do_something"]
+
+        warnings = trace_mitigations_to_functions(mitigations, functions)
+
+        # Approach-style mitigation should not trigger warning
+        assert len(warnings) == 0
+
+    def test_encoding_approach_no_warning(self):
+        """Issue #312: Encoding practice mitigations don't trigger warnings."""
+        mitigations = ["Use UTF-8 encoding explicitly throughout"]
+        functions = ["do_something"]
+
+        warnings = trace_mitigations_to_functions(mitigations, functions)
+
+        # Encoding practice should not trigger warning
+        assert len(warnings) == 0
+
+    def test_backtick_reference_matched_no_warning(self):
+        """Issue #312: Backtick reference that matches function has no warning."""
+        mitigations = ["Call `validate_input()` to check data"]
+        functions = ["validate_input", "process_data"]
+
+        warnings = trace_mitigations_to_functions(mitigations, functions)
+
+        # Referenced function exists - no warning
+        assert len(warnings) == 0
+
+
+# =============================================================================
+# Issue #312: Pattern Detection Tests
+# =============================================================================
+
+
+class TestContainsExplicitFunctionReference:
+    """Tests for explicit function reference detection."""
+
+    def test_detects_backtick_reference(self):
+        """Backtick function reference detected."""
+        from agentos.workflows.requirements.nodes.validate_mechanical import (
+            contains_explicit_function_reference,
+        )
+
+        has_ref, refs = contains_explicit_function_reference("Call `my_function` here")
+
+        assert has_ref is True
+        assert "my_function" in refs
+
+    def test_detects_parentheses_reference(self):
+        """Parentheses function reference detected."""
+        from agentos.workflows.requirements.nodes.validate_mechanical import (
+            contains_explicit_function_reference,
+        )
+
+        has_ref, refs = contains_explicit_function_reference("Call my_function() here")
+
+        assert has_ref is True
+        assert "my_function" in refs
+
+    def test_no_reference_returns_false(self):
+        """Plain text without function reference returns False."""
+        from agentos.workflows.requirements.nodes.validate_mechanical import (
+            contains_explicit_function_reference,
+        )
+
+        has_ref, refs = contains_explicit_function_reference("Just a plain description")
+
+        assert has_ref is False
+        assert len(refs) == 0
+
+
+class TestIsApproachMitigation:
+    """Tests for approach-style mitigation detection."""
+
+    def test_detects_complexity_notation(self):
+        """Complexity notation O(n) detected."""
+        from agentos.workflows.requirements.nodes.validate_mechanical import (
+            is_approach_mitigation,
+        )
+
+        is_approach, patterns = is_approach_mitigation("O(n) transformation")
+
+        assert is_approach is True
+        assert len(patterns) > 0
+
+    def test_detects_encoding_reference(self):
+        """Encoding reference detected."""
+        from agentos.workflows.requirements.nodes.validate_mechanical import (
+            is_approach_mitigation,
+        )
+
+        is_approach, patterns = is_approach_mitigation("Use UTF-8 encoding")
+
+        assert is_approach is True
+
+    def test_function_description_not_approach(self):
+        """Function description is not classified as approach."""
+        from agentos.workflows.requirements.nodes.validate_mechanical import (
+            is_approach_mitigation,
+        )
+
+        is_approach, patterns = is_approach_mitigation("Call validate_input to check")
+
+        assert is_approach is False
 
 
 # =============================================================================

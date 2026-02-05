@@ -3,14 +3,18 @@
 Issue #277: Add mechanical validation to catch path errors and section
 inconsistencies before Gemini review.
 
+Issue #312: Add pattern detection for function references vs approach mitigations
+to reduce false positive warnings.
+
 This node validates LLD content deterministically without LLM calls:
 - Mandatory sections exist (2.1, 11, 12)
 - File paths are valid (Modify/Delete exist, Add parents exist)
 - No placeholder prefixes (src/, lib/, app/) unless they exist
 - Definition of Done matches Files Changed
-- Risk mitigations trace to functions (warning only)
+- Risk mitigations trace to functions (warning only, with smart filtering)
 """
 
+import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
@@ -19,6 +23,7 @@ from typing import Any, Dict
 
 from agentos.workflows.requirements.state import RequirementsWorkflowState
 
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Data Structures
@@ -64,6 +69,147 @@ STOPWORDS = {
     "both", "few", "more", "most", "other", "some", "such", "no", "not",
     "only", "same", "so", "than", "too", "very", "just", "also", "any",
 }
+
+# Issue #312: Patterns for detecting explicit function references
+# Examples:
+# - `function_name` (backticks around identifier)
+# - function_name() (parentheses after identifier)
+# - "in function_name" or "via function_name"
+FUNCTION_REFERENCE_PATTERNS = [
+    re.compile(r'`([a-zA-Z_][a-zA-Z0-9_]*)`', re.IGNORECASE),  # `func_name`
+    re.compile(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*\(\)', re.IGNORECASE),  # func_name()
+    re.compile(r'\bin\s+([a-zA-Z_][a-zA-Z0-9_]*)\b', re.IGNORECASE),  # in func_name
+    re.compile(r'\bvia\s+([a-zA-Z_][a-zA-Z0-9_]*)\b', re.IGNORECASE),  # via func_name
+]
+
+# Issue #312: Patterns for detecting approach-style mitigations
+# Examples:
+# - O(n), O(1), O(log n) (algorithmic complexity)
+# - UTF-8, encoding, codec (encoding practices)
+# - opt-in, default unchanged, explicitly (configuration practices)
+APPROACH_MITIGATION_PATTERNS = [
+    re.compile(r'O\([^)]+\)', re.IGNORECASE),  # O(n), O(1), O(log n)
+    re.compile(r'\b(UTF-8|encoding|codec)\b', re.IGNORECASE),  # Encoding references
+    re.compile(r'\b(opt-in|default\s+unchanged|explicitly)\b', re.IGNORECASE),  # Practices
+]
+
+
+# =============================================================================
+# Issue #312: Pattern Detection Functions
+# =============================================================================
+
+
+def contains_explicit_function_reference(mitigation_text: str) -> tuple[bool, list[str]]:
+    """Check if mitigation contains explicit function reference syntax.
+    
+    Returns tuple of (has_reference, matched_references).
+    True if text contains backticks around identifier or parentheses after identifier.
+    
+    Note: Returns the actual matched references for prioritization logic.
+    
+    Args:
+        mitigation_text: The mitigation text to check.
+        
+    Returns:
+        Tuple of (has_reference, list of matched function names).
+    """
+    matched_functions = []
+    
+    for pattern in FUNCTION_REFERENCE_PATTERNS:
+        matches = pattern.findall(mitigation_text)
+        matched_functions.extend(matches)
+    
+    return (len(matched_functions) > 0, matched_functions)
+
+
+def is_approach_mitigation(mitigation_text: str) -> tuple[bool, list[str]]:
+    """Check if mitigation describes an approach rather than function.
+    
+    Returns tuple of (is_approach, matched_patterns).
+    True if text describes algorithmic complexity, encoding practices,
+    configuration flags, or other coding practices.
+    
+    Args:
+        mitigation_text: The mitigation text to check.
+        
+    Returns:
+        Tuple of (is_approach, list of matched pattern descriptions).
+    """
+    matched_patterns = []
+    
+    for pattern in APPROACH_MITIGATION_PATTERNS:
+        if pattern.search(mitigation_text):
+            matched_patterns.append(pattern.pattern)
+    
+    return (len(matched_patterns) > 0, matched_patterns)
+
+
+def should_warn_missing_function(
+    mitigation_text: str,
+    matched_functions: list[str],
+) -> bool:
+    """Determine if missing function match warrants a warning.
+    
+    Logic (addressing G3 mixed content issue):
+    1. If mitigation contains explicit function reference (backticks/parens):
+       - Extract the specific referenced function names
+       - If ANY referenced function is NOT in matched_functions, WARN
+       - Approach patterns do NOT suppress warnings for explicit references
+    2. If mitigation has NO explicit function reference:
+       - If it matches approach patterns, SKIP warning
+       - Otherwise, SKIP warning (plain description)
+    
+    This ensures explicit function references ALWAYS trigger warnings if unmatched,
+    even when approach patterns are also present (mixed content case).
+    
+    Args:
+        mitigation_text: The mitigation text.
+        matched_functions: List of function names found in Section 2.4.
+        
+    Returns:
+        True if a warning should be emitted, False otherwise.
+    """
+    has_ref, referenced_funcs = contains_explicit_function_reference(mitigation_text)
+    
+    if has_ref:
+        # Explicit function reference present - check if ANY referenced function is missing
+        normalized_matched = [f.lower() for f in matched_functions]
+        
+        for ref_func in referenced_funcs:
+            ref_func_lower = ref_func.lower()
+            # Check if this referenced function is in the matched list
+            found = any(
+                ref_func_lower in matched_func or matched_func in ref_func_lower
+                for matched_func in normalized_matched
+            )
+            if not found:
+                # At least one explicit reference is unmatched - warn
+                return True
+        
+        # All explicit references matched - no warning
+        return False
+    
+    # No explicit function reference - check if it's approach-style
+    is_approach, _ = is_approach_mitigation(mitigation_text)
+    
+    # If approach-style or plain description, don't warn
+    return False
+
+
+def log_skipped_mitigation(mitigation_text: str, matched_patterns: list[str]) -> None:
+    """Log skipped approach-style mitigation at DEBUG level for traceability.
+    
+    Called when a mitigation is classified as approach-style and warning is skipped.
+    Logs the mitigation text and which patterns matched for debugging purposes.
+    
+    Args:
+        mitigation_text: The mitigation text that was skipped.
+        matched_patterns: List of pattern descriptions that matched.
+    """
+    logger.debug(
+        f"Skipped approach-style mitigation: '{mitigation_text[:80]}...' "
+        f"(matched patterns: {', '.join(matched_patterns)})"
+    )
 
 
 # =============================================================================
@@ -512,12 +658,14 @@ def trace_mitigations_to_functions(
 ) -> list[ValidationError]:
     """Check that each mitigation has at least one related function.
 
+    Issue #312: Smart filtering to reduce false positives for approach-style mitigations.
+
     Args:
         mitigations: List of mitigation text strings.
         functions: List of function names.
 
     Returns:
-        List of WARNINGs for untraced mitigations.
+        List of WARNINGs for untraced mitigations (filtered by approach detection).
     """
     warnings = []
 
@@ -528,23 +676,33 @@ def trace_mitigations_to_functions(
         keywords = extract_keywords(mitigation)
 
         # Check if any keyword matches any function name (substring match)
-        found_match = False
+        matched_functions = []
         for keyword in keywords:
             for func in normalized_functions:
                 if keyword in func or func in keyword:
-                    found_match = True
-                    break
-            if found_match:
-                break
+                    matched_functions.append(func)
 
-        if not found_match and keywords:
-            warnings.append(
-                ValidationError(
-                    severity=ValidationSeverity.WARNING,
-                    section="11",
-                    message=f"Risk mitigation has no matching function: '{mitigation[:50]}...'",
+        # Issue #312: Use smart filtering to decide whether to warn
+        if not matched_functions:
+            # No function match - check if we should warn
+            if should_warn_missing_function(mitigation, matched_functions):
+                warnings.append(
+                    ValidationError(
+                        severity=ValidationSeverity.WARNING,
+                        section="11",
+                        message=f"Risk mitigation has no matching function: '{mitigation[:50]}...'",
+                    )
                 )
-            )
+            else:
+                # Check if it's approach-style and log for debugging
+                is_approach, matched_patterns = is_approach_mitigation(mitigation)
+                if is_approach:
+                    log_skipped_mitigation(mitigation, matched_patterns)
+                else:
+                    # Plain description - also log at DEBUG
+                    logger.debug(
+                        f"Skipped plain description mitigation: '{mitigation[:80]}...'"
+                    )
 
     return warnings
 
@@ -562,6 +720,9 @@ def validate_lld_mechanical(state: Dict[str, Any]) -> Dict[str, Any]:
 
     Issue #294: Returns only state updates (not full state) for proper
     LangGraph merge behavior, ensuring validation_errors persist.
+
+    Issue #312: Smart filtering for approach-style mitigations to reduce
+    false positive warnings.
 
     Args:
         state: Workflow state with current_draft and target_repo.
@@ -631,7 +792,7 @@ def validate_lld_mechanical(state: Dict[str, Any]) -> Dict[str, Any]:
     xref_errors = cross_reference_sections(lld_content, files)
     all_errors.extend(xref_errors)
 
-    # Step 6: Trace risk mitigations (warnings only)
+    # Step 6: Trace risk mitigations (warnings only, with Issue #312 smart filtering)
     mitigations = extract_mitigations_from_risks(lld_content)
     functions = extract_function_names(lld_content)
     mitigation_warnings = trace_mitigations_to_functions(mitigations, functions)
