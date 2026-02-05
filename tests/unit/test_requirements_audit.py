@@ -968,3 +968,133 @@ class TestShiftLineageVersions:
         assert len(operations) == 2
         assert "Deleted" in operations[0]
         assert "Reset status" in operations[1]
+
+
+# =============================================================================
+# Issue #339: get_repo_structure tests
+# =============================================================================
+
+
+class TestGetRepoStructure:
+    """Tests for get_repo_structure function."""
+
+    def test_shows_basic_directory_structure(self, tmp_path):
+        """Should show directory tree with standard layout."""
+        from agentos.workflows.requirements.audit import get_repo_structure
+
+        # Create a typical repo structure
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "__init__.py").write_text("")
+        (tmp_path / "src" / "main.py").write_text("")
+        (tmp_path / "src" / "utils").mkdir()
+        (tmp_path / "src" / "utils" / "__init__.py").write_text("")
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "tests" / "__init__.py").write_text("")
+        (tmp_path / "tests" / "unit").mkdir()
+
+        result = get_repo_structure(tmp_path)
+
+        assert "src/" in result
+        assert "tests/" in result
+        assert "__init__.py" in result
+        assert "main.py" in result
+        assert "utils/" in result
+        assert "unit/" in result
+
+    def test_excludes_git_and_cache_dirs(self, tmp_path):
+        """Should exclude .git, __pycache__, etc."""
+        from agentos.workflows.requirements.audit import get_repo_structure
+
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "__init__.py").write_text("")
+        (tmp_path / ".git").mkdir()
+        (tmp_path / ".git" / "config").write_text("")
+        (tmp_path / "__pycache__").mkdir()
+        (tmp_path / "__pycache__" / "module.pyc").write_text("")
+        (tmp_path / ".pytest_cache").mkdir()
+
+        result = get_repo_structure(tmp_path)
+
+        assert "src/" in result
+        assert ".git" not in result
+        assert "__pycache__" not in result
+        assert ".pytest_cache" not in result
+        assert "config" not in result
+        assert ".pyc" not in result
+
+    def test_respects_max_depth(self, tmp_path):
+        """Should stop at max_depth."""
+        from agentos.workflows.requirements.audit import get_repo_structure
+
+        # Create deep structure
+        (tmp_path / "a" / "b" / "c" / "d" / "e").mkdir(parents=True)
+        (tmp_path / "a" / "b" / "c" / "d" / "e" / "deep.py").write_text("")
+
+        result = get_repo_structure(tmp_path, max_depth=2)
+
+        assert "a/" in result
+        assert "b/" in result
+        # c/ might be at depth 2, but d/ should be cut off
+        # With max_depth=2, we go root(0) -> a(1) -> b(2) -> stop
+        assert "deep.py" not in result
+
+    def test_focus_dirs_limits_output(self, tmp_path):
+        """Should only show specified focus directories."""
+        from agentos.workflows.requirements.audit import get_repo_structure
+
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "main.py").write_text("")
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "tests" / "test_main.py").write_text("")
+        (tmp_path / "docs").mkdir()
+        (tmp_path / "docs" / "README.md").write_text("")
+        (tmp_path / "scripts").mkdir()
+
+        result = get_repo_structure(tmp_path, focus_dirs=["src", "tests"])
+
+        assert "src/" in result
+        assert "tests/" in result
+        assert "docs/" not in result
+        assert "scripts/" not in result
+
+    def test_handles_nonexistent_path(self, tmp_path):
+        """Should return error message for nonexistent path."""
+        from agentos.workflows.requirements.audit import get_repo_structure
+
+        result = get_repo_structure(tmp_path / "nonexistent")
+
+        assert "not found" in result.lower()
+
+    def test_prioritizes_src_and_tests(self, tmp_path):
+        """Should show src/ and tests/ first when no focus_dirs."""
+        from agentos.workflows.requirements.audit import get_repo_structure
+
+        # Create multiple dirs
+        (tmp_path / "src").mkdir()
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "aaa_first").mkdir()  # Would be alphabetically first
+        (tmp_path / "zzz_last").mkdir()
+
+        result = get_repo_structure(tmp_path)
+
+        # src and tests should appear before aaa_first alphabetically
+        src_pos = result.find("src/")
+        tests_pos = result.find("tests/")
+        assert src_pos != -1
+        assert tests_pos != -1
+        # They should be at the start (priority dirs)
+
+    def test_shows_python_files_at_shallow_depth(self, tmp_path):
+        """Should show .py files at depth 0-1 but not deeper."""
+        from agentos.workflows.requirements.audit import get_repo_structure
+
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "main.py").write_text("")
+        (tmp_path / "src" / "deep").mkdir()
+        (tmp_path / "src" / "deep" / "hidden.py").write_text("")
+
+        result = get_repo_structure(tmp_path)
+
+        assert "main.py" in result
+        # hidden.py is at depth 2, files only shown at depth 0-1
+        assert "hidden.py" not in result
