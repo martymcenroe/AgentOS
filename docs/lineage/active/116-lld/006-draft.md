@@ -2,8 +2,8 @@
 
 <!-- Template Metadata
 Last Updated: 2025-01-15
-Updated By: Gemini Review #1 revisions
-Update Reason: Address BLOCK issues - add CODECOV_TOKEN secret, add Req 8 test scenario, add workflow_dispatch test
+Updated By: Gemini Review #2 revisions
+Update Reason: Remove manual test scenario 110 per Gemini #2 feedback - schedule timing verification is platform testing
 -->
 
 ## 1. Context & Goal
@@ -216,7 +216,7 @@ Before finalizing any diagram, verify in [Mermaid Live Editor](https://mermaid.l
 - [x] **No touching:** All elements have visual separation (per 0006 §8.2)
 - [x] **No hidden lines:** All arrows fully visible (per 0006 §8.3)
 - [x] **Readable:** Labels not truncated, flow direction clear
-- [ ] **Auto-inspected:** Agent rendered via mermaid.ink and viewed (per 0006 §8.5)
+- [x] **Auto-inspected:** Agent rendered via mermaid.ink and viewed (per 0006 §8.5)
 
 **Agent Auto-Inspection (MANDATORY):**
 
@@ -372,7 +372,7 @@ flowchart TB
 | 010 | Workflow syntax valid | Auto | Push workflow file | GitHub accepts YAML | No syntax errors |
 | 020 | PR triggers fast tests | Auto | Open a PR | Fast tests job runs | Job completes < 5 min |
 | 030 | Push to main triggers full | Auto | Merge PR | Full regression runs | All non-live tests pass |
-| 040 | Nightly schedule works | Auto-Live | Wait for cron | All tests run | Includes live tests |
+| 040 | Nightly logic via dispatch | Auto | workflow_dispatch trigger | All tests run | Includes live tests |
 | 050 | Cache hit on second run | Auto | Two sequential runs | Second run faster | Cache restored message |
 | 060 | Coverage uploads | Auto | Run with --cov | Coverage artifact | Artifact visible in Actions |
 | 070 | Badge updates | Auto | After main push | Badge shows status | README badge correct |
@@ -401,11 +401,9 @@ grep -A5 "^env:" .github/workflows/ci.yml | grep "LANGSMITH_TRACING"
 
 ### 10.3 Manual Tests (Only If Unavoidable)
 
-| ID | Scenario | Why Not Automated | Steps |
-|----|----------|-------------------|-------|
-| 110 | Nightly schedule fires at correct time | Cannot wait 24h in CI; cron scheduling is GitHub infrastructure | 1. Merge workflow 2. Wait for 6 AM UTC 3. Verify job ran in Actions tab |
+N/A - All scenarios automated.
 
-**Note:** The nightly job *logic* is testable via `workflow_dispatch` (Scenario 100). Only the *schedule trigger timing* requires manual verification.
+**Note:** The nightly *schedule trigger timing* (cron fires at 6 AM UTC) is GitHub platform behavior, not feature logic. The nightly job *logic* is fully testable via `workflow_dispatch` (Scenario 100). Validating that GitHub's cron scheduler works correctly is platform testing outside the scope of this LLD.
 
 ## 11. Risks & Mitigations
 
@@ -595,10 +593,22 @@ jobs:
 | G1.4 | Python version decision needs documentation | YES - Added rationale in Section 2.7 Architecture Decisions |
 | G1.5 | Coverage threshold decision needs documentation | YES - Added rationale in Section 2.7 Architecture Decisions |
 
+### Gemini Review #2 (REVISE)
+
+**Reviewer:** Gemini 3 Pro
+**Verdict:** REVISE
+
+#### Comments
+
+| ID | Comment | Implemented? |
+|----|---------|--------------|
+| G2.1 | Scenario 110 (Manual) violates strict automated testing protocols - remove from formal test plan | YES - Removed Scenario 110 entirely; added note in 10.3 explaining schedule timing is platform testing |
+
 ### Review Summary
 
 | Review | Date | Verdict | Key Issue |
 |--------|------|---------|-----------|
 | Gemini #1 | (auto) | REVISE | Missing CODECOV_TOKEN, incomplete test coverage for Req 8 |
+| Gemini #2 | (auto) | REVISE | Manual test scenario 110 violates automated testing protocols |
 
 **Final Status:** PENDING
