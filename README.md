@@ -8,27 +8,45 @@
 
 ---
 
+## Production Evidence: 207 Issues in 27 Days
+
+This isn't theoretical. AgentOS has processed **207 issues** (159 closed) in 27 days:
+
+```
+Issues closed per day (Central Time):
+2026-01-21:  12 ############
+2026-02-02:  23 #######################
+2026-02-03:  55 #######################################################
+2026-02-04:  31 ###############################
+```
+
+**Average velocity:** 5.9 issues/day | **Peak:** 55 issues in one day | **[Full Metrics →](https://github.com/martymcenroe/AgentOS/wiki/Metrics)**
+
+---
+
 ## The Headline: Multi-Agent + Multi-Model
 
 ```mermaid
-graph LR
+graph TD
+    subgraph Intent["THE GREAT GOD OM"]
+        O["Human Intent<br/>& Oversight"]
+    end
+
     subgraph Agents["CLAUDE AGENTS (12+)"]
-        A["Feature | Bug Fix | Docs | Review"]
+        A["Feature | Bug Fix<br/>Docs | Review"]
     end
 
-    subgraph Gemini["GEMINI 3 PRO"]
-        G["Issue | LLD | Code | Security"]
+    subgraph Gemini["GEMINI VERIFICATION"]
+        G["LLD Review | Code Review<br/>Security | Quality"]
     end
 
-    subgraph Gov["GOVERNANCE"]
-        M["34 Audits | Friction | KPIs"]
+    subgraph Gov["GOVERNANCE GATES"]
+        M["Requirements | Implementation<br/>Reports | Audit Trail"]
     end
 
-    subgraph Road["LANGGRAPH"]
-        R["State Machines | Checkpoints"]
-    end
-
-    Agents --> Gemini --> Gov --> Road
+    O --> Agents
+    Agents --> Gemini
+    Gemini --> Gov
 ```
 
 **What makes AgentOS different:**
@@ -85,7 +103,7 @@ The headline feature: **run 12+ AI agents concurrently under single-user identit
 
 **Result:** One engineer orchestrating 12+ agents can accomplish what previously required a team.
 
-**[Full Architecture Documentation](../../wiki/Multi-Agent-Orchestration)**
+**[Full Architecture Documentation](https://github.com/martymcenroe/AgentOS/wiki/Multi-Agent-Orchestration)**
 
 ---
 
@@ -120,7 +138,7 @@ AgentOS detects **silent model downgrades**:
 - Our tools verify the actual model used in the response
 - If downgraded, the review is flagged as invalid
 
-**[Gemini Architecture Details](../../wiki/Gemini-Verification)**
+**[Gemini Architecture Details](https://github.com/martymcenroe/AgentOS/wiki/Gemini-Verification)**
 
 ---
 
@@ -160,7 +178,7 @@ Before merge, auto-generate:
 - `implementation-report.md` - What changed and why
 - `test-report.md` - Full test output, coverage metrics
 
-**[Gate Implementation Details](../../wiki/Governance-Gates)**
+**[Gate Implementation Details](https://github.com/martymcenroe/AgentOS/wiki/Governance-Gates)**
 
 ---
 
@@ -196,7 +214,7 @@ AgentOS identifies:
 | Time lost to prompts | 10+ min | < 1 min |
 | Developer frustration | High | Low |
 
-**[Permission Friction Deep Dive](../../wiki/Permission-Friction)**
+**[Permission Friction Deep Dive](https://github.com/martymcenroe/AgentOS/wiki/Permission-Friction)**
 
 ---
 
@@ -225,7 +243,7 @@ Audits designed with an **adversarial philosophy**: they exist to find violation
 | **0810** | ISO/IEC 42001 | AI management system |
 | **0815** | Internal | Permission friction patterns |
 
-**[Full Audit Catalog](../../wiki/Audits-Catalog)**
+**[Full Audit Catalog](https://github.com/martymcenroe/AgentOS/wiki/Audits-Catalog)**
 
 ---
 
@@ -265,7 +283,7 @@ Audits designed with an **adversarial philosophy**: they exist to find violation
 | Cost per agent-hour | API spend / Active agent hours |
 | ROI | (Time saved × Engineer cost) / Platform cost |
 
-**[Full KPI Framework](../../wiki/Measuring-Productivity)**
+**[Full KPI Framework](https://github.com/martymcenroe/AgentOS/wiki/Measuring-Productivity)**
 
 ---
 
@@ -290,7 +308,7 @@ AgentOS is **production-ready today** with prompt-based orchestration. The roadm
 | Human routes tasks to agents | Supervisor auto-routes |
 | Log parsing for metrics | LangSmith dashboards |
 
-**[Full Roadmap and Vision](../../wiki/LangGraph-Evolution)**
+**[Full Roadmap and Vision](https://github.com/martymcenroe/AgentOS/wiki/LangGraph-Evolution)**
 
 ---
 
@@ -325,7 +343,7 @@ The generated configs include:
 - Slash commands for common operations
 - Hooks for pre/post tool execution
 
-**[Detailed Setup Guide](../../wiki/Quick-Start)**
+**[Detailed Setup Guide](https://github.com/martymcenroe/AgentOS/wiki/Quick-Start)**
 
 ---
 
@@ -333,29 +351,29 @@ The generated configs include:
 
 ### Wiki
 
-Full documentation at **[AgentOS Wiki](../../wiki)**:
+Full documentation at **[AgentOS Wiki](https://github.com/martymcenroe/AgentOS/wiki)** (32 pages):
 
 | Page | Description |
 |------|-------------|
-| **[Multi-Agent Orchestration](../../wiki/Multi-Agent-Orchestration)** | The headline feature - 12+ concurrent agents |
-| **[Gemini Verification](../../wiki/Gemini-Verification)** | Multi-model review architecture |
-| **[LangGraph Evolution](../../wiki/LangGraph-Evolution)** | Roadmap to enterprise state machines |
-| **[Governance Gates](../../wiki/Governance-Gates)** | LLD, implementation, report gates |
-| **[Permission Friction](../../wiki/Permission-Friction)** | Eliminating approval prompts |
-| **[Measuring Productivity](../../wiki/Measuring-Productivity)** | KPIs, dashboards, ROI |
-| **[Security & Compliance](../../wiki/Security-Compliance)** | OWASP, GDPR, AI Safety |
-| **[Audits Catalog](../../wiki/Audits-Catalog)** | All 34 governance audits |
-| **[Tools Reference](../../wiki/Tools-Reference)** | Python tool documentation |
-| **[Quick Start](../../wiki/Quick-Start)** | 5-minute setup guide |
+| **[Metrics Dashboard](https://github.com/martymcenroe/AgentOS/wiki/Metrics)** | Velocity charts, Vetinari Index, production numbers |
+| **[Multi-Agent Orchestration](https://github.com/martymcenroe/AgentOS/wiki/Multi-Agent-Orchestration)** | The headline feature - 12+ concurrent agents |
+| **[Requirements Workflow](https://github.com/martymcenroe/AgentOS/wiki/Requirements-Workflow)** | LLD → Gemini → Approval flow |
+| **[Implementation Workflow](https://github.com/martymcenroe/AgentOS/wiki/Implementation-Workflow)** | Worktree → Code → Reports → PR |
+| **[Governance Gates](https://github.com/martymcenroe/AgentOS/wiki/Governance-Gates)** | LLD, implementation, report gates |
+| **[How AgentOS Learns](https://github.com/martymcenroe/AgentOS/wiki/How-the-AgentOS-Learns)** | Self-improving governance from verdicts |
+| **[Dramatis Personae](https://github.com/martymcenroe/AgentOS/wiki/Dramatis-Personae)** | The Discworld cast of workflows |
+| **[LangGraph Evolution](https://github.com/martymcenroe/AgentOS/wiki/LangGraph-Evolution)** | Roadmap to enterprise state machines |
+| **[Gemini Verification](https://github.com/martymcenroe/AgentOS/wiki/Gemini-Verification)** | Multi-model review architecture |
+| **[Quick Start](https://github.com/martymcenroe/AgentOS/wiki/Quick-Start)** | 5-minute setup guide |
 
 ### For Different Audiences
 
 | Audience | Start Here |
 |----------|------------|
-| **Engineering Leaders** | [Why AgentOS?](../../wiki/For-Enterprise-Leaders-Why-AgentOS) |
-| **Architects** | [Multi-Agent Orchestration](../../wiki/Multi-Agent-Orchestration) |
-| **Security Teams** | [Security & Compliance](../../wiki/Security-Compliance) |
-| **Developers** | [Quick Start](../../wiki/Quick-Start) |
+| **Engineering Leaders** | [Why AgentOS?](https://github.com/martymcenroe/AgentOS/wiki/For-Enterprise-Leaders-Why-AgentOS) |
+| **Architects** | [Multi-Agent Orchestration](https://github.com/martymcenroe/AgentOS/wiki/Multi-Agent-Orchestration) |
+| **Security Teams** | [Security & Compliance](https://github.com/martymcenroe/AgentOS/wiki/Security-Compliance) |
+| **Developers** | [Quick Start](https://github.com/martymcenroe/AgentOS/wiki/Quick-Start) |
 
 ---
 
@@ -404,6 +422,28 @@ The code in this repo is the same code that:
 
 ---
 
+## Dramatis Personae
+
+AgentOS workflows are named after **Terry Pratchett's Discworld** characters. This isn't whimsy—it's intuitive system design:
+
+| Persona | Function | Philosophy |
+|---------|----------|------------|
+| **The Great God Om** | Human Orchestrator | Pure Intent—the agents serve the Will |
+| **Moist von Lipwig** | Pipeline Orchestration | Keep the messages moving |
+| **Lord Vetinari** | Work Visibility | Information is power |
+| **Commander Vimes** | Regression Tests | Deep suspicion of everything |
+| **Captain Angua** | External Intelligence | Track down solutions others miss |
+| **Brutha** | RAG Memory | Perfect recall, never hallucinates |
+| **Lu-Tze** | Maintenance | Constant sweeping prevents disasters |
+| **DEATH** | Documentation Reconciliation | INEVITABLE. THOROUGH. PATIENT. |
+
+**[Full Cast →](https://github.com/martymcenroe/AgentOS/wiki/Dramatis-Personae)**
+
+*"A man is not dead while his name is still spoken."*
+**GNU Terry Pratchett**
+
+---
+
 ## License
 
-MIT
+PolyForm Noncommercial 1.0.0
