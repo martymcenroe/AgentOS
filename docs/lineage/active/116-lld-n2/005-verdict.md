@@ -1,4 +1,4 @@
-# LLD Review: 116 - Feature: Add GitHub Actions CI workflow for automated testing
+# LLD Review: 116-Feature: Add GitHub Actions CI Workflow for Automated Testing
 
 ## Identity Confirmation
 I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
@@ -7,27 +7,32 @@ I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
 PASSED
 
 ## Review Summary
-The LLD is well-structured and directly addresses the requirements for a standard CI workflow. The inclusion of matrix testing, dependency caching, and specific coverage handling demonstrates good architectural choices for this scope. The test plan covers all requirements effectively.
+The LLD provides a robust plan for implementing a tiered CI strategy using GitHub Actions and pytest markers. The "Hybrid" approach (Option D) is well-reasoned. However, the Test Plan (Section 10) relies almost exclusively on "Manual" verification in the scenario definitions, despite providing `act` commands for automation. This violates the "No Human Delegation" quality standard. The test definitions must be updated to prioritize local automation via `act` to be approved.
+
+## Open Questions Resolved
+No open questions found in Section 1 (all questions were marked resolved by the author).
 
 ## Requirement Coverage Analysis (MANDATORY)
 
 **Section 3 Requirements:**
 | # | Requirement | Test(s) | Status |
 |---|-------------|---------|--------|
-| 1 | Tests run automatically on every PR targeting main branch | 020 | ✓ Covered |
-| 2 | Tests run automatically on push to main branch | 010 | ✓ Covered |
-| 3 | Tests run against Python 3.10, 3.11, and 3.12 | 030 | ✓ Covered |
-| 4 | Coverage report generated and accessible as workflow artifact | 050 | ✓ Covered |
-| 5 | README displays CI status badge showing current build status | 070 | ✓ Covered |
-| 6 | Workflow caches Poetry dependencies for faster subsequent runs | 060 | ✓ Covered |
-| 7 | Tests pass without requiring API keys or external service credentials | 040 | ✓ Covered |
+| 1 | Tests run automatically on every PR opened or updated | T010 | ✓ Covered |
+| 2 | Tests run automatically on every push to main branch | T020 | ✓ Covered |
+| 3 | Nightly workflow runs full test suite including live tests | T030 | ✓ Covered |
+| 4 | Coverage report generated and visible on PRs | T050 | ✓ Covered |
+| 5 | CI status badge displayed in README | T060 | ✓ Covered |
+| 6 | PR tests complete in under 5 minutes | T090 | ✓ Covered |
+| 7 | Main branch tests complete in under 25 minutes | T100 | ✓ Covered |
+| 8 | All existing tests continue to pass | T010, T020 | ✓ Covered |
+| 9 | Clear documentation on how to add markers to new tests | T110 | ✓ Covered |
 
-**Coverage Calculation:** 7 requirements covered / 7 total = **100%**
+**Coverage Calculation:** 9 requirements covered / 9 total = **100%**
 
 **Verdict:** PASS
 
 ## Tier 1: BLOCKING Issues
-No blocking issues found. LLD is approved for implementation.
+No blocking issues found. LLD is approved for implementation from a Safety/Security/Cost perspective.
 
 ### Cost
 - [ ] No issues found.
@@ -42,25 +47,25 @@ No blocking issues found. LLD is approved for implementation.
 - [ ] No issues found.
 
 ## Tier 2: HIGH PRIORITY Issues
-No high-priority issues found.
 
 ### Architecture
-- [ ] No issues found.
+- [ ] **Ambiguous Configuration File:** Section 2.1 lists `pytest.ini` OR `pyproject.toml`. Section 12 (DoD) specifies `pyproject.toml`. **Recommendation:** Standardize on `pyproject.toml` for tool configuration to reduce root clutter and align with the DoD.
 
 ### Observability
 - [ ] No issues found.
 
 ### Quality
-- [ ] **Requirement Coverage:** PASS
+- [ ] **Excessive Manual Delegation (Section 10.1):** All Test Scenarios in Section 10.1 are marked "Type: Manual". This violates the strict "No Human Delegation" governance rule. While testing GitHub Actions in the cloud requires manual observation, the LLD provides `act` commands in Section 10.2. **Recommendation:** Update Scenarios T010, T040, T050, T060, T070, and T080 to "Type: Automated (Local)" and reference the `act` commands as the primary verification method. Only T090/T100 (Cloud Timings) and T110 (Docs) should remain Manual.
+- [ ] **Requirement Coverage:** PASS (100%).
 
 ## Tier 3: SUGGESTIONS
-- **Cache Verification:** For Test 060 (Cache works), verifying this automatically in a CI/CD context is difficult. Ensure you manually verify the "Cache restored" log line on the second run during the PR validation phase, as `act` caching can differ from GitHub Actions.
-- **Badge URL:** Ensure the `{owner}/{repo}` placeholders in the README badge are replaced with the actual repository path during implementation.
+- **Optimize Test Selection:** In `ci.yml` (test-fast job), the command is `poetry run pytest tests/unit/ -v ... -m "not slow..."`. This imposes two filters: directory (`tests/unit/`) and marker (`not slow`). If a fast integration test exists in `tests/integration/`, it will be skipped. Suggest removing the `tests/unit/` directory constraint and relying solely on markers for broader coverage without speed penalty.
+- **Implement diff-cover:** `diff-cover` is listed as an optional dependency but not implemented in the workflow. Adding this to the PR check ensures new code meets the 90% threshold without requiring legacy code cleanup immediately.
 
 ## Questions for Orchestrator
 1. None.
 
 ## Verdict
-[x] **APPROVED** - Ready for implementation
-[ ] **REVISE** - Fix Tier 1/2 issues first
+[ ] **APPROVED** - Ready for implementation
+[x] **REVISE** - Fix Tier 1/2 issues first
 [ ] **DISCUSS** - Needs Orchestrator decision

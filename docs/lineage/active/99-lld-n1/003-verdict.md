@@ -1,4 +1,4 @@
-# LLD Review: 199-Feature: Schema-driven project structure
+# LLD Review: #199 - Feature: Schema-driven project structure: eliminate tool/standard drift
 
 ## Identity Confirmation
 I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
@@ -7,38 +7,45 @@ I am Gemini 3 Pro, acting as Senior Software Architect & AI Governance Lead.
 PASSED
 
 ## Review Summary
-The LLD proposes a solid, configuration-driven approach to project structure management using standard JSON. The architecture is sound, leveraging the standard library to avoid dependencies. However, the LLD fails the strict 95% Requirement Coverage threshold because one requirement (documentation consistency) lacks an automated test. Additionally, the "Open Questions" section contains stale items that contradict or duplicate the proposed design decisions, indicating the document needs a final cleanup.
+The LLD proposes a solid schema-driven approach to standardize project structure, eliminating drift between documentation and tooling. The technical approach using a recursive JSON schema is sound and follows architectural standards. However, the Testing Strategy (Section 10) falls significantly below the 95% coverage threshold for Requirements defined in Section 3, specifically missing integration tests for the tool itself and content validation for the golden schema. This requires revision before implementation.
+
+## Open Questions Resolved
+- [x] ~~Should the schema support conditional directories (e.g., `docs/lineage/` only for certain project types)?~~ **RESOLVED: No.** Keep the schema declarative and simple for v1. Use the `required: false` flag for optional directories. Conditional logic adds unnecessary complexity at this stage.
+- [x] ~~Should we version the schema and support migrations between versions?~~ **RESOLVED: Yes to versioning, No to automated migrations.** Include a `version` field (as proposed) to enable future compatibility checks, but do not build automated migration logic (e.g., moving files) in this iteration.
 
 ## Requirement Coverage Analysis (MANDATORY)
 
 **Section 3 Requirements:**
 | # | Requirement | Test(s) | Status |
 |---|-------------|---------|--------|
-| 1 | A JSON schema file exists at `docs/standards/0009-structure-schema.json` | Test 100 (Schema includes lineage dirs - implies loading production schema) | ✓ Covered |
-| 2 | `new-repo-setup.py` reads directory structure from schema | Test 040, 060 | ✓ Covered |
-| 3 | `new-repo-setup.py --audit` validates against schema | Test 070, 080, 090 | ✓ Covered |
-| 4 | Standard 0009 markdown references schema as the authoritative source | - | **GAP** |
-| 5 | Schema includes `docs/lineage/` structure with `active/` and `done/` | Test 100 | ✓ Covered |
-| 6 | All existing functionality of `new-repo-setup.py` continues to work | Test 110 | ✓ Covered |
+| 1 | Schema file `docs/standards/0009-structure-schema.json` exists and is valid JSON | T090 (Input: Actual schema file) | ✓ Covered |
+| 2 | Schema includes all directories currently in `DOCS_STRUCTURE` list | - | **GAP** |
+| 3 | Schema includes `docs/lineage/` with `active/` and `done/` subdirectories | T090 | ✓ Covered |
+| 4 | `new-repo-setup.py` reads structure from schema (no hardcoded directory lists) | - | **GAP** |
+| 5 | `new-repo-setup.py --audit` validates against schema | T070, T080 | ✓ Covered |
+| 6 | Standard 0009 references the schema as the authoritative source | N/A (Documentation) | - |
+| 7 | Existing functionality preserved (setup creates same directories as before) | - | **GAP** |
 
-**Coverage Calculation:** 5 requirements covered / 6 total = **83.3%**
+**Coverage Calculation:** 3 requirements covered / 6 testable requirements = **50%**
 
-**Verdict:** **BLOCK** (Coverage < 95%)
+**Verdict:** BLOCK
 
 **Missing Test Scenarios:**
-*   **Req 4:** Add a test (e.g., `test_standard_references_schema`) that parses `docs/standards/0009-canonical-project-structure.md` and asserts it contains the string `0009-structure-schema.json`. This automates the check for drift between the standard text and the schema file location.
+1.  **Req 2 (Parity):** `test_schema_content_parity` - A test that asserts specific "golden" paths (e.g., `docs/standards`, `tools`) exist in the actual schema file.
+2.  **Req 4 (Integration):** `test_tool_integration_load` - A test (mocking `sys.argv`) that runs `new-repo-setup.py` and verifies it actually calls `load_structure_schema`.
+3.  **Req 7 (Creation):** `test_directory_creation` - A test verifying that `os.makedirs` is called for paths defined in a test schema (mocked execution).
 
 ## Tier 1: BLOCKING Issues
-No blocking issues found. LLD is approved for implementation regarding Cost, Safety, Security, and Legal.
+No blocking issues found. LLD is approved for implementation.
 
 ### Cost
-- [ ] No issues found.
+- [ ] No issues found. Recursive depth is naturally limited by JSON tree structure (DAG).
 
 ### Safety
-- [ ] No issues found.
+- [ ] No issues found. Safe directory creation (`exist_ok=True`) specified.
 
 ### Security
-- [ ] No issues found.
+- [ ] No issues found. Path traversal mitigation included.
 
 ### Legal
 - [ ] No issues found.
@@ -46,21 +53,18 @@ No blocking issues found. LLD is approved for implementation regarding Cost, Saf
 ## Tier 2: HIGH PRIORITY Issues
 
 ### Architecture
-- [ ] No issues found.
+- [ ] No issues found. Path structure `docs/standards/0009-structure-schema.json` is compliant.
 
 ### Observability
 - [ ] No issues found.
 
 ### Quality
-- [ ] **Requirement Coverage:** 83% < 95%. See Analysis above. The missing test for Requirement 4 must be added to Section 10 to ensure the "Single Source of Truth" objective is mechanically enforced.
-- [ ] **Stale Open Questions:** Section 1 "Open Questions" lists items that are resolved by the design in Section 2.
-    *   "Should we include file content templates...?" -> Resolved by Data Structures (uses `template` reference).
-    *   "What validation strictness...?" -> Resolved by Logic Flow (Audit Flow: Warning for optional).
-    *   **Action:** Remove resolved questions or update the design if these are still undecided. An approved LLD must represent a finalized design.
+- [ ] **Requirement Coverage:** BLOCK. Coverage is 50%, well below the 95% threshold. Add the missing test scenarios listed in the Coverage Analysis above to Section 10.
+- [ ] **Section 10.1 Scenarios:** Current scenarios (T010-T090) focus entirely on the *library functions* (loading/auditing). There are no scenarios testing the *application logic* (the script execution itself).
 
 ## Tier 3: SUGGESTIONS
-- **Schema Validation:** Consider explicitly testing for `..` traversal attempts in the "Invalid schema" test fixture (Test 030) to reinforce the Security mitigation mentioned in 7.1.
-- **Documentation:** Explicitly state in Section 2.5 (Logic Flow) that `new-repo-setup.py` will default to the standard schema location if no argument is provided.
+- **Performance:** Consider caching the schema load if the tool ever evolves into a long-running process (currently ephemeral, so not critical).
+- **Maintainability:** Add a comment in `new-repo-setup.py` pointing to the schema file location to aid future developers.
 
 ## Questions for Orchestrator
 1. None.

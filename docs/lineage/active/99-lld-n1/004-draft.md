@@ -1,19 +1,23 @@
-# 199 - Feature: Schema-driven project structure
+# 199 - Feature: Schema-driven project structure: eliminate tool/standard drift
 
 <!-- Template Metadata
-Last Updated: 2025-01-XX
-Updated By: Initial creation
-Update Reason: New LLD for schema-driven project structure
+Last Updated: 2026-02-02
+Updated By: Issue #117 fix
+Update Reason: Moved Verification & Testing to Section 10 (was Section 11) to match 0702c review prompt and testing workflow expectations
+Previous: Added sections based on 80 blocking issues from 164 governance verdicts (2026-02-01)
 -->
 
 ## 1. Context & Goal
 * **Issue:** #99
-* **Objective:** Create a JSON schema as the single source of truth for project structure, eliminating drift between documentation (standard 0009) and tooling (new-repo-setup.py)
+* **Objective:** Create a JSON schema as the single source of truth for project structure, eliminating drift between `new-repo-setup.py` and standard 0009.
 * **Status:** Draft
-* **Related Issues:** N/A
+* **Related Issues:** None
 
 ### Open Questions
-*All questions resolved during design phase - section retained for future questions during implementation.*
+*All questions resolved during Gemini Review #1.*
+
+- [x] ~~Should the schema support conditional directories (e.g., `docs/lineage/` only for certain project types)?~~ **RESOLVED: No.** Keep the schema declarative and simple for v1. Use the `required: false` flag for optional directories. Conditional logic adds unnecessary complexity at this stage.
+- [x] ~~Should we version the schema and support migrations between versions?~~ **RESOLVED: Yes to versioning, No to automated migrations.** Include a `version` field (as proposed) to enable future compatibility checks, but do not build automated migration logic (e.g., moving files) in this iteration.
 
 ## 2. Proposed Changes
 
@@ -23,38 +27,50 @@ Update Reason: New LLD for schema-driven project structure
 
 | File | Change Type | Description |
 |------|-------------|-------------|
-| `docs/standards/0009-structure-schema.json` | Add | New canonical schema defining project structure |
-| `scripts/new-repo-setup.py` | Modify | Refactor to read structure from schema, remove hardcoded lists |
+| `docs/standards/0009-structure-schema.json` | Add | Canonical JSON schema defining project structure |
+| `tools/new-repo-setup.py` | Modify | Remove hardcoded lists, read structure from schema |
 | `docs/standards/0009-canonical-project-structure.md` | Modify | Reference schema as authoritative source |
-| `tests/test_new_repo_setup.py` | Add | Unit tests for schema loading and validation |
+| `tests/unit/test_structure_schema.py` | Add | Tests for schema loading and validation |
+
+### 2.1.1 Path Validation (Mechanical - Auto-Checked)
+
+*Issue #277: Before human or Gemini review, paths are verified programmatically.*
+
+Mechanical validation automatically checks:
+- All "Modify" files must exist in repository
+- All "Delete" files must exist in repository
+- All "Add" files must have existing parent directories
+- No placeholder prefixes (`src/`, `lib/`, `app/`) unless directory exists
+
+**If validation fails, the LLD is BLOCKED before reaching review.**
 
 ### 2.2 Dependencies
 
-*No new packages required. Uses Python stdlib `json` module.*
+*New packages, APIs, or services required.*
 
 ```toml
 # pyproject.toml additions (if any)
-# None required - json is stdlib
+# No new dependencies - uses stdlib json module
 ```
 
 ### 2.3 Data Structures
 
 ```python
 # Pseudocode - NOT implementation
-class DirectorySpec(TypedDict):
+class DirectoryNode(TypedDict):
     required: bool  # Whether directory must exist
-    description: NotRequired[str]  # Human-readable description
-    children: NotRequired[dict[str, "DirectorySpec"]]  # Nested directories
+    description: NotRequired[str]  # Human-readable purpose
+    children: NotRequired[dict[str, "DirectoryNode"]]  # Nested directories
 
-class FileSpec(TypedDict):
+class FileNode(TypedDict):
     required: bool  # Whether file must exist
     template: NotRequired[str]  # Template filename for generation
-    description: NotRequired[str]  # Human-readable description
+    description: NotRequired[str]  # Human-readable purpose
 
 class ProjectStructureSchema(TypedDict):
     version: str  # Schema version (semver)
-    directories: dict[str, DirectorySpec]  # Top-level directories
-    files: dict[str, FileSpec]  # Top-level files
+    directories: dict[str, DirectoryNode]  # Top-level directories
+    files: dict[str, FileNode]  # Top-level files
 ```
 
 ### 2.4 Function Signatures
@@ -62,51 +78,47 @@ class ProjectStructureSchema(TypedDict):
 ```python
 # Signatures only - implementation in source files
 def load_structure_schema(schema_path: Path | None = None) -> ProjectStructureSchema:
-    """Load project structure schema from JSON file.
+    """Load and validate the project structure schema from JSON file.
     
-    Args:
-        schema_path: Path to schema file. Defaults to docs/standards/0009-structure-schema.json.
-    
-    Returns:
-        Parsed schema dictionary.
-    
-    Raises:
-        FileNotFoundError: If schema file doesn't exist.
-        json.JSONDecodeError: If schema is invalid JSON.
+    If schema_path is None, uses default location relative to this module.
+    Raises SchemaLoadError if file not found or invalid JSON.
     """
     ...
 
 def flatten_directories(schema: ProjectStructureSchema) -> list[str]:
     """Convert nested directory structure to flat list of paths.
     
-    Args:
-        schema: Parsed project structure schema.
-    
-    Returns:
-        List of directory paths (e.g., ["docs", "docs/adrs", "docs/lineage/active"]).
+    Returns paths like ['docs', 'docs/adrs', 'docs/standards', ...].
     """
     ...
 
-def flatten_files(schema: ProjectStructureSchema) -> list[tuple[str, FileSpec]]:
-    """Extract file specifications from schema.
+def flatten_files(schema: ProjectStructureSchema) -> list[tuple[str, FileNode]]:
+    """Extract flat list of file paths with their metadata.
     
-    Args:
-        schema: Parsed project structure schema.
-    
-    Returns:
-        List of (filepath, spec) tuples.
+    Returns list of (path, node) tuples for all defined files.
     """
     ...
 
-def audit_structure(root_path: Path, schema: ProjectStructureSchema) -> AuditResult:
-    """Validate existing project against schema.
+def get_required_directories(schema: ProjectStructureSchema) -> list[str]:
+    """Get only directories marked as required."""
+    ...
+
+def get_required_files(schema: ProjectStructureSchema) -> list[str]:
+    """Get only files marked as required."""
+    ...
+
+def audit_project_structure(root: Path, schema: ProjectStructureSchema) -> AuditResult:
+    """Validate a project directory against the schema.
     
-    Args:
-        root_path: Project root directory.
-        schema: Project structure schema.
+    Returns AuditResult with missing_required, missing_optional, and extra items.
+    """
+    ...
+
+def validate_paths(schema: ProjectStructureSchema) -> list[str]:
+    """Validate that no paths contain path traversal sequences.
     
-    Returns:
-        AuditResult with missing required items and optional items status.
+    Returns list of invalid paths (empty if all valid).
+    Checks for '..' and absolute paths.
     """
     ...
 ```
@@ -114,91 +126,84 @@ def audit_structure(root_path: Path, schema: ProjectStructureSchema) -> AuditRes
 ### 2.5 Logic Flow (Pseudocode)
 
 ```
-# Schema Loading
-1. Determine schema path:
-   - IF parameter provided THEN use parameter
-   - ELSE use default: docs/standards/0009-structure-schema.json
-2. Read JSON file
-3. Parse and validate basic structure
-4. Return typed dictionary
+1. LOAD SCHEMA:
+   1.1 Read JSON file from docs/standards/0009-structure-schema.json
+   1.2 Parse JSON
+   1.3 Validate required fields exist (version, directories)
+   1.4 Validate no path traversal sequences
+   1.5 Return typed schema dict
 
-# Directory Flattening (recursive)
-1. For each top-level directory in schema:
-   a. Add directory path to result
-   b. IF has children THEN
-      - Recursively process children with parent path prefix
-2. Return flat list of all paths
+2. FLATTEN DIRECTORIES (recursive):
+   2.1 FOR each top-level directory in schema.directories:
+       2.1.1 Add directory name to result
+       2.1.2 IF has children THEN
+             - Recursively flatten children with parent prefix
+   2.2 Return sorted list of all paths
 
-# Setup Flow (modified)
-1. Load schema from canonical location
-2. Flatten directories from schema
-3. Flatten files from schema
-4. Create directories (existing logic, now using schema-derived list)
-5. Create files (existing logic, now using schema-derived list)
+3. SETUP PROJECT (in new-repo-setup.py):
+   3.1 Load schema via load_structure_schema()
+   3.2 Get flat directory list via flatten_directories()
+   3.3 Create each directory (existing code, new data source)
+   3.4 Get file list via flatten_files()
+   3.5 Create files from templates as needed
 
-# Audit Flow
-1. Load schema
-2. For each required directory:
-   - Check existence
-   - Record missing as error
-3. For each optional directory:
-   - Check existence
-   - Record missing as warning
-4. For each required file:
-   - Check existence
-   - Record missing as error
-5. Return structured audit result
+4. AUDIT PROJECT (--audit mode):
+   4.1 Load schema
+   4.2 Get required directories and files
+   4.3 FOR each required item:
+       4.3.1 IF not exists THEN add to missing list
+   4.4 Report missing required items (error)
+   4.5 Report missing optional items (warning)
 ```
 
 ### 2.6 Technical Approach
 
-* **Module:** `scripts/new-repo-setup.py` (existing)
-* **Pattern:** Configuration-driven behavior with schema as external config
+* **Module:** `tools/new-repo-setup.py` (schema loading functions inline or extracted to utils)
+* **Pattern:** Schema-driven configuration with recursive tree traversal
 * **Key Decisions:** 
-  - JSON chosen over YAML for stdlib support (no new dependencies)
-  - Nested structure in schema mirrors filesystem hierarchy for readability
-  - Schema co-located with standard it defines (`docs/standards/`)
-  - Default schema path is `docs/standards/0009-structure-schema.json` when no argument provided
+  - Schema stored as JSON (not YAML) for stdlib compatibility
+  - Recursive structure allows arbitrary nesting depth
+  - `required` flag distinguishes mandatory from optional structure
+  - Comment in tool pointing to schema file location for maintainability
 
 ### 2.7 Architecture Decisions
 
-*Document key architectural decisions that affect the design.*
+*Document key architectural decisions that affect the design. This section addresses the most common category of governance feedback (23 patterns).*
 
 | Decision | Options Considered | Choice | Rationale |
 |----------|-------------------|--------|-----------|
-| Schema format | JSON, YAML, TOML | JSON | Stdlib support, no new dependencies, universal tooling |
-| Schema location | `scripts/`, `docs/standards/`, `schemas/` | `docs/standards/` | Co-located with standard 0009, single source of truth |
-| Nesting approach | Flat list with paths, Nested hierarchy | Nested hierarchy | More readable, mirrors filesystem, easier to maintain |
-| Required vs optional | Boolean flag, Separate sections | Boolean flag per item | Simpler schema, items stay grouped logically |
-| File templates | Inline in schema, Reference by filename | Reference by filename | Keeps schema focused on structure, templates can evolve independently |
-| Validation strictness | All errors, Warnings for optional | Errors for required, Warnings for optional | Balances enforcement with flexibility for project variants |
+| Schema format | JSON, YAML, TOML | JSON | Stdlib support, no new dependencies, GitHub renders it |
+| Schema location | In tool, separate file, in standard | Separate JSON file | Clear separation, versionable, reusable by other tools |
+| Tree vs flat structure | Flat list of paths, nested tree | Nested tree | Better represents hierarchy, easier to understand relationships |
+| Required flag | Implicit (all required), explicit per-item | Explicit per-item | Supports optional structure like `docs/lineage/` |
 
 **Architectural Constraints:**
-- Must not introduce new external dependencies (stdlib only)
-- Must maintain backward compatibility with existing `new-repo-setup.py` CLI
-- Schema must be human-readable and editable
+- Must not introduce new dependencies to `tools/new-repo-setup.py`
+- Schema must be valid JSON (parseable by stdlib `json` module)
+- Backward compatible with existing project structures
 
 ## 3. Requirements
 
 *What must be true when this is done. These become acceptance criteria.*
 
-1. A JSON schema file exists at `docs/standards/0009-structure-schema.json`
-2. `new-repo-setup.py` reads directory structure from schema (no hardcoded `DOCS_STRUCTURE` list)
-3. `new-repo-setup.py --audit` validates against schema, reporting required vs optional
-4. Standard 0009 markdown references schema as the authoritative source
-5. Schema includes `docs/lineage/` structure with `active/` and `done/` subdirectories
-6. All existing functionality of `new-repo-setup.py` continues to work
+1. Schema file `docs/standards/0009-structure-schema.json` exists and is valid JSON
+2. Schema includes all directories currently in `DOCS_STRUCTURE` list
+3. Schema includes `docs/lineage/` with `active/` and `done/` subdirectories
+4. `new-repo-setup.py` reads structure from schema (no hardcoded directory lists)
+5. `new-repo-setup.py --audit` validates against schema
+6. Standard 0009 references the schema as the authoritative source
+7. Existing functionality preserved (setup creates same directories as before)
 
 ## 4. Alternatives Considered
 
 | Option | Pros | Cons | Decision |
 |--------|------|------|----------|
-| JSON schema in `docs/standards/` | Stdlib, co-located with standard | Less expressive than YAML | **Selected** |
-| YAML schema | More readable, comments supported | Requires PyYAML dependency | Rejected |
-| Inline schema in Python | Single file, type hints | Defeats purpose of single source | Rejected |
-| Generate markdown from schema | Fully automated docs | Overengineered for current need, out of scope | Rejected (future) |
+| JSON schema file | No dependencies, stdlib support, GitHub renders | Less readable than YAML | **Selected** |
+| YAML schema file | More readable, comments allowed | Requires PyYAML dependency | Rejected |
+| Extract structure from markdown | Single source in human doc | Fragile parsing, hard to maintain | Rejected |
+| Generate markdown from schema | True single source | Adds build step, more complex | Rejected (future enhancement) |
 
-**Rationale:** JSON with stdlib provides the single source of truth benefit without adding dependencies. YAML's readability advantage doesn't justify the dependency cost for a relatively simple schema.
+**Rationale:** JSON provides the best balance of simplicity and tooling support. No new dependencies, parseable by any language, and GitHub's web interface renders it nicely.
 
 ## 5. Data & Fixtures
 
@@ -211,28 +216,29 @@ def audit_structure(root_path: Path, schema: ProjectStructureSchema) -> AuditRes
 | Source | Local file: `docs/standards/0009-structure-schema.json` |
 | Format | JSON |
 | Size | ~2KB estimated |
-| Refresh | Manual (edited by developers) |
-| Copyright/License | Project license (internal) |
+| Refresh | Manual (updated when structure changes) |
+| Copyright/License | Same as repository (internal) |
 
 ### 5.2 Data Pipeline
 
 ```
-Schema JSON ──load_structure_schema()──► Python Dict ──flatten_*()──► Path Lists
+Schema JSON file ──json.load()──► Python dict ──flatten_*()──► Path lists ──► Directory creation
 ```
 
 ### 5.3 Test Fixtures
 
 | Fixture | Source | Notes |
 |---------|--------|-------|
-| Valid schema | Generated | Minimal valid schema for unit tests |
-| Invalid schema | Generated | Missing required fields, malformed JSON, path traversal attempts |
-| Test directory tree | Generated | Temp directory with known structure |
+| Valid schema JSON | Generated in test | Minimal valid schema for testing |
+| Invalid schema JSON | Generated in test | Missing required fields |
+| Sample project tree | tempfile.mkdtemp | Created/cleaned up per test |
+| Golden paths list | Hardcoded in test | Expected paths from DOCS_STRUCTURE for parity check |
 
 ### 5.4 Deployment Pipeline
 
-Schema file is committed to repository. No special deployment needed - tool reads from repo location.
+Schema file is committed to repository. No separate deployment needed.
 
-**If data source is external:** N/A - schema is internal to repository.
+**If data source is external:** N/A - schema is internal.
 
 ## 6. Diagram
 
@@ -248,12 +254,17 @@ Before finalizing any diagram, verify in [Mermaid Live Editor](https://mermaid.l
 
 **Agent Auto-Inspection (MANDATORY):**
 
+AI agents MUST render and view the diagram before committing:
+1. Base64 encode diagram → fetch PNG from `https://mermaid.ink/img/{base64}`
+2. Read the PNG file (multimodal inspection)
+3. Document results below
+
 **Auto-Inspection Results:**
 ```
-- Touching elements: [x] None / [ ] Found: ___
-- Hidden lines: [x] None / [ ] Found: ___
-- Label readability: [x] Pass / [ ] Issue: ___
-- Flow clarity: [x] Clear / [ ] Issue: ___
+- Touching elements: [ ] None / [ ] Found: ___
+- Hidden lines: [ ] None / [ ] Found: ___
+- Label readability: [ ] Pass / [ ] Issue: ___
+- Flow clarity: [ ] Clear / [ ] Issue: ___
 ```
 
 *Reference: [0006-mermaid-diagrams.md](0006-mermaid-diagrams.md)*
@@ -265,78 +276,90 @@ flowchart TD
     subgraph Sources["Single Source of Truth"]
         Schema["0009-structure-schema.json"]
     end
-
+    
     subgraph Consumers["Consumers"]
         Tool["new-repo-setup.py"]
         Standard["0009-canonical-project-structure.md"]
+        Audit["--audit mode"]
     end
-
-    subgraph Actions["Tool Actions"]
-        Setup["--setup: Create directories"]
-        Audit["--audit: Validate structure"]
+    
+    subgraph Outputs["Results"]
+        Dirs["Created Directories"]
+        Report["Audit Report"]
     end
-
-    Schema -->|imports| Tool
-    Schema -->|references| Standard
-    Tool --> Setup
-    Tool --> Audit
+    
+    Schema -->|"load_structure_schema()"| Tool
+    Schema -->|"references"| Standard
+    Schema -->|"audit_project_structure()"| Audit
+    
+    Tool -->|"creates"| Dirs
+    Audit -->|"generates"| Report
 ```
 
 ## 7. Security & Safety Considerations
+
+*This section addresses security (10 patterns) and safety (9 patterns) concerns from governance feedback.*
 
 ### 7.1 Security
 
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| Path traversal in schema | Validate paths don't contain `..` or absolute paths | Addressed |
-| Arbitrary file creation | Schema only defines structure, not file contents | Addressed |
+| Path traversal in schema | Validate paths don't contain `..` or absolute paths via `validate_paths()` | Addressed |
+| Malicious schema injection | Schema loaded from known location in repo only | Addressed |
 
 ### 7.2 Safety
 
+*Safety concerns focus on preventing data loss, ensuring fail-safe behavior, and protecting system integrity.*
+
 | Concern | Mitigation | Status |
 |---------|------------|--------|
-| Schema file missing | Clear error message with path, graceful failure | Addressed |
-| Malformed JSON | Catch JSONDecodeError, report line/column | Addressed |
-| Breaking existing setups | Backward compatible CLI interface | Addressed |
+| Existing directory overwrite | `os.makedirs(exist_ok=True)` - no destructive operations | Addressed |
+| Schema file missing | Clear error message, fail fast | Addressed |
+| Invalid schema format | JSON parse error caught and reported | Addressed |
 
-**Fail Mode:** Fail Closed - If schema cannot be loaded, tool exits with error rather than using fallback hardcoded values (which would defeat the purpose).
+**Fail Mode:** Fail Closed - If schema cannot be loaded, tool exits with error rather than using fallback hardcoded structure.
 
-**Recovery Strategy:** If schema is corrupted, restore from git history. Schema is version controlled.
+**Recovery Strategy:** If schema is corrupted, restore from git history. No runtime recovery needed.
 
 ## 8. Performance & Cost Considerations
+
+*This section addresses performance and cost concerns (6 patterns) from governance feedback.*
 
 ### 8.1 Performance
 
 | Metric | Budget | Approach |
 |--------|--------|----------|
-| Schema load time | < 10ms | Single small file read, stdlib JSON |
-| Memory | < 1MB | Schema is ~2KB, in-memory dict |
-| Startup overhead | Negligible | One file read added to existing tool |
+| Schema load time | < 10ms | Single small JSON file, stdlib parsing |
+| Flatten operation | < 1ms | Simple recursive traversal |
+| Total overhead vs current | Negligible | One file read replaces inline list |
 
-**Bottlenecks:** None expected. Schema is tiny and parsed once at startup.
+**Bottlenecks:** None expected - schema is small and operations are simple.
 
 ### 8.2 Cost Analysis
 
 | Resource | Unit Cost | Estimated Usage | Monthly Cost |
 |----------|-----------|-----------------|--------------|
-| N/A | N/A | N/A | $0 |
+| Compute | $0 | Local execution | $0 |
+| Storage | $0 | ~2KB file | $0 |
 
 **Cost Controls:**
-- N/A - No cloud resources or paid APIs involved
+- N/A - No external services or paid resources
 
 **Worst-Case Scenario:** N/A - Local file operations only.
 
 ## 9. Legal & Compliance
 
+*This section addresses legal concerns (8 patterns) from governance feedback.*
+
 | Concern | Applies? | Mitigation |
 |---------|----------|------------|
 | PII/Personal Data | No | Schema contains only directory/file names |
-| Third-Party Licenses | No | All code is original, stdlib only |
-| Terms of Service | N/A | No external services |
-| Data Retention | N/A | No user data |
-| Export Controls | No | No restricted algorithms |
+| Third-Party Licenses | No | No external code or data |
+| Terms of Service | No | No external services |
+| Data Retention | No | No user data involved |
+| Export Controls | No | No restricted content |
 
-**Data Classification:** Internal
+**Data Classification:** Public - Schema defines open-source project structure.
 
 **Compliance Checklist:**
 - [x] No PII stored without consent
@@ -348,77 +371,115 @@ flowchart TD
 
 *Ref: [0005-testing-strategy-and-protocols.md](0005-testing-strategy-and-protocols.md)*
 
-**Testing Philosophy:** Strive for 100% automated test coverage. All tests for this feature can be automated.
+**Testing Philosophy:** Strive for 100% automated test coverage. Manual tests are a last resort for scenarios that genuinely cannot be automated (e.g., visual inspection, hardware interaction). Every scenario marked "Manual" requires justification.
+
+### 10.0 Test Plan (TDD - Complete Before Implementation)
+
+**TDD Requirement:** Tests MUST be written and failing BEFORE implementation begins.
+
+| Test ID | Test Description | Expected Behavior | Status |
+|---------|------------------|-------------------|--------|
+| T010 | test_load_schema_valid | Loads valid schema without error | RED |
+| T020 | test_load_schema_missing_file | Raises SchemaLoadError | RED |
+| T030 | test_load_schema_invalid_json | Raises SchemaLoadError | RED |
+| T040 | test_flatten_directories_simple | Returns flat list of paths | RED |
+| T050 | test_flatten_directories_nested | Handles deeply nested structure | RED |
+| T060 | test_get_required_directories | Filters to required only | RED |
+| T070 | test_audit_missing_required | Reports missing required dirs | RED |
+| T080 | test_audit_all_present | Returns clean result | RED |
+| T090 | test_schema_includes_lineage | Schema has docs/lineage structure | RED |
+| T100 | test_schema_content_parity | Schema contains all DOCS_STRUCTURE paths | RED |
+| T110 | test_tool_integration_load | Tool loads schema via load_structure_schema() | RED |
+| T120 | test_directory_creation | os.makedirs called for schema paths | RED |
+
+**Coverage Target:** ≥95% for all new code
+
+**TDD Checklist:**
+- [ ] All tests written before implementation
+- [ ] Tests currently RED (failing)
+- [ ] Test IDs match scenario IDs in 10.1
+- [ ] Test file created at: `tests/unit/test_structure_schema.py`
+
+*Note: Update Status from RED to GREEN as implementation progresses. All tests should be RED at LLD review time.*
 
 ### 10.1 Test Scenarios
 
 | ID | Scenario | Type | Input | Expected Output | Pass Criteria |
 |----|----------|------|-------|-----------------|---------------|
-| 010 | Load valid schema | Auto | Valid JSON schema file | Parsed ProjectStructureSchema dict | No exceptions, correct structure |
-| 020 | Load missing schema | Auto | Non-existent path | FileNotFoundError | Exception raised with path in message |
-| 030 | Load malformed JSON | Auto | Invalid JSON syntax including `..` traversal attempts | JSONDecodeError or validation error | Exception raised with location info |
-| 040 | Flatten nested directories | Auto | Schema with 3-level nesting | Flat list of all paths | All paths present, correct order |
-| 050 | Flatten empty schema | Auto | Schema with no directories | Empty list | Returns [] without error |
-| 060 | Setup creates schema dirs | Auto | Schema + empty temp dir | Directories created | All schema directories exist |
-| 070 | Audit finds missing required | Auto | Schema + incomplete tree | AuditResult with errors | Missing required items listed |
-| 080 | Audit allows missing optional | Auto | Schema + tree without optional | AuditResult with warnings only | No errors, warnings present |
-| 090 | Audit passes complete tree | Auto | Schema + complete tree | Clean AuditResult | No errors, no warnings |
-| 100 | Schema includes lineage dirs | Auto | Production schema | lineage/active, lineage/done in flatten | Paths present in output |
-| 110 | CLI backward compatibility | Auto | `--setup` flag | Same behavior as before | Exit 0, dirs created |
-| 120 | Standard references schema | Auto | `docs/standards/0009-canonical-project-structure.md` | Contains `0009-structure-schema.json` | String found in file content |
+| 010 | Load valid schema | Auto | Valid JSON file | Parsed dict | No exceptions, dict has 'version' |
+| 020 | Load missing file | Auto | Nonexistent path | SchemaLoadError | Exception raised with clear message |
+| 030 | Load invalid JSON | Auto | Malformed JSON | SchemaLoadError | Exception raised |
+| 040 | Flatten simple | Auto | `{dirs: {a: {}, b: {}}}` | `['a', 'b']` | Exact match |
+| 050 | Flatten nested | Auto | `{dirs: {a: {children: {b: {}}}}}` | `['a', 'a/b']` | Includes nested path |
+| 060 | Filter required | Auto | Mix of required/optional | Only required items | Optional excluded |
+| 070 | Audit missing | Auto | Empty dir + schema | Missing list populated | Reports missing required |
+| 080 | Audit complete | Auto | Complete dir + schema | Empty missing list | All required present |
+| 090 | Schema has lineage | Auto | Actual schema file | lineage structure exists | `docs/lineage/active`, `docs/lineage/done` in flatten |
+| 100 | Schema content parity | Auto | Actual schema file + golden paths | All golden paths exist | `docs/standards`, `tools`, etc. present |
+| 110 | Tool integration load | Auto | Mock sys.argv for tool | load_structure_schema() called | Function invoked (mocked) |
+| 120 | Directory creation | Auto | Test schema + mock os.makedirs | makedirs called for paths | All schema paths passed to makedirs |
 
 *Note: Use 3-digit IDs with gaps of 10 (010, 020, 030...) to allow insertions.*
+
+**Type values:**
+- `Auto` - Fully automated, runs in CI (pytest, playwright, etc.)
+- `Auto-Live` - Automated but hits real external services (may be slow/flaky)
+- `Manual` - Requires human execution (MUST include justification why automation is impossible)
 
 ### 10.2 Test Commands
 
 ```bash
 # Run all automated tests
-poetry run pytest tests/test_new_repo_setup.py -v
+poetry run pytest tests/unit/test_structure_schema.py -v
 
 # Run only fast/mocked tests (exclude live)
-poetry run pytest tests/test_new_repo_setup.py -v -m "not live"
+poetry run pytest tests/unit/test_structure_schema.py -v -m "not live"
 
-# Run schema-specific tests
-poetry run pytest tests/test_new_repo_setup.py -v -k "schema"
+# Test new-repo-setup integration
+poetry run python tools/new-repo-setup.py --audit --dry-run
 ```
 
 ### 10.3 Manual Tests (Only If Unavoidable)
 
-N/A - All scenarios automated.
+**N/A - All scenarios automated.**
 
 ## 11. Risks & Mitigations
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| Schema format changes break existing scripts | Med | Low | Semver in schema, version check in loader |
-| Developers edit tool instead of schema | Med | Med | Code comments pointing to schema, PR review |
-| Schema location changes | Low | Low | Single constant for path, documented in standard |
-| Complex nested schemas hard to read | Low | Low | Keep nesting to 3 levels max, good formatting |
+| Schema and tool get out of sync | Med | Low | T100 validates schema matches golden paths; T110 validates tool uses schema |
+| Breaking change to schema format | High | Low | Version field in schema, migration path documented |
+| Performance regression from file I/O | Low | Low | Schema cached after first load within process |
 
 ## 12. Definition of Done
 
 ### Code
 - [ ] Implementation complete and linted
 - [ ] Code comments reference this LLD
-- [ ] Hardcoded `DOCS_STRUCTURE` and `FILES_STRUCTURE` removed from `new-repo-setup.py`
-- [ ] `load_structure_schema()` function implemented
-- [ ] `flatten_directories()` and `flatten_files()` functions implemented
-- [ ] `--audit` mode uses schema for validation
+- [ ] Comment in `new-repo-setup.py` pointing to schema file location
 
 ### Tests
-- [ ] All test scenarios pass (including Test 120 for documentation consistency)
-- [ ] Test coverage meets threshold (>80%)
-- [ ] Schema validation tests pass
+- [ ] All test scenarios pass (T010-T120)
+- [ ] Test coverage meets threshold (≥95%)
 
 ### Documentation
 - [ ] LLD updated with any deviations
 - [ ] Implementation Report (0103) completed
-- [ ] Standard 0009 updated to reference schema
-- [ ] Schema file includes inline documentation via descriptions
+- [ ] Test Report (0113) completed if applicable
 
 ### Review
 - [ ] Code review completed
 - [ ] User approval before closing issue
+
+### 12.1 Traceability (Mechanical - Auto-Checked)
+
+*Issue #277: Cross-references are verified programmatically.*
+
+Mechanical validation automatically checks:
+- Every file mentioned in this section must appear in Section 2.1
+- Every risk mitigation in Section 11 should have a corresponding function in Section 2.4 (warning if not)
+
+**If files are missing from Section 2.1, the LLD is BLOCKED.**
 
 ---
 
@@ -426,9 +487,10 @@ N/A - All scenarios automated.
 
 *Track all review feedback with timestamps and implementation status.*
 
+<!-- Note: Timestamps are auto-generated by the workflow. Do not fill in manually. -->
+
 ### Gemini Review #1 (REVISE)
 
-**Timestamp:** 2025-01-XX
 **Reviewer:** Gemini 3 Pro
 **Verdict:** REVISE
 
@@ -436,16 +498,19 @@ N/A - All scenarios automated.
 
 | ID | Comment | Implemented? |
 |----|---------|--------------|
-| G1.1 | "Requirement Coverage 83% < 95% - missing test for Req 4 (standard references schema)" | YES - Added Test 120 in Section 10.1 |
-| G1.2 | "Stale Open Questions - resolved items should be removed" | YES - Cleared Section 1 Open Questions |
-| G1.3 | "Consider testing for `..` traversal attempts in Test 030" | YES - Updated Test 030 description |
-| G1.4 | "Explicitly state default schema location in Section 2.5" | YES - Added to Logic Flow step 1 and Section 2.6 |
+| G1.1 | "Open questions resolved" | YES - Section 1 updated with resolutions |
+| G1.2 | "Missing test for Req 2 (Parity): test_schema_content_parity" | YES - Added T100 in Sections 10.0 and 10.1 |
+| G1.3 | "Missing test for Req 4 (Integration): test_tool_integration_load" | YES - Added T110 in Sections 10.0 and 10.1 |
+| G1.4 | "Missing test for Req 7 (Creation): test_directory_creation" | YES - Added T120 in Sections 10.0 and 10.1 |
+| G1.5 | "Add comment in new-repo-setup.py pointing to schema file location" | YES - Added to Section 2.6 and Section 12 |
 
 ### Review Summary
 
+<!-- Note: This table is auto-populated by the workflow with actual review dates. -->
+
 | Review | Date | Verdict | Key Issue |
 |--------|------|---------|-----------|
-| Gemini #1 | 2025-01-XX | REVISE | Requirement coverage 83% < 95%, stale open questions |
+| Gemini #1 | (auto) | REVISE | Test coverage at 50%, missing integration and parity tests |
 
 **Final Status:** PENDING
 <!-- Note: This field is auto-updated to APPROVED by the workflow when finalized -->

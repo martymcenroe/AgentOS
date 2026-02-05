@@ -1,3 +1,10 @@
+---
+repo: martymcenroe/AgentOS
+issue: 99
+url: https://github.com/martymcenroe/AgentOS/issues/99
+fetched: 2026-02-05T00:23:17.769402Z
+---
+
 # Issue #99: Schema-driven project structure: eliminate tool/standard drift
 
 ## Problem

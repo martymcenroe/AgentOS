@@ -4,10 +4,16 @@
 
 ---
 
+### Metrics
+
+- [Dashboard](Metrics)
+- [Measuring Productivity](Measuring-Productivity)
+
+---
+
 ### For Leaders
 
 - [Why AgentOS?](For-Enterprise-Leaders-Why-AgentOS)
-- [Measuring Productivity](Measuring-Productivity)
 - [Security & Compliance](Security-Compliance)
 
 ---

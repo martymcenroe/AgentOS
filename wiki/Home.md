@@ -35,19 +35,32 @@ graph TD
 
 ---
 
-## Production Evidence: 50 Issues Closed
+## Production Evidence: 207 Issues, 159 Closed
 
-AgentOS isn't theoretical. It's been battle-tested through **50 completed issues** spanning:
+AgentOS isn't theoretical. It's been battle-tested through **207 issues** (159 closed, 48 open) in 27 days:
 
-| Theme | Issues | Examples |
-|-------|--------|----------|
-| **Workflow Automation** | 15 | LLD workflow, implementation workflow, report generation |
-| **Governance & Gates** | 12 | Gemini verification, skipped test gates, mechanical validation |
-| **Developer Experience** | 10 | Permission friction, worktree isolation, CI/CD |
-| **Intelligence Layer** | 8 | Scout workflow, verdict analyzer, template learning |
-| **Infrastructure** | 5 | GitHub Actions, Poetry dependencies, cross-platform |
+**[View Full Metrics Dashboard →](Metrics)**
 
-**Current velocity:** ~3 issues/day with multi-agent orchestration
+```
+Issues closed per day (Central Time):
+2026-01-11:   2 ##
+2026-01-17:   8 ########
+2026-01-21:  12 ############
+2026-02-01:   7 #######
+2026-02-02:  23 #######################
+2026-02-03:  55 #######################################################
+2026-02-04:  31 ###############################
+```
+
+| Theme | Examples |
+|-------|----------|
+| **Workflow Automation** | LLD workflow, implementation workflow, TDD workflow |
+| **Governance & Gates** | Gemini verification, mechanical validation, skipped test gates |
+| **Bug Fixes** | Unicode encoding, import errors, stale state bugs |
+| **Intelligence Layer** | Scout workflow, verdict analyzer, template learning |
+| **Infrastructure** | GitHub Actions, Poetry dependencies, cross-platform |
+
+**Current velocity:** 9.4 issues/day average (55 issues on peak day)
 
 ---
 

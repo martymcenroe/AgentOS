@@ -32,6 +32,9 @@ Quick reference for the orchestrator (Marty) on how to run tools, commands, agen
 | 0911 | [Dependabot PR Audit](0911-dependabot-pr-audit.md) | Manual | On Dependabot PRs | Sonnet |
 | 0912 | [GitHub Projects](0912-github-projects.md) | Reference | - | - |
 | 0913 | [Skill Command Reference](0913-skill-command-reference.md) | Reference | - | - |
+| 0914 | [Fix Implementation Workflow Archiving](0914-fix-implementation-workflow-should-archive-lld-and-reports-to-done--on-completion.md) | Manual | Post-merge | - |
+| 0915 | [Backfill Audit Directories](0915-backfill-audit-directories.md) | Manual | One-time | - |
+| 0916 | [Batch Workflow Runner](0916-batch-workflow-runner.md) | Manual | Unattended batch | Claude |
 
 ## Model Selection Guide
 
