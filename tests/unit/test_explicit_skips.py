@@ -86,7 +86,8 @@ class TestIntegrationMarkers:
         # Check for integration marker on the class or functions
         has_integration_marker = (
             "@pytest.mark.integration" in content or
-            'pytestmark = pytest.mark.integration' in content
+            'pytestmark = pytest.mark.integration' in content or
+            'pytest.mark.integration,' in content  # List form: pytestmark = [pytest.mark.integration, ...]
         )
 
         assert has_integration_marker, (
@@ -113,12 +114,15 @@ class TestSkipifDecoratorUsage:
             ("claude" in content.lower() or "shutil.which" in content)
         )
 
-        # The skipif should be a decorator, not inline
-        has_decorator_skipif = "@pytest.mark.skipif" in content
+        # The skipif should be a decorator or module-level marker, not inline
+        has_decorator_skipif = (
+            "@pytest.mark.skipif" in content or
+            "pytest.mark.skipif(" in content  # pytestmark list form
+        )
 
         assert has_decorator_skipif, (
             "Tests depending on claude CLI should use @pytest.mark.skipif "
-            "decorator with shutil.which('claude') check"
+            "decorator or pytestmark with skipif"
         )
 
     def test_gitignore_test_uses_skipif(self):
