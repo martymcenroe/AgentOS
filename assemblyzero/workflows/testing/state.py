@@ -24,6 +24,7 @@ class HumanDecision(str, Enum):
 
 
 class TestScenario(TypedDict):
+    __test__ = False
     """A single test scenario extracted from the LLD."""
 
     name: str  # Test name (e.g., "test_login_success")
@@ -35,6 +36,7 @@ class TestScenario(TypedDict):
 
 
 class TestingWorkflowState(TypedDict, total=False):
+    __test__ = False
     """State for the TDD testing workflow.
 
     Attributes:

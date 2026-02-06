@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class TestReportMetadata(TypedDict):
+    __test__ = False
     """Schema for test-report.json metadata file."""
 
     issue_number: int
