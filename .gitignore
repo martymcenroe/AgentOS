@@ -30,9 +30,10 @@ harvest-*.xlsx
 # Blog drafts (not ready for public)
 docs/blog/
 
-# Verdict analyzer database (generated locally)
-.assemblyzero/verdicts.db
-verdicts.db
+# Local AssemblyZero state (Issue #78)
+.assemblyzero/
+! .assemblyzero/config.example.json
 
-# Per-repo workflow database (Issue #78)
-.assemblyzero/issue_workflow.db
+# Keep databases ignored (redundant but explicit)
+*.db
+*.sqlite

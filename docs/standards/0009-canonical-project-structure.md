@@ -137,21 +137,20 @@ The lineage folder captures the design review workflow - the "paper trail" showi
 ```
 docs/lineage/
 ├── active/                     # Issues currently in design review
-│   └── {issue-id}/             # e.g., 4-footnote-handling/
-│       ├── 001-brief.md        # Initial idea/problem statement
-│       ├── 002-draft.md        # First LLD draft (Claude)
-│       ├── 003-verdict.md      # Gemini review verdict
-│       ├── 004-draft.md        # Revised draft after feedback
-│       ├── 005-verdict.md      # Second review verdict
-│       └── 006-filed.json      # Filing metadata
+│   └── {slug}/                 # e.g., Assemb0-0042/
+│       ├── {slug}-001-brief.md # Structured unique filename
+│       ├── {slug}-002-draft.md 
+│       ├── {slug}-003-verdict.md
+│       └── {slug}-004-filed.json
 └── done/                       # Completed (filed to GitHub)
-    └── {issue-id}/
+    └── {issue-number}-{slug}/
 ```
 
-**Naming convention:**
-- Folder: `{issue-number}-{short-description}/` (e.g., `4-footnote-handling/`)
-- Files: `{NNN}-{type}.{ext}` where NNN is sequence number (001, 002, ...)
-- Types: `brief`, `draft`, `verdict`, `filed`
+**Naming convention (Lean Pro Strategy):**
+- **Slug**: `{REPO}-{NUM}` where REPO is 7-char short ID and NUM is 4-digit sequential ID.
+- **Folder**: `{slug}/` (active) or `{issue-number}-{slug}/` (done).
+- **Files**: `{slug}-{NNN}-{type}.{ext}` where NNN is 3-digit sequence number.
+- **Common Repo IDs**: `Assemb0` (AssemblyZero), `Unleash` (unleashed), `Clio` (Clio).
 
 ---
 
