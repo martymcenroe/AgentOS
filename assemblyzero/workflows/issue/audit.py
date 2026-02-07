@@ -27,6 +27,7 @@ class FiledMetadata(TypedDict):
 
     issue_number: int
     issue_url: str
+    github_issue_url: str  # Alias for Issue #84
     title: str
     filed_at: str  # ISO8601
     brief_file: str
@@ -297,6 +298,7 @@ def save_filed_metadata(
     metadata: FiledMetadata = {
         "issue_number": issue_number,
         "issue_url": issue_url,
+        "github_issue_url": issue_url,  # Alias for Issue #84
         "title": title,
         "filed_at": datetime.now(timezone.utc).isoformat(),
         "brief_file": brief_file,

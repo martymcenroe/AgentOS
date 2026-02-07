@@ -158,10 +158,10 @@ def prompt_user_decision_verdict() -> tuple[HumanDecision, str]:
     print("\n" + "=" * 60)
     print("Verdict review complete.")
     print("=" * 60)
-    print("\n[A]pprove and file the issue")
+    print("\n[F]ile directly to GitHub")
     print("[R]evise - re-read verdict from disk, send to Claude")
     print("[W]rite feedback - re-read verdict + add comments, send to Claude")
-    print("[M]anual - exit for manual handling")
+    print("[S]ave and exit - pause workflow for later")
     print()
 
     # Test mode: auto-respond
@@ -171,17 +171,17 @@ def prompt_user_decision_verdict() -> tuple[HumanDecision, str]:
             # Only revise once, then approve
             os.environ["AGENTOS_TEST_REVISION"] = "0"
             choice = "R"
-            print(f"Your choice [A/R/W/M]: {choice} (TEST MODE - forcing revision to test Gemini feedback flow)")
+            print(f"Your choice [F/R/W/S]: {choice} (TEST MODE - forcing revision to test Gemini feedback flow)")
             return (HumanDecision.REVISE, "")
         else:
             choice = "A"
-            print(f"Your choice [A/R/W/M]: {choice} (TEST MODE - auto-approve)")
-            return (HumanDecision.APPROVE, "")
+            print(f"Your choice [F/R/W/S]: {choice} (TEST MODE - auto-approve)")
+            return (HumanDecision.FILE, "")
 
     while True:
-        choice = input("Your choice [A/R/W/M]: ").strip().upper()
-        if choice == "A":
-            return (HumanDecision.APPROVE, "")
+        choice = input("Your choice [F/R/W/S]: ").strip().upper()
+        if choice == "F":
+            return (HumanDecision.FILE, "")
         elif choice == "R":
             # Re-read verdict from disk (user may have edited), no additional comments
             return (HumanDecision.REVISE, "")
@@ -196,10 +196,10 @@ def prompt_user_decision_verdict() -> tuple[HumanDecision, str]:
                 lines.append(line)
             feedback = "\n".join(lines)
             return (HumanDecision.WRITE_FEEDBACK, feedback)
-        elif choice == "M":
+        elif choice == "S":
             return (HumanDecision.MANUAL, "")
         else:
-            print("Invalid choice. Please enter A, R, W, or M.")
+            print("Invalid choice. Please enter F, R, W, or S.")
 
 
 def human_edit_verdict(state: IssueWorkflowState) -> dict[str, Any]:
@@ -257,29 +257,49 @@ def human_edit_verdict(state: IssueWorkflowState) -> dict[str, Any]:
         print(f"    {verdict_path}")
         open_vscode_non_blocking(draft_path, verdict_path)
 
-    if clean:
-        # Perfectly clean - auto-file
-        print(f"\n{'=' * 60}")
-        print("VERDICT PASSED with no suggestions")
-        print(f"{'=' * 60}")
-        print(">>> Auto-filing issue to GitHub (N6)...")
-        return {
-            "current_draft": draft_content,
-            "current_verdict": verdict_content,
-            "next_node": "N6_file",
-            "error_message": "",
-        }
-    else:
-        # Has feedback - auto-revise
-        print(f"\n{'=' * 60}")
-        print("WARNING: Verdict has feedback (suggestions/architecture)")
-        print(f"{'=' * 60}")
-        print(">>> Auto-sending to Claude for revision (N2)...")
+    # Auto mode: auto-route based on verdict cleanliness
+    if os.environ.get("AGENTOS_AUTO_MODE") == "1":
+        if clean:
+            print("\n>>> Auto-filing (clean verdict)...")
+            return {
+                "current_draft": draft_content,
+                "current_verdict": verdict_content,
+                "next_node": "N6_file",
+                "error_message": "",
+            }
+        else:
+            print("\n>>> Auto-revising (verdict has feedback)...")
+            return {
+                "current_draft": draft_content,
+                "current_verdict": verdict_content,
+                "user_feedback": "",
+                "next_node": "N2_draft",
+                "error_message": "",
+            }
+
+    # Interactive mode: Prompt user for decision
+    decision, feedback = prompt_user_decision_verdict()
+
+    if decision == HumanDecision.MANUAL:
+        print("\n>>> Pausing workflow for manual handling...")
+        raise KeyboardInterrupt("User chose manual handling")
+
+    if decision == HumanDecision.REVISE or decision == HumanDecision.WRITE_FEEDBACK:
+        print("\n>>> Sending to Claude for revision (N2)...")
         return {
             "current_draft": draft_content,
             "current_verdict": verdict_content,
             "file_counter": file_counter,
-            "user_feedback": "",
+            "user_feedback": feedback,
             "next_node": "N2_draft",
             "error_message": "",
         }
+
+    # FILE - proceed to GitHub
+    print("\n>>> Filing issue to GitHub (N6)...")
+    return {
+        "current_draft": draft_content,
+        "current_verdict": verdict_content,
+        "next_node": "N6_file",
+        "error_message": "",
+    }
