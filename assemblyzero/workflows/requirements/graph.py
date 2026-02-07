@@ -41,7 +41,7 @@ from typing import Literal
 
 from langgraph.graph import END, START, StateGraph
 
-from assemblyzero.workflows.requirements.nodes import (
+from assemblyzero.workflows.requirements.nodes import (\n    librarian_node,
     finalize,
     generate_draft,
     human_gate_draft,
@@ -61,7 +61,7 @@ from assemblyzero.workflows.requirements.state import RequirementsWorkflowState
 # =============================================================================
 
 N0_LOAD_INPUT = "N0_load_input"
-N1_GENERATE_DRAFT = "N1_generate_draft"
+N0_5_LIBRARIAN = "N0_5_librarian"\nN1_GENERATE_DRAFT = "N1_generate_draft"
 N1_5_VALIDATE_MECHANICAL = "N1_5_validate_mechanical"  # Issue #277
 N2_HUMAN_GATE_DRAFT = "N2_human_gate_draft"
 N3_REVIEW = "N3_review"
@@ -76,7 +76,7 @@ N5_FINALIZE = "N5_finalize"
 
 def route_after_load_input(
     state: RequirementsWorkflowState,
-) -> Literal["N1_generate_draft", "END"]:
+) -> Literal["N0_5_librarian", "END"]:
     """Route after load_input node.
 
     Routes to:
@@ -91,7 +91,7 @@ def route_after_load_input(
     """
     if state.get("error_message"):
         return "END"
-    return "N1_generate_draft"
+    return "N0_5_librarian"
 
 
 def route_after_generate_draft(
@@ -164,7 +164,7 @@ def route_after_validate_mechanical(
             print(f"    [ROUTING] Max iterations ({max_iterations}) reached with validation errors - ending")
             return "END"
         print("    [ROUTING] Mechanical validation failed - returning to drafter")
-        return "N1_generate_draft"
+        return "N0_5_librarian"
 
     # Validation passed - proceed to human gate or review
     if state.get("config_gates_draft", True):
@@ -194,7 +194,7 @@ def route_from_human_gate_draft(
     if next_node == "N3_review":
         return "N3_review"
     elif next_node == "N1_generate_draft":
-        return "N1_generate_draft"
+        return "N0_5_librarian"
     else:
         return "END"
 
@@ -239,7 +239,7 @@ def route_after_review(
             print(f"    [ROUTING] Max iterations ({max_iterations}) reached with unanswered questions - going to human gate")
             return "N4_human_gate_verdict"
         print("    [ROUTING] Open questions unanswered - looping back to drafter for revision")
-        return "N1_generate_draft"
+        return "N0_5_librarian"
 
     # Normal routing
     if state.get("config_gates_verdict", True):
@@ -256,7 +256,7 @@ def route_after_review(
             if iteration_count >= max_iterations:
                 # Max iterations reached - finalize with current status
                 return "N5_finalize"
-            return "N1_generate_draft"
+            return "N0_5_librarian"
 
 
 def route_from_human_gate_verdict(
@@ -280,7 +280,7 @@ def route_from_human_gate_verdict(
     if next_node == "N5_finalize":
         return "N5_finalize"
     elif next_node == "N1_generate_draft":
-        return "N1_generate_draft"
+        return "N0_5_librarian"
     else:
         return "END"
 
@@ -326,7 +326,7 @@ def create_requirements_graph() -> StateGraph:
 
     # Add nodes
     graph.add_node(N0_LOAD_INPUT, load_input)
-    graph.add_node(N1_GENERATE_DRAFT, generate_draft)
+    graph.add_node(N0_5_LIBRARIAN, librarian_node)\n    graph.add_node(N1_GENERATE_DRAFT, generate_draft)
     graph.add_node(N1_5_VALIDATE_MECHANICAL, validate_lld_mechanical)  # Issue #277
     graph.add_node(N2_HUMAN_GATE_DRAFT, human_gate_draft)
     graph.add_node(N3_REVIEW, review)
@@ -337,12 +337,12 @@ def create_requirements_graph() -> StateGraph:
     # START -> N0
     graph.add_edge(START, N0_LOAD_INPUT)
 
-    # N0 -> N1 or END (on error)
+    # N0.5 -> N1\n    graph.add_edge(N0_5_LIBRARIAN, N1_GENERATE_DRAFT)\n\n    # N0 -> N0.5 or END (on error)
     graph.add_conditional_edges(
         N0_LOAD_INPUT,
         route_after_load_input,
         {
-            "N1_generate_draft": N1_GENERATE_DRAFT,
+            "N0_5_librarian": N0_5_LIBRARIAN,
             "END": END,
         },
     )
@@ -369,7 +369,7 @@ def create_requirements_graph() -> StateGraph:
         {
             "N2_human_gate_draft": N2_HUMAN_GATE_DRAFT,
             "N3_review": N3_REVIEW,
-            "N1_generate_draft": N1_GENERATE_DRAFT,
+            "N0_5_librarian": N0_5_LIBRARIAN,
             "END": END,
         },
     )
@@ -380,7 +380,7 @@ def create_requirements_graph() -> StateGraph:
         route_from_human_gate_draft,
         {
             "N3_review": N3_REVIEW,
-            "N1_generate_draft": N1_GENERATE_DRAFT,
+            "N0_5_librarian": N0_5_LIBRARIAN,
             "END": END,
         },
     )
@@ -393,7 +393,7 @@ def create_requirements_graph() -> StateGraph:
         {
             "N4_human_gate_verdict": N4_HUMAN_GATE_VERDICT,
             "N5_finalize": N5_FINALIZE,
-            "N1_generate_draft": N1_GENERATE_DRAFT,
+            "N0_5_librarian": N0_5_LIBRARIAN,
             "N3_review": N3_REVIEW,
             "END": END,
         },
@@ -405,7 +405,7 @@ def create_requirements_graph() -> StateGraph:
         route_from_human_gate_verdict,
         {
             "N5_finalize": N5_FINALIZE,
-            "N1_generate_draft": N1_GENERATE_DRAFT,
+            "N0_5_librarian": N0_5_LIBRARIAN,
             "END": END,
         },
     )

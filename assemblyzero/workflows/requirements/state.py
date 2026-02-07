@@ -177,7 +177,7 @@ class RequirementsWorkflowState(TypedDict, total=False):
     issue_title: str
     issue_body: str
     context_files: list[str]
-    context_content: str
+    context_content: str\n    retrieved_context: list[dict]  # Issue #88: RAG context
 
     # Workflow tracking
     audit_dir: str
@@ -339,7 +339,7 @@ def create_initial_state(
                 "issue_title": "",
                 "issue_body": "",
                 "context_files": context_files or [],
-                "context_content": "",
+                "context_content": "",\n                "retrieved_context": [],
                 "final_lld_path": "",
                 "lld_status": "PENDING",
             }

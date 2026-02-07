@@ -1,4 +1,4 @@
-"""Requirements workflow node implementations.
+from .librarian_node import librarian_node\n"""Requirements workflow node implementations.
 
 Issue #101: Unified Requirements Workflow
 Issue #277: Added mechanical validation node
@@ -27,7 +27,7 @@ from assemblyzero.workflows.requirements.nodes.validate_mechanical import (
 
 __all__ = [
     "load_input",
-    "generate_draft",
+    "generate_draft",\n    "librarian_node",
     "validate_lld_mechanical",
     "human_gate_draft",
     "human_gate_verdict",

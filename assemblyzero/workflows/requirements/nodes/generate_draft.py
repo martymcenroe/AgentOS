@@ -177,12 +177,19 @@ def _build_prompt(
         issue_number = state.get("issue_number", 0)
         issue_title = state.get("issue_title", "")
         issue_body = state.get("issue_body", "")
-        context_content = state.get("context_content", "")
+        context_content = state.get("context_content", "")\n        retrieved_context = state.get("retrieved_context", [])
 
         # CRITICAL: Explicitly include issue number to prevent LLM confusion
         input_content = f"# Issue #{issue_number}: {issue_title}\n\n{issue_body}"
         if context_content:
-            input_content += f"\n\n## Context\n\n{context_content}"
+            input_content += f"\n\n## Manual Context\n\n{context_content}"
+        
+        # Issue #88: Add RAG context
+        if retrieved_context:
+            input_content += "\n\n## Automatically Retrieved Governance Context\n"
+            input_content += "The following relevant standards and architectural decisions were found:\n\n"
+            for r in retrieved_context:
+                input_content += f"### {r['file_path']} ({r['section']})\n{r['content']}\n\n"
         input_content += f"\n\n**CRITICAL: This LLD is for GitHub Issue #{issue_number}. Use this exact issue number in all references.**"
         input_label = f"GitHub Issue #{issue_number}"
 

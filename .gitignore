@@ -37,3 +37,4 @@ docs/blog/
 # Keep databases ignored (redundant but explicit)
 *.db
 *.sqlite
+\n# RAG Vector Store (Issue #88)\n.assemblyzero/vector_store/\n
