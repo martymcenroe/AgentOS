@@ -36,7 +36,7 @@ jobs:
             venv-${{ runner.os }}-
 
       - name: Install dependencies
-        run: poetry install --no-interaction
+        run: poetry install --no-interaction --with dev
 
       - name: Run unit tests
         run: poetry run pytest tests/unit/ -v --tb=short

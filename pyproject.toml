@@ -31,6 +31,14 @@ dependencies = [
     "pycparser (>=3.0,<4.0)"
 ]
 
+[tool.pytest.ini_options]
+addopts = "-m 'not integration and not e2e'"
+markers = [
+    "integration: tests that call real external services (deselect with '-m \"not integration\"')",
+    "e2e: end-to-end workflow tests requiring sandbox repo",
+    "expensive: tests that use significant API quota",
+]
+
 [tool.poetry]
 packages = [{include = "assemblyzero"}]
 
