@@ -17,7 +17,7 @@ class HumanDecision(str, Enum):
     APPROVE = "A"  # Approve and file (N5 only)
     REVISE = "R"  # Re-read verdict from disk, send to Claude (N5 only)
     WRITE_FEEDBACK = "W"  # Re-read verdict + prompt for comments, send to Claude (N5 only)
-    MANUAL = "M"  # Exit for manual handling
+    FILE = "F"  # File directly to GitHub\n    MANUAL = "M"  # Exit for manual handling
 
 
 class SlugCollisionChoice(str, Enum):

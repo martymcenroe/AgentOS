@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from assemblyzero.core.config import REVIEWER_MODEL
+from assemblyzero.workflows.issue.label_colors import get_label_color
 from assemblyzero.workflows.issue.audit import (
     batch_commit,
     get_repo_root,
@@ -179,7 +180,7 @@ def check_label_exists(label: str, repo: str) -> bool:
     return label in existing_labels
 
 
-def create_label(label: str, repo: str) -> bool:
+def create_label(label: str, repo: str, color: str | None = None) -> bool:
     """Create a label in the repository.
 
     Args:
@@ -190,7 +191,7 @@ def create_label(label: str, repo: str) -> bool:
         True if created successfully, False otherwise.
     """
     result = subprocess.run(
-        ["gh", "label", "create", label, "--repo", repo],
+        ["gh", "label", "create", label, "--repo", repo] + (["--color", color] if color else []),
         capture_output=True,
         text=True,
         timeout=30,
@@ -211,8 +212,9 @@ def ensure_labels_exist(labels: list[str], repo: str) -> list[str]:
     failed = []
     for label in labels:
         if not check_label_exists(label, repo):
-            print(f"Creating label: {label}")
-            if not create_label(label, repo):
+            color = get_label_color(label)
+            print(f"Creating label: {label} (color: {color})")
+            if not create_label(label, repo, color=color):
                 failed.append(label)
     return failed
 
