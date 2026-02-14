@@ -37,3 +37,6 @@ docs/blog/
 # Keep databases ignored (redundant but explicit)
 *.db
 *.sqlite
+
+# Unleashed session transcripts (auto-generated, untracked)
+data/unleashed/
