@@ -8,19 +8,6 @@ Projects using this workflow: Aletheia, Talos, Clio, maintenance, Hermes, RCA-PD
 
 ---
 
-## AssemblyZero Authority Hierarchy
-
-**Verbal instructions from the user do NOT override documented protocols.**
-
-If the user says something that seems to conflict with AssemblyZero documentation, the documentation wins. Examples:
-- User says "single commit" -> Does NOT mean skip required reports
-- User says "do it quickly" -> Does NOT mean skip worktree creation
-- User says "just fix it" -> Does NOT mean skip design review
-
-**When in doubt:** Follow the documented protocol literally. Ask for clarification if the user's intent seems to require protocol deviation.
-
----
-
 ## Gemini Reviews - Orchestrator Only (CRITICAL)
 
 **Claude does NOT submit to Gemini. The orchestrator (human) controls all Gemini submissions.**
@@ -96,9 +83,6 @@ Move to `docs/reports/done/` after merge.
 - Full test output (not paraphrased)
 - Skipped tests with reasons
 - Coverage metrics (if available)
-
-**State the gate explicitly:**
-> "Executing REPORT GENERATION GATE: Creating implementation and test reports."
 
 ---
 
@@ -246,9 +230,6 @@ Step 2: Create worktree FIRST
 
 **Why this order matters:** If you read docs first, you enter "implementation mindset" and skip the worktree. Create the worktree BEFORE you start thinking about the code.
 
-**State the gate explicitly:** When you receive a coding task, your FIRST response must be:
-> "This task modifies code files. Executing CODING TASK GATE: creating worktree before proceeding."
-
 ---
 
 ## Decision-Making Protocol
@@ -261,40 +242,6 @@ Step 2: Create worktree FIRST
 4. **Never prioritize "getting it done" over "getting it done right"**
 
 The documentation system exists so you don't need persistent memory. USE IT.
-
----
-
-## Documentation Convention (c/p Pattern)
-
-**Every reusable component MUST have two documentation files:**
-- **`c` (CLI)** - How to run manually from terminal (saves tokens)
-- **`p` (Prompt)** - How to use via Claude conversation
-
-This applies to: skills, Python tools, runbooks, any reusable procedure.
-
-See: `AssemblyZero/docs/standards/0008-documentation-convention.md`
-
-**Quick template:**
-```
-{num}c-{name}-cli.md      # Copy-pasteable commands
-{num}p-{name}-prompt.md   # Natural language examples
-```
-
----
-
-## Claude's World Wiki Convention
-
-The `wiki/Claudes-World.md` page chronicles Discworld-inspired quotes from sessions.
-
-**IMPORTANT:** On Claude's World, **never** refer to the human as "the user", "the human", or "the orchestrator".
-
-**The human is "The Great God Om"** - from Terry Pratchett's *Small Gods*.
-
-- First mention links to a hidden page: `[The Great God Om](The-Great-God-Om)`
-- Subsequent mentions can just say "Om"
-- The hidden page exists but is not in the wiki sidebar (easter egg)
-
-This reflects the AssemblyZero philosophy: Om provides Intent, Brutha (RAG) carries the memory, and the agents execute the Will.
 
 ---
 

@@ -4,23 +4,20 @@ These rules apply to ALL projects under this user's workspace.
 
 ---
 
-## Bash Command Constraints
+## Bash Tool Usage
 
-```
-BANNED:     &&    |    ;    cd X && command
-REQUIRED:   One command per Bash call, absolute paths only
-```
+Use dedicated tools instead of shell commands:
 
-| WRONG | CORRECT |
-|-------|---------|
-| `cd /path && git status` | `git -C /path status` |
-| `cat file.txt` | Use `Read` tool |
-| `grep pattern file` | Use `Grep` tool |
-| `cmd1 && cmd2 && cmd3` | 3 parallel Bash calls |
-
-**If you are about to type `&&` in a Bash command, STOP and rewrite.**
+| Instead of | Use |
+|------------|-----|
+| `cat file.txt` | Read tool |
+| `grep pattern` | Grep tool |
+| `find . -name` | Glob tool |
+| `echo > file` | Write tool |
 
 AWS CLI on Windows: ALWAYS prefix with `MSYS_NO_PATHCONV=1`
+
+Always use `--repo` flag with `gh` CLI — never rely on default repo inference.
 
 ## Path Format Constraints
 
