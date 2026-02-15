@@ -43,35 +43,75 @@ from assemblyzero.workflows.issue.state import (
 
 
 class TestSlugGeneration:
-    """Test slug generation from brief filenames."""
+    """Test slug generation using Lean Pro Strategy ({REPO}-{NNNN})."""
 
-    def test_simple_filename(self):
-        """Test simple filename conversion."""
-        assert generate_slug("governance-notes.md") == "governance-notes"
+    def _setup_repo(self, tmp_path, repo_id="TestRep"):
+        """Create a tmp repo root with a known repo_id config."""
+        config_dir = tmp_path / ".assemblyzero"
+        config_dir.mkdir()
+        (config_dir / "config.json").write_text(
+            json.dumps({"repo_id": repo_id})
+        )
 
-    def test_spaces_to_hyphens(self):
-        """Test spaces converted to hyphens."""
-        assert generate_slug("My Feature Ideas.md") == "my-feature-ideas"
+    def test_first_slug_in_empty_repo(self, tmp_path):
+        """Test first slug is {REPO}-0001 when no lineage dirs exist."""
+        self._setup_repo(tmp_path, "TestRep")
+        slug = generate_slug("governance-notes.md", repo_root=tmp_path)
+        assert slug == "TestRep-0001"
 
-    def test_underscores_to_hyphens(self):
-        """Test underscores converted to hyphens."""
-        assert generate_slug("auth_redesign_notes.md") == "auth-redesign-notes"
+    def test_increments_past_existing(self, tmp_path):
+        """Test slug increments past existing lineage directories."""
+        self._setup_repo(tmp_path, "TestRep")
+        active_dir = tmp_path / "docs" / "lineage" / "active"
+        active_dir.mkdir(parents=True)
+        (active_dir / "TestRep-0001").mkdir()
+        (active_dir / "TestRep-0002").mkdir()
+        slug = generate_slug("any-brief.md", repo_root=tmp_path)
+        assert slug == "TestRep-0003"
 
-    def test_removes_special_chars(self):
-        """Test special characters removed."""
-        assert generate_slug("feature!@#$%notes.md") == "featurenotes"
+    def test_scans_done_directory_too(self, tmp_path):
+        """Test slug accounts for dirs in both active/ and done/."""
+        self._setup_repo(tmp_path, "TestRep")
+        active_dir = tmp_path / "docs" / "lineage" / "active"
+        done_dir = tmp_path / "docs" / "lineage" / "done"
+        active_dir.mkdir(parents=True)
+        done_dir.mkdir(parents=True)
+        (done_dir / "TestRep-0005").mkdir()
+        slug = generate_slug("brief.md", repo_root=tmp_path)
+        assert slug == "TestRep-0006"
 
-    def test_collapses_multiple_hyphens(self):
-        """Test multiple hyphens collapsed."""
-        assert generate_slug("feature---notes.md") == "feature-notes"
+    def test_slug_format_is_repo_dash_number(self, tmp_path):
+        """Test slug always matches {REPO}-{NNNN} pattern."""
+        self._setup_repo(tmp_path, "MyProj")
+        slug = generate_slug("anything.md", repo_root=tmp_path)
+        import re
+        assert re.match(r"^MyProj-\d{4}$", slug)
 
-    def test_full_path(self):
-        """Test with full path - only uses filename."""
-        assert generate_slug("/path/to/my-brief.md") == "my-brief"
+    def test_brief_filename_does_not_affect_slug(self, tmp_path):
+        """Test that different brief filenames produce same slug format."""
+        self._setup_repo(tmp_path, "TestRep")
+        slug1 = generate_slug("feature-ideas.md", repo_root=tmp_path)
+        slug2 = generate_slug("bug-report.md", repo_root=tmp_path)
+        # Both should be the same since no lineage dirs exist between calls
+        assert slug1 == slug2 == "TestRep-0001"
+
+    def test_known_repo_id_mapping(self, tmp_path):
+        """Test that known repo names map to their canonical IDs."""
+        config_dir = tmp_path / ".assemblyzero"
+        config_dir.mkdir()
+        (config_dir / "config.json").write_text(
+            json.dumps({"repo_id": "assemblyzero"})
+        )
+        slug = generate_slug("brief.md", repo_root=tmp_path)
+        assert slug.startswith("Assemb0-")
 
 
 class TestAuditFileNumbering:
-    """Test sequential file numbering in audit trail."""
+    """Test sequential file numbering in audit trail.
+
+    Files use {SLUG}-{NNN}-{TYPE} naming convention (e.g., TestRep-0001-001-brief.md).
+    next_file_number scans for the -NNN- pattern in filenames.
+    """
 
     def test_empty_directory(self, tmp_path):
         """Test first file gets number 1."""
@@ -79,51 +119,67 @@ class TestAuditFileNumbering:
 
     def test_increments_after_existing(self, tmp_path):
         """Test increments past existing files."""
-        (tmp_path / "001-brief.md").touch()
-        (tmp_path / "002-draft.md").touch()
+        (tmp_path / "TestRep-0001-001-brief.md").touch()
+        (tmp_path / "TestRep-0001-002-draft.md").touch()
         assert next_file_number(tmp_path) == 3
 
     def test_handles_gaps(self, tmp_path):
         """Test finds max even with gaps."""
-        (tmp_path / "001-brief.md").touch()
-        (tmp_path / "005-draft.md").touch()
+        (tmp_path / "TestRep-0001-001-brief.md").touch()
+        (tmp_path / "TestRep-0001-005-draft.md").touch()
         assert next_file_number(tmp_path) == 6
 
     def test_ignores_non_numbered(self, tmp_path):
-        """Test ignores files without NNN- prefix."""
+        """Test ignores files without -NNN- pattern."""
         (tmp_path / "readme.md").touch()
-        (tmp_path / "001-brief.md").touch()
+        (tmp_path / "TestRep-0001-001-brief.md").touch()
         assert next_file_number(tmp_path) == 2
 
 
 class TestAuditFileSaving:
-    """Test audit file saving."""
+    """Test audit file saving.
+
+    save_audit_file creates files as {SLUG}-{NNN}-{SUFFIX} where SLUG
+    is the audit directory name.
+    """
 
     def test_save_creates_file(self, tmp_path):
         """Test file is created with correct name."""
-        path = save_audit_file(tmp_path, 1, "brief.md", "# My Brief")
+        audit_dir = tmp_path / "TestRep-0001"
+        audit_dir.mkdir()
+        path = save_audit_file(audit_dir, 1, "brief.md", "# My Brief")
         assert path.exists()
-        assert path.name == "001-brief.md"
+        assert path.name == "TestRep-0001-001-brief.md"
 
     def test_save_content_correct(self, tmp_path):
         """Test content is saved correctly."""
+        audit_dir = tmp_path / "TestRep-0001"
+        audit_dir.mkdir()
         content = "# Test Content\n\nWith multiple lines."
-        path = save_audit_file(tmp_path, 42, "draft.md", content)
+        path = save_audit_file(audit_dir, 42, "draft.md", content)
         assert path.read_text() == content
 
     def test_save_numbered_correctly(self, tmp_path):
         """Test three-digit padding."""
-        path = save_audit_file(tmp_path, 7, "feedback.txt", "Fix diagrams")
-        assert path.name == "007-feedback.txt"
+        audit_dir = tmp_path / "TestRep-0001"
+        audit_dir.mkdir()
+        path = save_audit_file(audit_dir, 7, "feedback.txt", "Fix diagrams")
+        assert path.name == "TestRep-0001-007-feedback.txt"
 
 
 class TestFiledMetadata:
-    """Test filed.json metadata."""
+    """Test filed.json metadata.
+
+    save_filed_metadata creates files as {SLUG}-{NNN}-filed.json where SLUG
+    is the audit directory name.
+    """
 
     def test_creates_json(self, tmp_path):
         """Test JSON file is created."""
+        audit_dir = tmp_path / "TestRep-0001"
+        audit_dir.mkdir()
         path = save_filed_metadata(
-            tmp_path,
+            audit_dir,
             number=10,
             issue_number=62,
             issue_url="https://github.com/owner/repo/issues/62",
@@ -134,12 +190,14 @@ class TestFiledMetadata:
             verdict_count=2,
         )
         assert path.exists()
-        assert path.name == "010-filed.json"
+        assert path.name == "TestRep-0001-010-filed.json"
 
     def test_json_content(self, tmp_path):
         """Test JSON contains correct fields."""
+        audit_dir = tmp_path / "TestRep-0001"
+        audit_dir.mkdir()
         path = save_filed_metadata(
-            tmp_path,
+            audit_dir,
             number=1,
             issue_number=123,
             issue_url="https://example.com/issues/123",
@@ -173,27 +231,30 @@ class TestLoadBrief:
         assert "error_message" in result
         assert "not found" in result["error_message"]
 
+    @patch("assemblyzero.workflows.issue.nodes.load_brief.generate_slug")
     @patch("assemblyzero.workflows.issue.nodes.load_brief.get_repo_root")
     @patch("assemblyzero.workflows.issue.nodes.load_brief.slug_exists")
     @patch("assemblyzero.workflows.issue.nodes.load_brief.create_audit_dir")
     @patch("assemblyzero.workflows.issue.nodes.load_brief.save_audit_file")
     def test_loads_brief_content(
-        self, mock_save, mock_create, mock_exists, mock_root, tmp_path
+        self, mock_save, mock_create, mock_exists, mock_root, mock_slug, tmp_path
     ):
-        """Test brief content is loaded."""
+        """Test brief content is loaded and slug is set from generate_slug."""
         # Create temp brief file
         brief_path = tmp_path / "test-brief.md"
         brief_path.write_text("# My Brief\n\nContent here.")
 
+        mock_slug.return_value = "TestRep-0001"
         mock_root.return_value = tmp_path
         mock_exists.return_value = False
-        mock_create.return_value = tmp_path / "docs/audit/active/test-brief"
+        mock_create.return_value = tmp_path / "docs/lineage/active/TestRep-0001"
 
         state: IssueWorkflowState = {"brief_file": str(brief_path)}
         result = load_brief(state)
 
         assert result.get("brief_content") == "# My Brief\n\nContent here."
-        assert result.get("slug") == "test-brief"
+        assert result.get("slug") == "TestRep-0001"
+        mock_slug.assert_called_once_with(str(brief_path))
 
     @patch("assemblyzero.workflows.issue.nodes.load_brief.get_repo_root")
     @patch("assemblyzero.workflows.issue.nodes.load_brief.slug_exists")
@@ -471,8 +532,8 @@ class TestDraftNode:
         mock_template.return_value = "# Template\n\n## Section"
         mock_claude.return_value = "# Generated Issue\n\nContent here."
 
-        # Create audit dir
-        audit_dir = tmp_path / "audit"
+        # Create audit dir with a realistic slug name
+        audit_dir = tmp_path / "TestRep-0001"
         audit_dir.mkdir()
 
         state: IssueWorkflowState = {
@@ -487,7 +548,7 @@ class TestDraftNode:
         assert result["error_message"] == ""
         assert result["current_draft"] == "# Generated Issue\n\nContent here."
         assert result["draft_count"] == 1
-        assert (audit_dir / "001-draft.md").exists()
+        assert (audit_dir / "TestRep-0001-001-draft.md").exists()
 
     @patch("assemblyzero.workflows.issue.nodes.draft.call_claude_headless")
     @patch("assemblyzero.workflows.issue.nodes.draft.load_issue_template")
@@ -498,9 +559,9 @@ class TestDraftNode:
         mock_template.return_value = "# Template"
         mock_claude.return_value = "# Revised Issue"
 
-        audit_dir = tmp_path / "audit"
+        audit_dir = tmp_path / "TestRep-0001"
         audit_dir.mkdir()
-        (audit_dir / "001-brief.md").touch()
+        (audit_dir / "TestRep-0001-001-brief.md").touch()
 
         state: IssueWorkflowState = {
             "audit_dir": str(audit_dir),

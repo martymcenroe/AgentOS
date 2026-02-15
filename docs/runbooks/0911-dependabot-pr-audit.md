@@ -2,7 +2,7 @@
 
 **Category:** Runbook / Security Maintenance
 **Version:** 1.0
-**Last Updated:** 2026-02-01
+**Last Updated:** 2026-02-15
 
 ---
 
@@ -118,6 +118,10 @@ for PR in $DEPENDABOT_PRS; do
             --label "dependencies,regression,bug"
     else
         echo "PR #$PR merged successfully - tests pass"
+
+        # Approve the PR for contribution graph credit
+        gh pr review $PR --approve --repo martymcenroe/AssemblyZero \
+            --body "Automated review: regression tests pass. Merged via 0911 dependabot audit."
     fi
 done
 ```
