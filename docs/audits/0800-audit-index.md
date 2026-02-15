@@ -139,6 +139,7 @@ Audits exist because:
 | 0839 | Wiki Alignment | Monthly | No |
 | 0840 | Cross-Project Harvest | Monthly | No |
 | 0848 | Code Quality Procedure | Monthly | No |
+| 0849 | Mermaid Diagram Visual Audit | Monthly | Partial |
 | 0899 | Meta-Audit | Quarterly | No |
 
 **Under Development (design complete, automation pending):**
@@ -298,7 +299,7 @@ Audits that govern the audit system itself.
 |-----------|--------|
 | **Continuous** | 0803, 0836, 0837 |
 | **Weekly** | 0816, 0828, 0834, 0838, 0841*, 0842*, 0844* |
-| **Monthly** | 0804, 0809, 0817, 0826*, 0827*, 0831*, 0832, 0835, 0839, 0840, 0846*, 0847, 0848 |
+| **Monthly** | 0804, 0809, 0817, 0826*, 0827*, 0831*, 0832, 0835, 0839, 0840, 0846*, 0847, 0848, 0849 |
 | **Quarterly** | 0805, 0806, 0807, 0808, 0812, 0813, 0814, 0899 |
 | **On-Demand** | 0811, 0815, 0829*, 0843*, 0845* |
 | **Ultimate** | 0801, 0802, 0810, 0833 |
@@ -482,6 +483,7 @@ Standard format for all audits:
 - [0839 - Wiki Alignment](0839-audit-wiki-alignment.md)
 - [0840 - Cross-Project Harvest](0840-cross-project-harvest.md)
 - [0848 - Code Quality Procedure](0848-audit-code-quality-procedure.md)
+- [0849 - Mermaid Diagram Visual Audit](0849-audit-mermaid-visual.md) ✨
 
 **Documentation Health (0841-0847)**
 - [0841 - Open Issues Currency](0841-audit-open-issues.md) 📝
@@ -514,7 +516,7 @@ Standard format for all audits:
 | Compliance | 0806, 0807, 0810 |
 | Cost | 0832 |
 | Dependencies | 0805, 0812 |
-| Documentation | 0838, 0839, 0841-0846 |
+| Documentation | 0838, 0839, 0841-0846, 0849 |
 | Incidents | 0811 |
 | License | 0805 |
 | Permissions | 0815, 0816 |
