@@ -46,10 +46,10 @@ Added environment variable support for worktree-isolated testing:
 def get_checkpoint_db_path() -> Path:
     """Get path to SQLite checkpoint database.
 
-    Supports AGENTOS_WORKFLOW_DB environment variable for worktree isolation.
+    Supports ASSEMBLYZERO_WORKFLOW_DB environment variable for worktree isolation.
     """
     # Support environment variable for worktree isolation
-    if db_path_env := os.environ.get("AGENTOS_WORKFLOW_DB"):
+    if db_path_env := os.environ.get("ASSEMBLYZERO_WORKFLOW_DB"):
         db_path = Path(db_path_env)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         return db_path
@@ -69,7 +69,7 @@ This enables:
 
 Added 4 new integration tests that verify the checkpoint/resume mechanism:
 
-1. **test_checkpoint_db_path_env_var** - Verifies AGENTOS_WORKFLOW_DB env var works
+1. **test_checkpoint_db_path_env_var** - Verifies ASSEMBLYZERO_WORKFLOW_DB env var works
 2. **test_checkpoint_db_path_default** - Verifies default path (~/. assemblyzero/issue_workflow.db)
 3. **test_sqlite_checkpointer_saves_state** - Verifies SQLite actually persists workflow state
 4. **test_workflow_resume_from_checkpoint** - Verifies stream(None, config) continues correctly
@@ -136,17 +136,17 @@ Slug: test-resume-brief
 ## Files Changed
 
 - `assemblyzero/workflows/issue/nodes/human_edit_draft.py` - KeyboardInterrupt fix, UX improvements
-- `tools/run_issue_workflow.py` - AGENTOS_WORKFLOW_DB support, poetry run in resume commands
+- `tools/run_issue_workflow.py` - ASSEMBLYZERO_WORKFLOW_DB support, poetry run in resume commands
 - `tests/test_issue_workflow.py` - Added 4 integration tests
 
 ## Known Limitations
 
-1. The shared database at `~/.assemblyzero/issue_workflow.db` is still the default - users working on multiple workflows simultaneously should use AGENTOS_WORKFLOW_DB to isolate.
+1. The shared database at `~/.assemblyzero/issue_workflow.db` is still the default - users working on multiple workflows simultaneously should use ASSEMBLYZERO_WORKFLOW_DB to isolate.
 
 ## Verification
 
 - All 58 existing tests pass (1 pre-existing failure unrelated to this fix)
 - 4 new integration tests pass
-- Full end-to-end test with `AGENTOS_TEST_MODE=1` ran 25 iterations successfully
+- Full end-to-end test with `ASSEMBLYZERO_TEST_MODE=1` ran 25 iterations successfully
 - Manual testing confirms `[S]ave and exit` properly saves state for resume
 - Resume command with `poetry run` prefix works correctly

@@ -9,8 +9,8 @@ set -uo pipefail
 # Note: not using -e because we need to capture failures
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AGENTOS_ROOT="$(dirname "$SCRIPT_DIR")"
-BATCH_SCRIPT="$AGENTOS_ROOT/tools/batch-workflow.sh"
+ASSEMBLYZERO_ROOT="$(dirname "$SCRIPT_DIR")"
+BATCH_SCRIPT="$ASSEMBLYZERO_ROOT/tools/batch-workflow.sh"
 
 # Colors
 RED='\033[0;31m'

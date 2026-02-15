@@ -293,7 +293,7 @@ def main():
 
     # Set environment variables for mode flags
     if args.auto_mode:
-        os.environ["AGENTOS_AUTO_MODE"] = "1"
+        os.environ["ASSEMBLYZERO_AUTO_MODE"] = "1"
 
     # Import after setting up path
     from langgraph.checkpoint.sqlite import SqliteSaver

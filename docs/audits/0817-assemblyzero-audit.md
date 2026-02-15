@@ -1,4 +1,4 @@
-# 0807 - AgentOS Health Check
+# 0817 - AssemblyZero Health Check
 
 ## Purpose
 
@@ -158,7 +158,7 @@ done
 
 ## Auto-Fix (Default Behavior)
 
-**This audit auto-fixes AgentOS health issues rather than just reporting them.**
+**This audit auto-fixes AssemblyZero health issues rather than just reporting them.**
 
 ### Auto-Fixable Items
 
@@ -198,7 +198,7 @@ For each auto-fixable finding:
 ## Output Format
 
 ```markdown
-## AgentOS Health Check - YYYY-MM-DD
+## AssemblyZero Health Check - YYYY-MM-DD
 
 ### Auto-Fixed
 - [x] Added `0107-TEMPLATE-xxx.md` to template index
@@ -225,7 +225,7 @@ For each auto-fixable finding:
 
 When invoked with extended thinking (ultrathink), perform deep analysis beyond the standard checks above. This mode is used for nightly audits and major system reviews.
 
-See `docs/0901-runbook-nightly-agentos-audit.md` for invocation instructions.
+See `docs/0901-runbook-nightly-assemblyzero-audit.md` for invocation instructions.
 
 ### Conflict Detection
 
@@ -294,7 +294,7 @@ After extended analysis, offer to batch-create GitHub issues for significant fin
 | Documentation-only fixes | No | Yes |
 
 **Issue format:**
-- Title: `[AgentOS] {finding type}: {brief description}`
+- Title: `[AssemblyZero] {finding type}: {brief description}`
 - Label: `agentos`, `maintenance`
 - Body: Include finding details, affected files, recommended fix
 

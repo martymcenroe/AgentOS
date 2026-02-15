@@ -56,11 +56,11 @@ def temp_non_git_dir(tmp_path: Path) -> Generator[Path, None, None]:
 
 @pytest.fixture
 def clean_env() -> Generator[None, None, None]:
-    """Ensure AGENTOS_WORKFLOW_DB is not set during tests."""
-    old_value = os.environ.pop("AGENTOS_WORKFLOW_DB", None)
+    """Ensure ASSEMBLYZERO_WORKFLOW_DB is not set during tests."""
+    old_value = os.environ.pop("ASSEMBLYZERO_WORKFLOW_DB", None)
     yield
     if old_value is not None:
-        os.environ["AGENTOS_WORKFLOW_DB"] = old_value
+        os.environ["ASSEMBLYZERO_WORKFLOW_DB"] = old_value
 
 
 @pytest.fixture
@@ -121,7 +121,7 @@ def test_020(tmp_path: Path, clean_env: None):
 def test_030(temp_git_repo: Path, tmp_path: Path):
     """
     Environment variable override | Auto | Set
-    `AGENTOS_WORKFLOW_DB=/tmp/custom.db` | Database at `/tmp/custom.db` |
+    `ASSEMBLYZERO_WORKFLOW_DB=/tmp/custom.db` | Database at `/tmp/custom.db` |
     File created at env var path, not in repo
     """
     custom_db_path = tmp_path / "custom_location" / "custom.db"
@@ -129,7 +129,7 @@ def test_030(temp_git_repo: Path, tmp_path: Path):
     os.chdir(temp_git_repo)
     
     try:
-        with mock.patch.dict(os.environ, {"AGENTOS_WORKFLOW_DB": str(custom_db_path)}):
+        with mock.patch.dict(os.environ, {"ASSEMBLYZERO_WORKFLOW_DB": str(custom_db_path)}):
             db_path = get_checkpoint_db_path()
         
         assert db_path == custom_db_path
@@ -142,7 +142,7 @@ def test_040(temp_non_git_dir: Path, clean_env: None):
     """
     Fail closed outside repo | Auto | Run workflow in non-git directory |
     Exit code 1, error message | Exit code 1; stderr contains
-    "AGENTOS_WORKFLOW_DB"
+    "ASSEMBLYZERO_WORKFLOW_DB"
     """
     original_cwd = os.getcwd()
     os.chdir(temp_non_git_dir)
@@ -274,7 +274,7 @@ def test_080(temp_git_repo: Path, clean_env: None):
 def test_090(tmp_path: Path):
     """
     Env var with ~ expansion | Auto | Set
-    `AGENTOS_WORKFLOW_DB=~/custom.db` | Path expanded correctly | File at
+    `ASSEMBLYZERO_WORKFLOW_DB=~/custom.db` | Path expanded correctly | File at
     `$HOME/custom.db`
     """
     mock_home = tmp_path / "mock_home"
@@ -284,7 +284,7 @@ def test_090(tmp_path: Path):
     os.chdir(tmp_path)
     
     try:
-        with mock.patch.dict(os.environ, {"AGENTOS_WORKFLOW_DB": "~/custom.db"}):
+        with mock.patch.dict(os.environ, {"ASSEMBLYZERO_WORKFLOW_DB": "~/custom.db"}):
             with mock.patch("os.path.expanduser") as mock_expand:
                 mock_expand.return_value = str(mock_home / "custom.db")
                 db_path = get_checkpoint_db_path()
@@ -296,14 +296,14 @@ def test_090(tmp_path: Path):
 
 def test_100(temp_git_repo: Path):
     """
-    Empty env var treated as unset | Auto | Set `AGENTOS_WORKFLOW_DB=""`
+    Empty env var treated as unset | Auto | Set `ASSEMBLYZERO_WORKFLOW_DB=""`
     | Falls back to per-repo | Uses repo path, not empty string
     """
     original_cwd = os.getcwd()
     os.chdir(temp_git_repo)
     
     try:
-        with mock.patch.dict(os.environ, {"AGENTOS_WORKFLOW_DB": ""}):
+        with mock.patch.dict(os.environ, {"ASSEMBLYZERO_WORKFLOW_DB": ""}):
             db_path = get_checkpoint_db_path()
         
         expected_path = temp_git_repo / ".assemblyzero" / "issue_workflow.db"
@@ -356,7 +356,7 @@ print(path)
     for repo in repos:
         env = os.environ.copy()
         env["PYTHONPATH"] = str(source_path)
-        env.pop("AGENTOS_WORKFLOW_DB", None)
+        env.pop("ASSEMBLYZERO_WORKFLOW_DB", None)
         proc = subprocess.Popen(
             [sys.executable, str(test_script)],
             cwd=repo,

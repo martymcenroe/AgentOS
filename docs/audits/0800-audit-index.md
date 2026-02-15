@@ -123,7 +123,7 @@ Audits exist because:
 | 0814 | Horizon Scanning Protocol | Quarterly | No |
 | 0815 | Permission Friction | On-Demand | **Yes** |
 | 0816 | Permission Permissiveness | Weekly | **Yes** |
-| 0817 | AgentOS Self-Audit | Monthly | **Yes** |
+| 0817 | AssemblyZero Self-Audit | Monthly | **Yes** |
 | 0826 | Cross-Browser Testing | Monthly | No |
 | 0827 | Infrastructure Integration (AWS) | Monthly | No |
 | 0828 | Build Artifact Freshness | Weekly | No |
@@ -197,7 +197,7 @@ Regular governance and structure checks.
 |--------|------|-------|----------|
 | 0804 | Accessibility (WCAG) | UI compliance | No |
 | 0809 | Agentic AI Governance | OWASP Agentic | No |
-| 0817 | AgentOS Self-Audit | Framework health | **Yes** |
+| 0817 | AssemblyZero Self-Audit | Framework health | **Yes** |
 | 0826 | Cross-Browser Testing | Extension parity | No |
 | 0827 | Infrastructure Integration | AWS verification | No |
 | 0831 | Web Assets | UI quality | No |
@@ -463,7 +463,7 @@ Standard format for all audits:
 - [0814 - Horizon Scanning](0814-horizon-scanning-protocol.md)
 - [0815 - Permission Friction](0815-permission-friction.md) ✨
 - [0816 - Permission Permissiveness](0816-permission-permissiveness.md) ✨
-- [0817 - AgentOS Self-Audit](0817-agentos-audit.md) ✨
+- [0817 - AssemblyZero Self-Audit](0817-assemblyzero-audit.md) ✨
 
 **Infrastructure Audits (0826-0831) - For Child Projects**
 - [0826 - Cross-Browser Testing](0826-audit-cross-browser-testing.md) 📝
@@ -558,7 +558,7 @@ Cost optimization: use the cheapest model that can reliably execute each audit.
 | 0814 Horizon Scanning | Haiku | Framework registry parsing |
 | 0815 Permission Friction | Sonnet | Session log analysis, pattern recognition |
 | 0816 Permission Permissiveness | Haiku | Settings file parsing |
-| 0817 AgentOS Self-Audit | Haiku | Text diff comparison |
+| 0817 AssemblyZero Self-Audit | Haiku | Text diff comparison |
 | 0826 Cross-Browser Testing | Sonnet | Browser compatibility analysis |
 | 0827 Infrastructure Integration | Haiku | AWS CLI parsing, config verification |
 | 0828 Build Artifact Freshness | Haiku | Timestamp comparison |

@@ -111,7 +111,7 @@ def select_idea_interactive(repo_root: Path | None = None) -> tuple[str, bool] |
     print()
 
     # Test mode: select first idea
-    if os.environ.get("AGENTOS_TEST_MODE") == "1" and ideas:
+    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1" and ideas:
         choice = "1"
         print(f"Select idea [1-{len(ideas)}, a, q]: {choice} (TEST MODE - auto-select)")
         return (str(ideas[0]), True)
@@ -138,14 +138,14 @@ def select_idea_interactive(repo_root: Path | None = None) -> tuple[str, bool] |
 def get_checkpoint_db_path() -> Path:
     """Get path to SQLite checkpoint database.
 
-    Supports AGENTOS_WORKFLOW_DB environment variable for worktree isolation.
+    Supports ASSEMBLYZERO_WORKFLOW_DB environment variable for worktree isolation.
 
     Returns:
-        Path to checkpoint database. Uses AGENTOS_WORKFLOW_DB if set,
+        Path to checkpoint database. Uses ASSEMBLYZERO_WORKFLOW_DB if set,
         otherwise falls back to ~/.assemblyzero/issue_workflow.db
     """
     # Support environment variable for worktree isolation
-    if db_path_env := os.environ.get("AGENTOS_WORKFLOW_DB"):
+    if db_path_env := os.environ.get("ASSEMBLYZERO_WORKFLOW_DB"):
         db_path = Path(db_path_env)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         return db_path
@@ -173,13 +173,13 @@ def prompt_slug_collision(slug: str) -> tuple[SlugCollisionChoice, str]:
     print()
 
     # Test mode: auto-clean
-    if os.environ.get("AGENTOS_TEST_MODE") == "1":
+    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1":
         choice = "C"
         print(f"Your choice [R/N/C/A]: {choice} (TEST MODE - auto-clean)")
         return (SlugCollisionChoice.CLEAN, "")
 
     # Auto mode: auto-resume existing workflow
-    if os.environ.get("AGENTOS_AUTO_MODE") == "1":
+    if os.environ.get("ASSEMBLYZERO_AUTO_MODE") == "1":
         choice = "R"
         print(f"Your choice [R/N/C/A]: {choice} (AUTO MODE - auto-resume)")
         return (SlugCollisionChoice.RESUME, "")
@@ -399,7 +399,7 @@ def run_new_workflow(
 
                     # Auto/Test mode: auto-save and exit
                     import os
-                    if os.environ.get("AGENTOS_TEST_MODE") == "1" or os.environ.get("AGENTOS_AUTO_MODE") == "1":
+                    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1" or os.environ.get("ASSEMBLYZERO_AUTO_MODE") == "1":
                         choice = "S"
                         print(f"Your choice: {choice} (AUTO MODE - auto-save on recursion limit)")
                     else:
@@ -561,7 +561,7 @@ def run_resume_workflow(brief_file: str, repo_root: Path | None = None) -> int:
 
                     # Auto/Test mode: auto-save and exit
                     import os
-                    if os.environ.get("AGENTOS_TEST_MODE") == "1" or os.environ.get("AGENTOS_AUTO_MODE") == "1":
+                    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1" or os.environ.get("ASSEMBLYZERO_AUTO_MODE") == "1":
                         choice = "S"
                         print(f"Your choice: {choice} (AUTO MODE - auto-save on recursion limit)")
                     else:
@@ -778,7 +778,7 @@ def apply_gates_config(args: argparse.Namespace) -> None:
 
     # Set environment variable based on gates
     if args.gates == "none":
-        os.environ["AGENTOS_AUTO_MODE"] = "1"
+        os.environ["ASSEMBLYZERO_AUTO_MODE"] = "1"
 
 
 def main() -> int:

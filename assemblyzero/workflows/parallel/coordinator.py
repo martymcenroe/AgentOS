@@ -180,7 +180,7 @@ class ParallelCoordinator:
             if credential and self.credential_coordinator:
                 # Check for simulated rate limit
                 import os
-                rate_limited = os.environ.get("AGENTOS_SIMULATE_429") == "true"
+                rate_limited = os.environ.get("ASSEMBLYZERO_SIMULATE_429") == "true"
                 self.credential_coordinator.release(
                     credential,
                     rate_limited=rate_limited,

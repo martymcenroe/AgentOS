@@ -390,7 +390,7 @@ class TestSelectBriefFile:
 
         assert result is None
 
-    @patch.dict("os.environ", {"AGENTOS_TEST_MODE": "1"})
+    @patch.dict("os.environ", {"ASSEMBLYZERO_TEST_MODE": "1"})
     def test_auto_selects_first_in_test_mode(self, tmp_path):
         """Test auto-selects first brief in test mode."""
         from tools.run_requirements_workflow import select_brief_file
@@ -487,7 +487,7 @@ class TestSelectGitHubIssue:
         assert result is None
 
     @patch("subprocess.run")
-    @patch.dict("os.environ", {"AGENTOS_TEST_MODE": "1"})
+    @patch.dict("os.environ", {"ASSEMBLYZERO_TEST_MODE": "1"})
     def test_auto_selects_first_in_test_mode(self, mock_run, tmp_path):
         """Test auto-selects first issue in test mode."""
         from tools.run_requirements_workflow import select_github_issue
@@ -971,7 +971,7 @@ class TestCheckAndShiftExistingLLD:
         # LLD should be deleted
         assert not lld_file.exists()
 
-    @patch.dict("os.environ", {"AGENTOS_TEST_MODE": "1"})
+    @patch.dict("os.environ", {"ASSEMBLYZERO_TEST_MODE": "1"})
     def test_auto_confirms_in_test_mode(self, tmp_path):
         """Test auto-confirms YES in test mode."""
         from tools.run_requirements_workflow import check_and_shift_existing_lld

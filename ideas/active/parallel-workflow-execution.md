@@ -84,7 +84,7 @@ More sophisticated:
 ## Recommendation
 
 Start with **Option A (Process Isolation)** as it's simplest:
-1. Each subprocess uses `AGENTOS_WORKFLOW_DB` env var for isolated DB
+1. Each subprocess uses `ASSEMBLYZERO_WORKFLOW_DB` env var for isolated DB
 2. Console output prefixed with `[{issue}]`
 3. Credential pool already has thread-safe rotation
 4. Easy to limit parallelism (e.g., max 3 concurrent)

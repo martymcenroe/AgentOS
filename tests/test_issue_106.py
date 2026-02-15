@@ -166,7 +166,7 @@ def test_040(mock_credentials):
 
 def test_050():
     """
-    HTTP 429 triggers backoff | Auto | AGENTOS_SIMULATE_429=true | Key
+    HTTP 429 triggers backoff | Auto | ASSEMBLYZERO_SIMULATE_429=true | Key
     marked rate-limited | Backoff applied, different key used or wait
     """
     # TDD: Arrange
@@ -184,7 +184,7 @@ def test_050():
     )
     
     # TDD: Act
-    with patch.dict(os.environ, {"AGENTOS_SIMULATE_429": "true"}):
+    with patch.dict(os.environ, {"ASSEMBLYZERO_SIMULATE_429": "true"}):
         stats, results = coordinator.execute_parallel(
             items=items,
             worker_func=worker_func,

@@ -329,7 +329,7 @@ class TestParallelCoordinatorExecution:
         item_id_func = lambda x: x
 
         # Simulate rate limit
-        with patch.dict("os.environ", {"AGENTOS_SIMULATE_429": "true"}):
+        with patch.dict("os.environ", {"ASSEMBLYZERO_SIMULATE_429": "true"}):
             stats, results = coordinator.execute_parallel(
                 items, worker_func, item_id_func
             )

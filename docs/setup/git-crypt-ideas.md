@@ -5,7 +5,7 @@ Every repo can have an `ideas/` folder for capturing thoughts before they're rea
 ## Setup (Using Generator)
 
 ```bash
-poetry run --directory $AGENTOS_ROOT python $AGENTOS_ROOT/tools/assemblyzero-generate.py --project YOUR_PROJECT --ideas
+poetry run --directory $ASSEMBLYZERO_ROOT python $ASSEMBLYZERO_ROOT/tools/assemblyzero-generate.py --project YOUR_PROJECT --ideas
 ```
 
 ## Setup (Manual for git-crypt)

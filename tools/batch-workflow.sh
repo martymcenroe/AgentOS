@@ -26,8 +26,8 @@
 set -euo pipefail
 
 # Configuration
-AGENTOS_ROOT="/c/Users/mcwiz/Projects/AssemblyZero"
-LOG_DIR="$AGENTOS_ROOT/logs/batch"
+ASSEMBLYZERO_ROOT="/c/Users/mcwiz/Projects/AssemblyZero"
+LOG_DIR="$ASSEMBLYZERO_ROOT/logs/batch"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # Colors for output
@@ -161,7 +161,7 @@ run_workflow() {
     # Run with unbuffered output, tee to log file
     local exit_code=0
     (
-        cd "$AGENTOS_ROOT"
+        cd "$ASSEMBLYZERO_ROOT"
         PYTHONUNBUFFERED=1 $cmd 2>&1 | tee "$log_file"
     ) || exit_code=$?
 
@@ -374,7 +374,7 @@ mkdir -p "$LOG_DIR"
 TOTAL=${#ISSUES[@]}
 echo ""
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║              AGENTOS BATCH WORKFLOW RUNNER                 ║${NC}"
+echo -e "${BLUE}║              ASSEMBLYZERO BATCH WORKFLOW RUNNER                 ║${NC}"
 echo -e "${BLUE}╠════════════════════════════════════════════════════════════╣${NC}"
 printf "${BLUE}║${NC} %-58s ${BLUE}║${NC}\n" "Type: $WORKFLOW_TYPE"
 printf "${BLUE}║${NC} %-58s ${BLUE}║${NC}\n" "Gates: $GATES"

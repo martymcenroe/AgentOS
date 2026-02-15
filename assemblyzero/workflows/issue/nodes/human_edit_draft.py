@@ -27,7 +27,7 @@ def open_vscode_non_blocking(file_path: str) -> tuple[bool, str]:
     import datetime
 
     # Test mode: skip VS Code launch
-    if os.environ.get("AGENTOS_TEST_MODE") == "1":
+    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1":
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
         print(f"[{timestamp}] TEST MODE: Skipping VS Code launch for {file_path}")
         return True, ""
@@ -78,7 +78,7 @@ def open_vscode_and_wait(file_path: str) -> tuple[bool, str]:
     import datetime
 
     # Test mode: skip VS Code launch
-    if os.environ.get("AGENTOS_TEST_MODE") == "1":
+    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1":
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
         print(f"[{timestamp}] TEST MODE: Skipping VS Code launch for {file_path}")
         return True, ""
@@ -135,13 +135,13 @@ def prompt_user_decision_draft() -> tuple[HumanDecision, str]:
     print()
 
     # Test mode: auto-respond
-    if os.environ.get("AGENTOS_TEST_MODE") == "1":
+    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1":
         choice = "G"
         print(f"Your choice [G/R/S]: {choice} (TEST MODE - auto-send)")
         return (HumanDecision.SEND, "")
 
     # Auto mode: auto-send to Gemini
-    if os.environ.get("AGENTOS_AUTO_MODE") == "1":
+    if os.environ.get("ASSEMBLYZERO_AUTO_MODE") == "1":
         choice = "G"
         print(f"Your choice [G/R/S]: {choice} (AUTO MODE - auto-send)")
         return (HumanDecision.SEND, "")
@@ -206,7 +206,7 @@ def human_edit_draft(state: IssueWorkflowState) -> dict[str, Any]:
     print(f">>> Opening: {draft_path}")
 
     # Auto mode: skip VS Code (will open done/ folder at end of workflow)
-    if os.environ.get("AGENTOS_AUTO_MODE") == "1":
+    if os.environ.get("ASSEMBLYZERO_AUTO_MODE") == "1":
         pass  # Don't open VS Code - user can't interact anyway
     else:
         # Interactive mode: open VS Code and wait for user to close

@@ -53,7 +53,7 @@ def open_vscode_non_blocking(file1: str, file2: str) -> tuple[bool, str]:
     import datetime
 
     # Test mode: skip VS Code launch
-    if os.environ.get("AGENTOS_TEST_MODE") == "1":
+    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1":
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
         print(f"[{timestamp}] TEST MODE: Skipping VS Code launch for {file1} and {file2}")
         return True, ""
@@ -105,7 +105,7 @@ def open_vscode_split_and_wait(file1: str, file2: str) -> tuple[bool, str]:
     import datetime
 
     # Test mode: skip VS Code launch
-    if os.environ.get("AGENTOS_TEST_MODE") == "1":
+    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1":
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
         print(f"[{timestamp}] TEST MODE: Skipping VS Code launch for {file1} and {file2}")
         return True, ""
@@ -165,11 +165,11 @@ def prompt_user_decision_verdict() -> tuple[HumanDecision, str]:
     print()
 
     # Test mode: auto-respond
-    if os.environ.get("AGENTOS_TEST_MODE") == "1":
+    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1":
         # Check if we should force a revision (for testing revision flow)
-        if os.environ.get("AGENTOS_TEST_REVISION") == "1":
+        if os.environ.get("ASSEMBLYZERO_TEST_REVISION") == "1":
             # Only revise once, then approve
-            os.environ["AGENTOS_TEST_REVISION"] = "0"
+            os.environ["ASSEMBLYZERO_TEST_REVISION"] = "0"
             choice = "R"
             print(f"Your choice [A/R/W/M]: {choice} (TEST MODE - forcing revision to test Gemini feedback flow)")
             return (HumanDecision.REVISE, "")
@@ -250,7 +250,7 @@ def human_edit_verdict(state: IssueWorkflowState) -> dict[str, Any]:
     clean = is_verdict_clean(verdict_content)
 
     # Auto mode: skip VS Code preview (will open done/ folder at end of workflow)
-    if os.environ.get("AGENTOS_AUTO_MODE") != "1":
+    if os.environ.get("ASSEMBLYZERO_AUTO_MODE") != "1":
         # Interactive mode: open VS Code non-blocking for inspection
         print(f">>> Opening verdict in VS Code (non-blocking):")
         print(f"    {draft_path}")

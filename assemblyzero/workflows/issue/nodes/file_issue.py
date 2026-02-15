@@ -56,7 +56,7 @@ def open_vscode_folder(folder_path: str) -> tuple[bool, str]:
         Tuple of (success, error_message). error_message is empty string on success.
     """
     # Test mode: skip VS Code launch
-    if os.environ.get("AGENTOS_TEST_MODE") == "1":
+    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1":
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
         print(f"[{timestamp}] TEST MODE: Skipping VS Code launch for folder {folder_path}")
         return True, ""
@@ -284,7 +284,7 @@ def prompt_error_recovery() -> ErrorRecovery:
     print()
 
     # Test mode: abort on error
-    if os.environ.get("AGENTOS_TEST_MODE") == "1":
+    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1":
         choice = "A"
         print(f"Your choice [R/E/A]: {choice} (TEST MODE - abort)")
         return ErrorRecovery.ABORT
@@ -422,7 +422,7 @@ def file_issue(state: IssueWorkflowState) -> dict[str, Any]:
                 print(f"Warning: Failed to commit audit trail: {e}")
 
             # Auto mode: open done/ folder for review (since we skipped VS Code during workflow)
-            if os.environ.get("AGENTOS_AUTO_MODE") == "1":
+            if os.environ.get("ASSEMBLYZERO_AUTO_MODE") == "1":
                 print(f"\n>>> Opening audit trail for review...")
                 success, error = open_vscode_folder(str(done_dir))
                 if not success:

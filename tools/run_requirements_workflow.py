@@ -62,12 +62,12 @@ from assemblyzero.workflows.requirements.state import create_initial_state, Requ
 def get_checkpoint_db_path() -> Path:
     """Get path to SQLite checkpoint database.
 
-    Supports AGENTOS_WORKFLOW_DB environment variable for worktree isolation.
+    Supports ASSEMBLYZERO_WORKFLOW_DB environment variable for worktree isolation.
 
     Returns:
         Path to checkpoint database.
     """
-    if db_path_env := os.environ.get("AGENTOS_WORKFLOW_DB"):
+    if db_path_env := os.environ.get("ASSEMBLYZERO_WORKFLOW_DB"):
         db_path = Path(db_path_env)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         return db_path
@@ -192,7 +192,7 @@ def select_brief_file(target_repo: Path) -> str | None:
     print()
 
     # Test mode: auto-select first
-    if os.environ.get("AGENTOS_TEST_MODE") == "1" and briefs:
+    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1" and briefs:
         choice = "1"
         print(f"Select brief [1-{len(briefs)}, q]: {choice} (TEST MODE)")
         return str(briefs[0].relative_to(target_repo))
@@ -268,7 +268,7 @@ def select_github_issue(target_repo: Path) -> int | None:
     print()
 
     # Test mode: auto-select first
-    if os.environ.get("AGENTOS_TEST_MODE") == "1" and issues:
+    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1" and issues:
         choice = "1"
         print(f"Select issue [1-{len(issues)}, q]: {choice} (TEST MODE)")
         return issues[0]["number"]
@@ -486,7 +486,7 @@ def resolve_roots(args: argparse.Namespace) -> tuple[Path, Path]:
         Tuple of (assemblyzero_root, target_repo) as Path objects.
     """
     # assemblyzero_root: from env var or package location
-    assemblyzero_root_env = os.environ.get("AGENTOS_ROOT")
+    assemblyzero_root_env = os.environ.get("ASSEMBLYZERO_ROOT")
     if assemblyzero_root_env:
         assemblyzero_root = Path(assemblyzero_root_env).resolve()
     else:
@@ -852,7 +852,7 @@ def check_and_shift_existing_lld(
 
     # Interactive confirmation required
     # Test mode: auto-confirm
-    if os.environ.get("AGENTOS_TEST_MODE") == "1":
+    if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1":
         print("Type YES to proceed, or anything else to abort: YES (TEST MODE)")
         operations = shift_lineage_versions(issue_number, target_repo)
         for op in operations:

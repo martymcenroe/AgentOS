@@ -38,7 +38,7 @@ def get_checkpoint_db_path() -> Path:
     """Determine the checkpoint database path.
 
     Priority:
-    1. AGENTOS_WORKFLOW_DB environment variable (if set and non-empty)
+    1. ASSEMBLYZERO_WORKFLOW_DB environment variable (if set and non-empty)
     2. Per-repo: {repo_root}/.assemblyzero/issue_workflow.db
     3. Fail closed with descriptive error if outside git repo
 
@@ -49,7 +49,7 @@ def get_checkpoint_db_path() -> Path:
         SystemExit: If not in a git repo and no env var set (fail closed).
     """
     # Priority 1: Environment variable override
-    env_path = os.environ.get("AGENTOS_WORKFLOW_DB", "")
+    env_path = os.environ.get("ASSEMBLYZERO_WORKFLOW_DB", "")
     if env_path:  # Non-empty string
         # Expand ~ to home directory
         expanded_path = os.path.expanduser(env_path)
@@ -67,11 +67,11 @@ def get_checkpoint_db_path() -> Path:
 
     # Priority 3: Fail closed
     print(
-        "ERROR: Not in a git repository and AGENTOS_WORKFLOW_DB environment "
+        "ERROR: Not in a git repository and ASSEMBLYZERO_WORKFLOW_DB environment "
         "variable is not set.\n"
         "Please either:\n"
         "  1. Run from within a git repository, or\n"
-        "  2. Set AGENTOS_WORKFLOW_DB to a custom database path",
+        "  2. Set ASSEMBLYZERO_WORKFLOW_DB to a custom database path",
         file=sys.stderr,
     )
     sys.exit(1)

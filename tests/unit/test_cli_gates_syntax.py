@@ -99,7 +99,7 @@ class TestIssueWorkflowGatesSyntax:
     """Tests for run_issue_workflow.py --gates argument."""
 
     def test_gates_none_sets_auto_mode(self):
-        """--gates none should set AGENTOS_AUTO_MODE=1."""
+        """--gates none should set ASSEMBLYZERO_AUTO_MODE=1."""
         from tools.run_issue_workflow import create_argument_parser, apply_gates_config
 
         parser = create_argument_parser()
@@ -109,20 +109,20 @@ class TestIssueWorkflowGatesSyntax:
         with patch.dict("os.environ", {}, clear=False):
             import os
             apply_gates_config(args)
-            assert os.environ.get("AGENTOS_AUTO_MODE") == "1"
+            assert os.environ.get("ASSEMBLYZERO_AUTO_MODE") == "1"
 
     def test_gates_all_disables_auto_mode(self):
-        """--gates all should not set AGENTOS_AUTO_MODE."""
+        """--gates all should not set ASSEMBLYZERO_AUTO_MODE."""
         from tools.run_issue_workflow import create_argument_parser, apply_gates_config
 
         parser = create_argument_parser()
         args = parser.parse_args(["--select", "--gates", "all"])
 
-        with patch.dict("os.environ", {"AGENTOS_AUTO_MODE": ""}, clear=False):
+        with patch.dict("os.environ", {"ASSEMBLYZERO_AUTO_MODE": ""}, clear=False):
             import os
-            os.environ.pop("AGENTOS_AUTO_MODE", None)
+            os.environ.pop("ASSEMBLYZERO_AUTO_MODE", None)
             apply_gates_config(args)
-            assert os.environ.get("AGENTOS_AUTO_MODE") != "1"
+            assert os.environ.get("ASSEMBLYZERO_AUTO_MODE") != "1"
 
     def test_auto_flag_deprecated_but_works(self):
         """--auto should work but print deprecation warning."""
@@ -136,7 +136,7 @@ class TestIssueWorkflowGatesSyntax:
             with patch.dict("os.environ", {}, clear=False):
                 import os
                 apply_gates_config(args)
-                assert os.environ.get("AGENTOS_AUTO_MODE") == "1"
+                assert os.environ.get("ASSEMBLYZERO_AUTO_MODE") == "1"
 
         # Should print deprecation warning
         warning = stderr.getvalue()

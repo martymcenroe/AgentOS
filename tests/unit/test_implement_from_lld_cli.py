@@ -132,7 +132,7 @@ class TestArgumentsAffectBehavior:
     """
 
     def test_auto_mode_sets_environment(self):
-        """Test --auto sets AGENTOS_AUTO_MODE environment variable."""
+        """Test --auto sets ASSEMBLYZERO_AUTO_MODE environment variable."""
         import os
         import argparse
 
@@ -141,12 +141,12 @@ class TestArgumentsAffectBehavior:
 
         # The code should set this env var
         if args.auto:
-            os.environ["AGENTOS_AUTO_MODE"] = "1"
+            os.environ["ASSEMBLYZERO_AUTO_MODE"] = "1"
 
-        assert os.environ.get("AGENTOS_AUTO_MODE") == "1"
+        assert os.environ.get("ASSEMBLYZERO_AUTO_MODE") == "1"
 
         # Cleanup
-        del os.environ["AGENTOS_AUTO_MODE"]
+        del os.environ["ASSEMBLYZERO_AUTO_MODE"]
 
     def test_skip_e2e_in_initial_state(self):
         """Test --skip-e2e is passed to initial state."""

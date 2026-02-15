@@ -173,11 +173,11 @@ I defaulted to "I can't do this" instead of "How do I do this?" This is learned 
 **The Fix (obvious in hindsight):**
 ```python
 # Test mode environment variable
-AGENTOS_TEST_MODE=1 - Skip VS Code, auto-respond to prompts
-AGENTOS_TEST_REVISION=1 - Force one revision to test feedback loop
+ASSEMBLYZERO_TEST_MODE=1 - Skip VS Code, auto-respond to prompts
+ASSEMBLYZERO_TEST_REVISION=1 - Force one revision to test feedback loop
 
 # Now fully automated end-to-end testing works
-AGENTOS_TEST_MODE=1 poetry run python tools/run_issue_workflow.py --brief test.md
+ASSEMBLYZERO_TEST_MODE=1 poetry run python tools/run_issue_workflow.py --brief test.md
 ```
 
 **Time to implement:** 10 minutes
@@ -290,7 +290,7 @@ echo "Testing CLI help..."
 python tools/run_issue_workflow.py --help || exit 1
 
 echo "Testing with test brief..."
-AGENTOS_TEST_MODE=1 python tools/run_issue_workflow.py --brief test-brief.md || exit 1
+ASSEMBLYZERO_TEST_MODE=1 python tools/run_issue_workflow.py --brief test-brief.md || exit 1
 
 echo "All verifications passed"
 ```
@@ -658,7 +658,7 @@ def test_vscode_real_launch():
 All interactive tools MUST support test mode:
 
 ```python
-TEST_MODE = os.environ.get("AGENTOS_TEST_MODE") == "1"
+TEST_MODE = os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1"
 
 if TEST_MODE:
     # Auto-responses
@@ -812,7 +812,7 @@ Implement inversion of control. Make verification external. Reward adversarial t
 - Test issues #67, #68 created and closed (test runs)
 - 3 major bugs fixed (ImportError, VS Code launch, UnboundLocalError)
 - Template preservation fix in revision loop
-- Test mode implemented (AGENTOS_TEST_MODE)
+- Test mode implemented (ASSEMBLYZERO_TEST_MODE)
 - [R]/[W] revision options added
 - Progress indicators and timestamps added
 - VS Code markdown preview support added
@@ -896,7 +896,7 @@ User: [S]ave → KeyboardInterrupt → checkpoint saved (node pending) → resum
 
 2. **Poetry run in resume commands:** All printed resume instructions now include `poetry run` prefix
 
-3. **Database isolation:** `AGENTOS_WORKFLOW_DB` env var for worktree-isolated testing
+3. **Database isolation:** `ASSEMBLYZERO_WORKFLOW_DB` env var for worktree-isolated testing
 
 ---
 
@@ -904,7 +904,7 @@ User: [S]ave → KeyboardInterrupt → checkpoint saved (node pending) → resum
 
 **End-to-end test:**
 ```bash
-AGENTOS_WORKFLOW_DB=./test.db AGENTOS_TEST_MODE=1 poetry run python tools/run_issue_workflow.py --brief test.md
+ASSEMBLYZERO_WORKFLOW_DB=./test.db ASSEMBLYZERO_TEST_MODE=1 poetry run python tools/run_issue_workflow.py --brief test.md
 ```
 
 - Ran 25 iterations (hit max turns)
@@ -1037,7 +1037,7 @@ Verify the conditional logic exists:
 import inspect
 source = inspect.getsource(file_issue)
 
-has_auto_check = 'if os.environ.get("AGENTOS_AUTO_MODE") == "1":' in source
+has_auto_check = 'if os.environ.get("ASSEMBLYZERO_AUTO_MODE") == "1":' in source
 has_folder_call = 'open_vscode_folder' in source
 
 assert has_auto_check and has_folder_call
@@ -1054,8 +1054,8 @@ Actually let VS Code spawn (no TEST_MODE):
 
 ```python
 # No TEST_MODE - real behavior
-if "AGENTOS_TEST_MODE" in os.environ:
-    del os.environ["AGENTOS_TEST_MODE"]
+if "ASSEMBLYZERO_TEST_MODE" in os.environ:
+    del os.environ["ASSEMBLYZERO_TEST_MODE"]
 
 initial = count_vscode_processes()
 
@@ -1206,7 +1206,7 @@ python -m py_compile myfile.py
 
 ```python
 # WRONG: Doesn't prove real behavior works
-AGENTOS_TEST_MODE=1 python script.py
+ASSEMBLYZERO_TEST_MODE=1 python script.py
 assert "success"  # TEST_MODE might skip the bug
 ```
 
@@ -2503,8 +2503,8 @@ python -c "import ast; ast.parse(open('$file').read())"
 
 After any code change:
 ```bash
-AGENTOS_TEST_MODE=1 poetry run python tools/run_issue_workflow.py --brief test.md
-AGENTOS_TEST_MODE=1 poetry run python tools/run_lld_workflow.py --issue 999 --mock
+ASSEMBLYZERO_TEST_MODE=1 poetry run python tools/run_issue_workflow.py --brief test.md
+ASSEMBLYZERO_TEST_MODE=1 poetry run python tools/run_lld_workflow.py --issue 999 --mock
 ```
 
 ---
@@ -2566,9 +2566,9 @@ Implemented and tested `--all` option for batch processing of briefs/issues. Fou
 
 **Problem:** When hitting recursion limit (25 iterations), code tried to prompt user with `input()`. In auto mode with no stdin, this crashed with `EOFError`.
 
-**Fix:** Added `AGENTOS_AUTO_MODE` check alongside existing `AGENTOS_TEST_MODE`:
+**Fix:** Added `ASSEMBLYZERO_AUTO_MODE` check alongside existing `ASSEMBLYZERO_TEST_MODE`:
 ```python
-if os.environ.get("AGENTOS_TEST_MODE") == "1" or os.environ.get("AGENTOS_AUTO_MODE") == "1":
+if os.environ.get("ASSEMBLYZERO_TEST_MODE") == "1" or os.environ.get("ASSEMBLYZERO_AUTO_MODE") == "1":
     choice = "S"  # Auto-save and continue
 ```
 
@@ -2578,9 +2578,9 @@ if os.environ.get("AGENTOS_TEST_MODE") == "1" or os.environ.get("AGENTOS_AUTO_MO
 
 **Problem:** When an in-progress workflow exists (slug collision), code prompted for Resume/New/Clean/Abort. In auto mode, this crashed.
 
-**Fix:** Added `AGENTOS_AUTO_MODE` check to auto-resume:
+**Fix:** Added `ASSEMBLYZERO_AUTO_MODE` check to auto-resume:
 ```python
-if os.environ.get("AGENTOS_AUTO_MODE") == "1":
+if os.environ.get("ASSEMBLYZERO_AUTO_MODE") == "1":
     choice = "R"  # Auto-resume existing workflow
 ```
 

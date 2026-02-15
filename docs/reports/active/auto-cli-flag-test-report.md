@@ -16,7 +16,7 @@ poetry run --directory /c/Users/mcwiz/Projects/AssemblyZero-auto-cli-flag python
 Testing --auto CLI Flag Implementation
 ============================================================
 
-Test 1 PASS: --auto flag sets AGENTOS_AUTO_MODE=1
+Test 1 PASS: --auto flag sets ASSEMBLYZERO_AUTO_MODE=1
 
 Test 2a PASS: Auto-send check (line 144) returns True
 Test 2b PASS: VS Code skip check (line 209) returns True
@@ -33,12 +33,12 @@ ALL TESTS PASSED
 ## Test Descriptions
 
 ### Test 1: Flag Sets Environment Variable
-Verifies that passing `--auto` to `run_issue_workflow.py` correctly sets `AGENTOS_AUTO_MODE=1` in the environment.
+Verifies that passing `--auto` to `run_issue_workflow.py` correctly sets `ASSEMBLYZERO_AUTO_MODE=1` in the environment.
 
 **Method:** Simulates argparse with `['run_issue_workflow.py', '--select', '--auto']` and verifies env var is set.
 
 ### Test 2: Auto Mode Code Paths
-Verifies all four locations that check `AGENTOS_AUTO_MODE` work correctly:
+Verifies all four locations that check `ASSEMBLYZERO_AUTO_MODE` work correctly:
 
 | Test | File | Line | Check |
 |------|------|------|-------|
@@ -48,7 +48,7 @@ Verifies all four locations that check `AGENTOS_AUTO_MODE` work correctly:
 | 2d | `file_issue.py` | 375 | `== "1"` for done folder |
 
 ### Test 3: TEST_MODE Priority
-Verifies that when both `AGENTOS_TEST_MODE` and `AGENTOS_AUTO_MODE` are set, TEST_MODE takes priority (expected behavior per code structure at lines 138-147).
+Verifies that when both `ASSEMBLYZERO_TEST_MODE` and `ASSEMBLYZERO_AUTO_MODE` are set, TEST_MODE takes priority (expected behavior per code structure at lines 138-147).
 
 ## Additional Verification
 
@@ -78,7 +78,7 @@ The module docstring at `run_issue_workflow.py:1-18` includes:
 
 ## Coverage
 
-All code paths that check `AGENTOS_AUTO_MODE` have been verified:
+All code paths that check `ASSEMBLYZERO_AUTO_MODE` have been verified:
 - 4/4 env var checks tested
 - Argument parsing tested
 - Help output verified

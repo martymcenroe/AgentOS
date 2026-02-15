@@ -82,7 +82,7 @@ tests/test_issue_workflow.py::TestWorkflowResumeIntegration::test_workflow_resum
 
 | Test | Description | Result |
 |------|-------------|--------|
-| test_checkpoint_db_path_env_var | Verifies AGENTOS_WORKFLOW_DB env var works | PASSED |
+| test_checkpoint_db_path_env_var | Verifies ASSEMBLYZERO_WORKFLOW_DB env var works | PASSED |
 | test_checkpoint_db_path_default | Verifies default path behavior | PASSED |
 | test_sqlite_checkpointer_saves_state | Verifies SQLite persists state | PASSED |
 | test_workflow_resume_from_checkpoint | Verifies resume mechanism works | PASSED |
@@ -93,8 +93,8 @@ tests/test_issue_workflow.py::TestWorkflowResumeIntegration::test_workflow_resum
 
 1. Started workflow:
    ```bash
-   AGENTOS_WORKFLOW_DB=./.worktree-data/test.db \
-   AGENTOS_TEST_MODE=1 \
+   ASSEMBLYZERO_WORKFLOW_DB=./.worktree-data/test.db \
+   ASSEMBLYZERO_TEST_MODE=1 \
    python tools/run_issue_workflow.py --brief test-resume-brief.md
    ```
 

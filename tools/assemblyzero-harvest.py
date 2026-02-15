@@ -32,8 +32,8 @@ except ImportError:
 
 
 # AssemblyZero root (where this script lives)
-AGENTOS_ROOT = Path(__file__).parent.parent.resolve()
-REGISTRY_PATH = AGENTOS_ROOT / ".claude" / "project-registry.json"
+ASSEMBLYZERO_ROOT = Path(__file__).parent.parent.resolve()
+REGISTRY_PATH = ASSEMBLYZERO_ROOT / ".claude" / "project-registry.json"
 
 
 @dataclass
@@ -72,7 +72,7 @@ def load_registry() -> dict:
 
 def get_assemblyzero_commands() -> set:
     """Get set of command names in AssemblyZero."""
-    commands_dir = AGENTOS_ROOT / ".claude" / "commands"
+    commands_dir = ASSEMBLYZERO_ROOT / ".claude" / "commands"
     if not commands_dir.exists():
         return set()
     return {f.stem for f in commands_dir.glob("*.md")}
@@ -80,7 +80,7 @@ def get_assemblyzero_commands() -> set:
 
 def get_assemblyzero_tools() -> set:
     """Get set of tool names in AssemblyZero."""
-    tools_dir = AGENTOS_ROOT / ".claude" / "tools"
+    tools_dir = ASSEMBLYZERO_ROOT / ".claude" / "tools"
     if not tools_dir.exists():
         return set()
     # Include both shell scripts and other tools
@@ -92,7 +92,7 @@ def get_assemblyzero_tools() -> set:
 
 def get_assemblyzero_templates() -> set:
     """Get set of template directories/patterns in AssemblyZero."""
-    templates_dir = AGENTOS_ROOT / ".claude" / "templates"
+    templates_dir = ASSEMBLYZERO_ROOT / ".claude" / "templates"
     if not templates_dir.exists():
         return set()
     # Get subdirectory names (e.g., gemini-prompts)
@@ -205,7 +205,7 @@ def scan_project_permissions(project_path: Path, project_name: str) -> list:
     allow_patterns = settings.get("permissions", {}).get("allow", [])
 
     # Load AssemblyZero base permissions for comparison
-    assemblyzero_settings = AGENTOS_ROOT / ".claude" / "settings.local.json"
+    assemblyzero_settings = ASSEMBLYZERO_ROOT / ".claude" / "settings.local.json"
     assemblyzero_allow = set()
     if assemblyzero_settings.exists():
         try:
@@ -240,7 +240,7 @@ def scan_claude_md(project_path: Path, project_name: str) -> list:
     """Check for CLAUDE.md sections that duplicate AssemblyZero content."""
     candidates = []
     project_claude = project_path / "CLAUDE.md"
-    assemblyzero_claude = AGENTOS_ROOT / "CLAUDE.md"
+    assemblyzero_claude = ASSEMBLYZERO_ROOT / "CLAUDE.md"
 
     if not project_claude.exists() or not assemblyzero_claude.exists():
         return candidates

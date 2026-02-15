@@ -101,7 +101,7 @@ Progress is displayed in real-time with colored status indicators:
 
 ### Logs
 
-All output is logged to `$AGENTOS_ROOT/logs/batch/`:
+All output is logged to `$ASSEMBLYZERO_ROOT/logs/batch/`:
 
 ```
 logs/batch/

@@ -308,12 +308,12 @@ When `--auto` is passed:
 - Opens the `done/` folder in VS Code at the END for post-hoc review
 
 ```
-AGENTOS_AUTO_MODE=1
+ASSEMBLYZERO_AUTO_MODE=1
 ```
 
 ### Test Mode
 
-When `AGENTOS_TEST_MODE=1`:
+When `ASSEMBLYZERO_TEST_MODE=1`:
 - Auto-selects first idea
 - Auto-sends to Gemini
 - Auto-approves verdicts

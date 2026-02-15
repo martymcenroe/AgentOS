@@ -855,7 +855,7 @@ class TestWorkflowResumeIntegration:
     """
 
     def test_checkpoint_db_path_env_var(self):
-        """Test that AGENTOS_WORKFLOW_DB environment variable works."""
+        """Test that ASSEMBLYZERO_WORKFLOW_DB environment variable works."""
         import os
         from tools.run_issue_workflow import get_checkpoint_db_path
 
@@ -864,17 +864,17 @@ class TestWorkflowResumeIntegration:
             custom_db = tmpdir / "custom.db"
 
             # Set environment variable
-            old_env = os.environ.get("AGENTOS_WORKFLOW_DB")
+            old_env = os.environ.get("ASSEMBLYZERO_WORKFLOW_DB")
             try:
-                os.environ["AGENTOS_WORKFLOW_DB"] = str(custom_db)
+                os.environ["ASSEMBLYZERO_WORKFLOW_DB"] = str(custom_db)
                 result = get_checkpoint_db_path()
                 assert result == custom_db
             finally:
                 # Restore original environment
                 if old_env:
-                    os.environ["AGENTOS_WORKFLOW_DB"] = old_env
+                    os.environ["ASSEMBLYZERO_WORKFLOW_DB"] = old_env
                 else:
-                    os.environ.pop("AGENTOS_WORKFLOW_DB", None)
+                    os.environ.pop("ASSEMBLYZERO_WORKFLOW_DB", None)
 
     def test_checkpoint_db_path_default(self):
         """Test default checkpoint database path."""
@@ -882,15 +882,15 @@ class TestWorkflowResumeIntegration:
         from tools.run_issue_workflow import get_checkpoint_db_path
 
         # Ensure env var is not set
-        old_env = os.environ.get("AGENTOS_WORKFLOW_DB")
+        old_env = os.environ.get("ASSEMBLYZERO_WORKFLOW_DB")
         try:
-            os.environ.pop("AGENTOS_WORKFLOW_DB", None)
+            os.environ.pop("ASSEMBLYZERO_WORKFLOW_DB", None)
             result = get_checkpoint_db_path()
             expected = Path.home() / ".assemblyzero" / "issue_workflow.db"
             assert result == expected
         finally:
             if old_env:
-                os.environ["AGENTOS_WORKFLOW_DB"] = old_env
+                os.environ["ASSEMBLYZERO_WORKFLOW_DB"] = old_env
 
     def test_sqlite_checkpointer_saves_state(self):
         """Test that SQLite checkpointer actually saves workflow state.
