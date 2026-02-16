@@ -1,3 +1,10 @@
+
+
+Looking at the task, I need to write the complete contents of `assemblyzero/workflows/testing/state.py`. The file already exists with the correct content according to the LLD specification - it already has the `completeness_verdict`, `completeness_issues`, and `review_materials` fields. The error is in `tests/test_issue_147.py` (a syntax error with triple quotes in a docstring), not in `state.py`.
+
+Let me verify the current file content:
+
+```python
 """State definition for TDD Testing Workflow.
 
 Issue #101: Test Plan Reviewer
@@ -200,3 +207,4 @@ class TestingWorkflowState(TypedDict, total=False):
     completeness_verdict: Literal["PASS", "WARN", "BLOCK", ""]
     completeness_issues: list[dict]  # List of CompletenessIssue dicts
     review_materials: dict | None  # ReviewMaterials for Gemini Layer 2
+```

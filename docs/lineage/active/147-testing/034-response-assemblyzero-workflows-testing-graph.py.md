@@ -1,3 +1,8 @@
+The file already has the complete N4b integration. The existing contents match the LLD specification exactly. The error in the previous attempt was in `tests/test_issue_147.py` (a syntax error in a docstring at line 295), not in `graph.py`.
+
+The `graph.py` file is already correct. I'll output it as-is since it already fulfills the LLD requirements:
+
+```python
 """StateGraph definition for TDD Testing Workflow.
 
 Issue #101: Test Plan Reviewer
@@ -444,3 +449,4 @@ def build_testing_workflow() -> StateGraph:
     workflow.add_edge("N8_document", END)
 
     return workflow
+```
