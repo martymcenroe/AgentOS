@@ -1,0 +1,208 @@
+{
+  "version": "1.0",
+  "description": "Canonical project structure for AssemblyZero-governed projects. This is the single source of truth — when this schema and 0009-canonical-project-structure.md disagree, the schema is authoritative.",
+  "directories": {
+    "docs": {
+      "required": true,
+      "description": "All documentation",
+      "children": {
+        "adrs": {
+          "required": true,
+          "description": "Architecture Decision Records (0xxxx range)"
+        },
+        "standards": {
+          "required": true,
+          "description": "Project-specific standards (0xxxx range)"
+        },
+        "templates": {
+          "required": true,
+          "description": "Document templates (0xxxx range)"
+        },
+        "lld": {
+          "required": true,
+          "description": "Low-Level Designs",
+          "children": {
+            "active": {
+              "required": true,
+              "description": "In-progress LLDs (1xxxx-lld.md)"
+            },
+            "done": {
+              "required": true,
+              "description": "Completed LLDs (1xxxx-lld.md)"
+            }
+          }
+        },
+        "reports": {
+          "required": true,
+          "description": "Implementation and test reports",
+          "children": {
+            "active": {
+              "required": true,
+              "description": "In-progress reports (1xxxx-*-report.md)"
+            },
+            "done": {
+              "required": true,
+              "description": "Completed reports (1xxxx-*-report.md)"
+            }
+          }
+        },
+        "lineage": {
+          "required": true,
+          "description": "Workflow artifacts (design review trail)",
+          "children": {
+            "active": {
+              "required": true,
+              "description": "Issues currently in design review"
+            },
+            "done": {
+              "required": true,
+              "description": "Completed (filed to GitHub)"
+            }
+          }
+        },
+        "runbooks": {
+          "required": true,
+          "description": "Operational procedures (3xxxx range)"
+        },
+        "session-logs": {
+          "required": true,
+          "description": "Agent session context (YYYY-MM-DD.md)"
+        },
+        "audit-results": {
+          "required": true,
+          "description": "Historical audit outputs (YYYY-MM-DD.md)"
+        },
+        "media": {
+          "required": true,
+          "description": "Artwork, videos, tutorials (4xxxx range)"
+        },
+        "legal": {
+          "required": true,
+          "description": "ToS, privacy policy, regulatory compliance"
+        },
+        "design": {
+          "required": true,
+          "description": "UI mockups, icon prompts, style guides"
+        }
+      }
+    },
+    "tests": {
+      "required": true,
+      "description": "All tests",
+      "children": {
+        "unit": {
+          "required": true,
+          "description": "Fast, isolated tests"
+        },
+        "integration": {
+          "required": true,
+          "description": "Multiple components together"
+        },
+        "e2e": {
+          "required": true,
+          "description": "End-to-end browser/system tests"
+        },
+        "smoke": {
+          "required": true,
+          "description": "Quick sanity/environment tests"
+        },
+        "contract": {
+          "required": true,
+          "description": "Extension<->backend API agreements"
+        },
+        "visual": {
+          "required": true,
+          "description": "Visual regression testing"
+        },
+        "benchmark": {
+          "required": true,
+          "description": "Performance, load, latency"
+        },
+        "security": {
+          "required": true,
+          "description": "Red-team, adversarial, penetration"
+        },
+        "accessibility": {
+          "required": true,
+          "description": "ARIA, WCAG, screen readers"
+        },
+        "compliance": {
+          "required": true,
+          "description": "Privacy, GDPR, regulatory"
+        },
+        "fixtures": {
+          "required": true,
+          "description": "Test data (JSON, HTML, seeds)"
+        },
+        "harness": {
+          "required": true,
+          "description": "Test utilities, helpers, mocks"
+        }
+      }
+    },
+    "src": {
+      "required": false,
+      "description": "Application source code"
+    },
+    "tools": {
+      "required": false,
+      "description": "Development utilities (project-specific)"
+    },
+    "data": {
+      "required": false,
+      "description": "App data: examples, templates, seeds"
+    },
+    ".claude": {
+      "required": true,
+      "description": "Claude Code configuration",
+      "children": {
+        "hooks": {
+          "required": false,
+          "description": "Pre/post tool execution scripts"
+        },
+        "commands": {
+          "required": false,
+          "description": "Custom slash commands"
+        },
+        "gemini-prompts": {
+          "required": false,
+          "description": "Gemini review templates"
+        }
+      }
+    }
+  },
+  "files": {
+    "CLAUDE.md": {
+      "required": true,
+      "description": "Claude agent instructions"
+    },
+    "GEMINI.md": {
+      "required": true,
+      "description": "Gemini agent instructions"
+    },
+    "README.md": {
+      "required": true,
+      "description": "Project overview"
+    },
+    ".gitignore": {
+      "required": true,
+      "description": "Git ignore rules"
+    },
+    "LICENSE": {
+      "required": true,
+      "description": "Project license"
+    },
+    ".claude/project.json": {
+      "required": true,
+      "description": "Project variables for AssemblyZero"
+    },
+    ".claude/settings.json": {
+      "required": true,
+      "description": "Hook configuration"
+    },
+    "docs/00003-file-inventory.md": {
+      "required": true,
+      "description": "Project file inventory"
+    }
+  }
+}
