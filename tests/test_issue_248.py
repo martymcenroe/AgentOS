@@ -29,6 +29,7 @@ from assemblyzero.workflows.requirements.nodes.review import (
 from assemblyzero.workflows.requirements.graph import (
     route_after_generate_draft,
     route_after_validate_mechanical,
+    route_after_validate_test_plan,
     route_after_review,
 )
 
@@ -212,14 +213,23 @@ def test_t010(draft_with_open_questions, mock_state_base):
     state["lld_status"] = "PENDING"  # Not BLOCKED
     result_after_validation = route_after_validate_mechanical(state)
 
+    # Issue #166: After mechanical validation, go to test plan validation
+    state["test_plan_validation_result"] = {"passed": True}
+    state["error_message"] = ""
+    result_after_test_plan = route_after_validate_test_plan(state)
+
     # TDD: Assert
     # Step 1: After draft, LLD workflows go to mechanical validation
     assert result_after_draft == "N1_5_validate_mechanical", \
         "LLD workflows should go to mechanical validation after draft (Issue #277)"
 
-    # Step 2: After validation passes (no BLOCKED), proceed to review
-    assert result_after_validation == "N3_review", \
-        "After validation passes with gates disabled, should proceed to review"
+    # Step 2: After mechanical validation passes, go to test plan validation (Issue #166)
+    assert result_after_validation == "N1b_validate_test_plan", \
+        "After mechanical validation passes, should proceed to test plan validation"
+
+    # Step 3: After test plan validation passes, proceed to review
+    assert result_after_test_plan == "N3_review", \
+        "After test plan validation passes with gates disabled, should proceed to review"
 
 
 def test_t020(draft_with_open_questions, verdict_with_resolved_questions):
@@ -373,13 +383,22 @@ def test_010(draft_with_open_questions, mock_state_base):
     state["lld_status"] = "PENDING"  # Not BLOCKED
     route_after_validation = route_after_validate_mechanical(state)
 
+    # Issue #166: After mechanical validation, go to test plan validation
+    state["test_plan_validation_result"] = {"passed": True}
+    state["error_message"] = ""
+    route_after_test_plan = route_after_validate_test_plan(state)
+
     # TDD: Assert
     assert has_questions, "Draft should have unchecked open questions"
-    # Issue #277: LLD workflows go to N1.5 first, then N3 when validation passes
+    # Issue #277: LLD workflows go to N1.5 first
     assert route_after_draft == "N1_5_validate_mechanical", \
         "LLD workflows go to mechanical validation after draft"
-    assert route_after_validation == "N3_review", \
-        "Should proceed to review despite open questions (after validation passes)"
+    # Issue #166: Then N1b test plan validation
+    assert route_after_validation == "N1b_validate_test_plan", \
+        "After mechanical validation passes, go to test plan validation"
+    # Then to review
+    assert route_after_test_plan == "N3_review", \
+        "Should proceed to review despite open questions (after test plan validation passes)"
 
 
 def test_020(draft_with_open_questions, verdict_with_resolved_questions):

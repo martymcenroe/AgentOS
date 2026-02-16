@@ -4,6 +4,10 @@ Submits the test plan to Gemini for coverage analysis:
 - Checks 100% requirement coverage (ADR 0207)
 - Ensures no human delegation (real tests required)
 - Validates test types match LLD content
+
+Issue #166: Requirement coverage utilities moved to shared module
+at assemblyzero.core.validation. Legacy functions preserved as
+thin wrappers for backward compatibility.
 """
 
 import re
@@ -29,6 +33,7 @@ REVIEW_PROMPT_PATH = Path("docs/skills/0706c-Test-Plan-Review-Prompt.md")
 
 # =============================================================================
 # Requirement Coverage Utilities (ADR 0207)
+# Issue #166: Core logic now in assemblyzero.core.validation.test_plan_validator
 # =============================================================================
 
 

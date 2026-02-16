@@ -4,21 +4,23 @@ Issue #101: Unified Requirements Workflow
 Issue #248: Add conditional edge for question-loop after review
 Issue #277: Add mechanical validation node before human gate
 Issue #334: Print validation errors in route_after_validate function
+Issue #166: Add test plan validation node (N1b) after mechanical validation
 
 Creates a LangGraph StateGraph that connects:
 - N0: load_input (brief or issue loading)
 - N1: generate_draft (pluggable drafter)
 - N1.5: validate_lld_mechanical (mechanical validation - Issue #277)
+- N1b: validate_test_plan (test plan coverage validation - Issue #166)
 - N2: human_gate_draft (human checkpoint)
 - N3: review (pluggable reviewer)
 - N4: human_gate_verdict (human checkpoint)
 - N5: finalize (issue filing or LLD saving)
 
 Graph structure:
-    START -> N0 -> N1 -> N1.5 -> N2 -> N3 -> N4 -> N5 -> END
-                    ^                   |         |
-                    |                   v         |
-                    +-------<-----------+---------+
+    START -> N0 -> N1 -> N1.5 -> N1b -> N2 -> N3 -> N4 -> N5 -> END
+                    ^                          |         |
+                    |                          v         |
+                    +----------<---------------+---------+
 
 Issue #248 addition: After N3 (review), if open questions are UNANSWERED,
 loop back to N3 with a followup prompt. If HUMAN_REQUIRED, force N4.
@@ -26,8 +28,11 @@ loop back to N3 with a followup prompt. If HUMAN_REQUIRED, force N4.
 Issue #277 addition: N1.5 validates LLD structure mechanically (paths, sections)
 before any human or LLM review. Blocks on errors, warns on issues.
 
-Issue #334 addition: Validation errors are now printed to console in 
+Issue #334 addition: Validation errors are now printed to console in
 route_after_validate_mechanical for immediate user feedback.
+
+Issue #166 addition: N1b validates test plan coverage, vague assertions,
+and human delegation before Gemini review.
 
 Routing is controlled by:
 - error_message: Non-empty routes to END
@@ -49,6 +54,7 @@ from assemblyzero.workflows.requirements.nodes import (
     load_input,
     review,
     validate_lld_mechanical,
+    validate_test_plan_node,
 )
 from assemblyzero.workflows.requirements.nodes.validate_mechanical import (
     print_validation_errors,
@@ -63,6 +69,7 @@ from assemblyzero.workflows.requirements.state import RequirementsWorkflowState
 N0_LOAD_INPUT = "N0_load_input"
 N1_GENERATE_DRAFT = "N1_generate_draft"
 N1_5_VALIDATE_MECHANICAL = "N1_5_validate_mechanical"  # Issue #277
+N1B_VALIDATE_TEST_PLAN = "N1b_validate_test_plan"  # Issue #166
 N2_HUMAN_GATE_DRAFT = "N2_human_gate_draft"
 N3_REVIEW = "N3_review"
 N4_HUMAN_GATE_VERDICT = "N4_human_gate_verdict"
@@ -132,15 +139,15 @@ def route_after_generate_draft(
 
 def route_after_validate_mechanical(
     state: RequirementsWorkflowState,
-) -> Literal["N2_human_gate_draft", "N3_review", "N1_generate_draft", "END"]:
+) -> Literal["N1b_validate_test_plan", "N1_generate_draft", "END"]:
     """Route after validate_lld_mechanical node.
 
     Issue #277: Routes based on validation result.
     Issue #334: Prints validation errors to console for immediate feedback.
+    Issue #166: On pass, routes to N1b (test plan validation) instead of N2.
 
     Routes to:
-    - N2_human_gate_draft: Validation passed, gate enabled
-    - N3_review: Validation passed, gate disabled
+    - N1b_validate_test_plan: Validation passed (Issue #166)
     - N1_generate_draft: Validation failed (BLOCKED), return to drafter
     - END: Error or max iterations reached
 
@@ -156,7 +163,7 @@ def route_after_validate_mechanical(
         validation_errors = state.get("validation_errors", [])
         if validation_errors:
             print_validation_errors(validation_errors)
-        
+
         # Check max iterations before looping back
         iteration_count = state.get("iteration_count", 0)
         max_iterations = state.get("max_iterations", 20)
@@ -164,6 +171,44 @@ def route_after_validate_mechanical(
             print(f"    [ROUTING] Max iterations ({max_iterations}) reached with validation errors - ending")
             return "END"
         print("    [ROUTING] Mechanical validation failed - returning to drafter")
+        return "N1_generate_draft"
+
+    # Issue #166: Validation passed - proceed to test plan validation
+    return "N1b_validate_test_plan"
+
+
+def route_after_validate_test_plan(
+    state: RequirementsWorkflowState,
+) -> Literal["N2_human_gate_draft", "N3_review", "N1_generate_draft", "END"]:
+    """Route after validate_test_plan node.
+
+    Issue #166: Routes based on test plan validation result.
+
+    Routes to:
+    - N2_human_gate_draft: Validation passed, gate enabled
+    - N3_review: Validation passed, gate disabled
+    - N1_generate_draft: Validation failed, return to drafter
+    - END: Error or escalation (max attempts reached)
+
+    Args:
+        state: Current workflow state.
+
+    Returns:
+        Next node name.
+    """
+    if state.get("error_message"):
+        return "END"
+
+    # Check if test plan validation failed (lld_status set to BLOCKED by node)
+    result = state.get("test_plan_validation_result")
+    if result and not result.get("passed", False):
+        # Check max iterations before looping back
+        iteration_count = state.get("iteration_count", 0)
+        max_iterations = state.get("max_iterations", 20)
+        if iteration_count >= max_iterations:
+            print(f"    [ROUTING] Max iterations ({max_iterations}) reached with test plan errors - ending")
+            return "END"
+        print("    [ROUTING] Test plan validation failed - returning to drafter")
         return "N1_generate_draft"
 
     # Validation passed - proceed to human gate or review
@@ -310,13 +355,15 @@ def create_requirements_graph() -> StateGraph:
     """Create the requirements workflow graph.
 
     Graph structure:
-        START -> N0 -> N1 -> N2 -> N3 -> N4 -> N5 -> END
-                        ^          |         |
-                        |          v         |
-                        +-----<----+---------+
+        START -> N0 -> N1 -> N1.5 -> N1b -> N2 -> N3 -> N4 -> N5 -> END
+                        ^                          |         |
+                        |                          v         |
+                        +----------<---------------+---------+
 
     Issue #248: N3 can now loop back to N1 when open questions are
     unanswered, or force N4 when questions require human decision.
+
+    Issue #166: N1b validates test plan coverage after structural validation.
 
     Returns:
         Uncompiled StateGraph.
@@ -328,6 +375,7 @@ def create_requirements_graph() -> StateGraph:
     graph.add_node(N0_LOAD_INPUT, load_input)
     graph.add_node(N1_GENERATE_DRAFT, generate_draft)
     graph.add_node(N1_5_VALIDATE_MECHANICAL, validate_lld_mechanical)  # Issue #277
+    graph.add_node(N1B_VALIDATE_TEST_PLAN, validate_test_plan_node)  # Issue #166
     graph.add_node(N2_HUMAN_GATE_DRAFT, human_gate_draft)
     graph.add_node(N3_REVIEW, review)
     graph.add_node(N4_HUMAN_GATE_VERDICT, human_gate_verdict)
@@ -360,12 +408,24 @@ def create_requirements_graph() -> StateGraph:
         },
     )
 
-    # N1.5 -> N2 or N3 or N1 or END (based on validation result)
+    # N1.5 -> N1b or N1 or END (based on validation result)
     # Issue #277: Mechanical validation routes based on BLOCKED status
-    # Issue #334: Prints validation errors before routing back to drafter
+    # Issue #166: On pass, routes to N1b (test plan validation)
     graph.add_conditional_edges(
         N1_5_VALIDATE_MECHANICAL,
         route_after_validate_mechanical,
+        {
+            "N1b_validate_test_plan": N1B_VALIDATE_TEST_PLAN,
+            "N1_generate_draft": N1_GENERATE_DRAFT,
+            "END": END,
+        },
+    )
+
+    # N1b -> N2 or N3 or N1 or END (based on test plan validation)
+    # Issue #166: Test plan validation routes
+    graph.add_conditional_edges(
+        N1B_VALIDATE_TEST_PLAN,
+        route_after_validate_test_plan,
         {
             "N2_human_gate_draft": N2_HUMAN_GATE_DRAFT,
             "N3_review": N3_REVIEW,
