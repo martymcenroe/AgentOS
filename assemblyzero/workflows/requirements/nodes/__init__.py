@@ -2,11 +2,13 @@
 
 Issue #101: Unified Requirements Workflow
 Issue #277: Added mechanical validation node
+Issue #166: Added test plan validation node
 
 Nodes:
 - N0 load_input: Load brief (issue workflow) or fetch issue (LLD workflow)
 - N1 generate_draft: Generate draft using pluggable drafter
 - N1.5 validate_lld_mechanical: Mechanical validation before human gate (Issue #277)
+- N1b validate_test_plan: Mechanical test plan validation (Issue #166)
 - N2 human_gate_draft: Human checkpoint after draft generation
 - N3 review: Review draft using pluggable reviewer
 - N4 human_gate_verdict: Human checkpoint after review
@@ -24,11 +26,15 @@ from assemblyzero.workflows.requirements.nodes.review import review
 from assemblyzero.workflows.requirements.nodes.validate_mechanical import (
     validate_lld_mechanical,
 )
+from assemblyzero.workflows.requirements.nodes.validate_test_plan import (
+    validate_test_plan_node,
+)
 
 __all__ = [
     "load_input",
     "generate_draft",
     "validate_lld_mechanical",
+    "validate_test_plan_node",
     "human_gate_draft",
     "human_gate_verdict",
     "review",

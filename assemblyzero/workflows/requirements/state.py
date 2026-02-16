@@ -216,6 +216,10 @@ class RequirementsWorkflowState(TypedDict, total=False):
     validation_errors: list[str]
     validation_warnings: list[str]
 
+    # Test plan validation (Issue #166)
+    test_plan_validation_result: dict | None
+    test_plan_validation_attempts: int
+
     # Git commit tracking (Issue #162)
     created_files: list[str]
     commit_sha: str
@@ -311,6 +315,9 @@ def create_initial_state(
         # Mechanical validation (Issue #277)
         "validation_errors": [],
         "validation_warnings": [],
+        # Test plan validation (Issue #166)
+        "test_plan_validation_result": None,
+        "test_plan_validation_attempts": 0,
         # Git commit tracking (Issue #162)
         "created_files": [],
         "commit_sha": "",
