@@ -1,3 +1,6 @@
+
+
+```python
 """State definition for TDD Testing Workflow.
 
 Issue #101: Test Plan Reviewer
@@ -200,3 +203,4 @@ class TestingWorkflowState(TypedDict, total=False):
     completeness_verdict: Literal["PASS", "WARN", "BLOCK", ""]
     completeness_issues: list[dict]  # List of CompletenessIssue dicts
     review_materials: dict | None  # ReviewMaterials for Gemini Layer 2
+```

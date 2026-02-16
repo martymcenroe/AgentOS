@@ -1,3 +1,10 @@
+
+
+Looking at the task, the file to modify is `assemblyzero/workflows/testing/nodes/__init__.py`. The LLD says to "Export completeness_gate node" and the existing file contents already have the correct imports and exports. The error is in `tests/test_issue_147.py` (a syntax error with triple quotes in a docstring), not in this `__init__.py` file.
+
+The `__init__.py` file is already correct as shown in the "Existing File Contents" section. The `completeness_gate` is already imported and exported. Let me verify this is indeed the file I need to write:
+
+```python
 """Node implementations for TDD Testing Workflow.
 
 Issue #101: Test Plan Reviewer
@@ -49,3 +56,4 @@ __all__ = [
     "document",
     "validate_commit_message",
 ]
+```
