@@ -122,5 +122,21 @@ def _build_validation_feedback(result: dict) -> str:
         lines.append("")
 
     lines.append("Please revise the LLD to address the errors above.")
+    lines.append("")
+    lines.append("### Format Requirements (CRITICAL)")
+    lines.append("")
+    lines.append("**Section 3 (Requirements):** MUST use numbered list format:")
+    lines.append("```")
+    lines.append("1. First requirement text")
+    lines.append("2. Second requirement text")
+    lines.append("```")
+    lines.append("Do NOT use tables, bullet points, or REQ-ID prefixes in Section 3.")
+    lines.append("")
+    lines.append("**Section 10.1 (Test Scenarios):** Each test scenario MUST reference "
+                 "its requirement in the Scenario column using `(REQ-N)` suffix:")
+    lines.append("```")
+    lines.append("| 010 | Create logger with defaults (REQ-1) | Auto | ... |")
+    lines.append("| 020 | Log directory auto-created (REQ-2) | Auto | ... |")
+    lines.append("```")
 
     return "\n".join(lines)
