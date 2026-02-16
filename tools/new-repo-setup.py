@@ -23,11 +23,13 @@ See: docs/standards/0009-canonical-project-structure.md
 
 import argparse
 import json
+import logging
 import re
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 # Import AssemblyZero config for path resolution
 try:
@@ -38,48 +40,250 @@ except ImportError:
     from assemblyzero_config import config
 
 
-# Directory structure per 0009 standard
-DOCS_STRUCTURE = [
-    "docs/adrs",
-    "docs/standards",
-    "docs/templates",
-    "docs/lld/active",
-    "docs/lld/done",
-    "docs/reports/active",
-    "docs/reports/done",
-    "docs/runbooks",
-    "docs/session-logs",
-    "docs/audit-results",
-    "docs/media",   # 4xxxx range: artwork, videos, tutorials
-    "docs/legal",   # ToS, privacy policy, regulatory compliance
-    "docs/design",  # UI mockups, icon prompts, style guides
-    "docs/lineage/active",  # Design review artifacts (active)
-    "docs/lineage/done",    # Design review artifacts (archived)
-]
+# ---------------------------------------------------------------------------
+# Schema types and exceptions
+# ---------------------------------------------------------------------------
 
-TESTS_STRUCTURE = [
-    "tests/unit",
-    "tests/integration",
-    "tests/e2e",
-    "tests/contract",
-    "tests/visual",
-    "tests/benchmark",
-    "tests/security",
-    "tests/accessibility",
-    "tests/compliance",
-    "tests/fixtures",
-    "tests/harness",
-    "tests/smoke",  # Quick sanity/environment tests
-]
+class SchemaValidationError(Exception):
+    """Raised when schema structure is invalid."""
+    pass
 
-OTHER_STRUCTURE = [
-    "src",
-    "tools",
-    "data",  # App data: examples, templates, seeds
-    ".claude/hooks",
-    ".claude/commands",
-    ".claude/gemini-prompts",
-]
+
+# ---------------------------------------------------------------------------
+# Schema-driven structure functions (Issue #99 / LLD-099)
+# ---------------------------------------------------------------------------
+
+# Default schema location: co-located with standard 0009
+_DEFAULT_SCHEMA_PATH = Path(__file__).parent.parent / "docs" / "standards" / "0009-structure-schema.json"
+
+
+def load_structure_schema(schema_path: Path | None = None) -> dict:
+    """Load and validate the project structure schema from JSON file.
+
+    Args:
+        schema_path: Path to schema file. Defaults to standard location.
+
+    Returns:
+        Parsed and validated schema dictionary.
+
+    Raises:
+        FileNotFoundError: If schema file doesn't exist.
+        json.JSONDecodeError: If schema is invalid JSON.
+        SchemaValidationError: If schema structure is invalid.
+    """
+    path = schema_path or _DEFAULT_SCHEMA_PATH
+    if not path.exists():
+        raise FileNotFoundError(f"Schema file not found: {path}")
+
+    text = path.read_text(encoding="utf-8")
+    schema = json.loads(text)
+
+    # Validate required top-level keys
+    for key in ("version", "directories", "files"):
+        if key not in schema:
+            raise SchemaValidationError(
+                f"Schema missing required key: '{key}'"
+            )
+
+    # Security validation
+    validate_paths_no_traversal(schema)
+
+    return schema
+
+
+def _flatten_dirs_recursive(
+    entries: dict, prefix: str = "", required_only: bool = False
+) -> list[str]:
+    """Recursively flatten nested directory entries into path list."""
+    result = []
+    for name, entry in entries.items():
+        path = f"{prefix}{name}" if not prefix else f"{prefix}/{name}"
+        if required_only and not entry.get("required", True):
+            continue
+        result.append(path)
+        children = entry.get("children")
+        if children:
+            result.extend(
+                _flatten_dirs_recursive(children, path, required_only)
+            )
+    return result
+
+
+def flatten_directories(
+    schema: dict, required_only: bool = False
+) -> list[str]:
+    """Flatten nested directory structure into list of paths.
+
+    Args:
+        schema: The loaded project structure schema.
+        required_only: If True, only return required directories.
+
+    Returns:
+        List of directory paths relative to project root.
+    """
+    return _flatten_dirs_recursive(
+        schema.get("directories", {}), "", required_only
+    )
+
+
+def flatten_files(
+    schema: dict, required_only: bool = False
+) -> list[dict[str, Any]]:
+    """Flatten file definitions into list of file configs.
+
+    Args:
+        schema: The loaded project structure schema.
+        required_only: If True, only return required files.
+
+    Returns:
+        List of file configurations with path and metadata.
+    """
+    result = []
+    for path, entry in schema.get("files", {}).items():
+        if required_only and not entry.get("required", True):
+            continue
+        result.append({"path": path, **entry})
+    return result
+
+
+def validate_paths_no_traversal(schema: dict) -> None:
+    """Validate that no paths in schema contain traversal sequences.
+
+    Raises:
+        SchemaValidationError: If any path contains '..' or is absolute.
+    """
+    all_paths = flatten_directories(schema) + [
+        f["path"] for f in flatten_files(schema)
+    ]
+    for p in all_paths:
+        if ".." in p:
+            raise SchemaValidationError(
+                f"Path traversal detected in schema path: '{p}'"
+            )
+        if p.startswith("/") or p.startswith("\\"):
+            raise SchemaValidationError(
+                f"Absolute path detected in schema path: '{p}'"
+            )
+
+
+def validate_template_files_exist(
+    schema: dict, template_dir: Path
+) -> None:
+    """Validate that all referenced template files exist.
+
+    Raises:
+        SchemaValidationError: If any referenced template file doesn't exist.
+    """
+    for path, entry in schema.get("files", {}).items():
+        template = entry.get("template")
+        if template:
+            template_path = template_dir / template
+            if not template_path.exists():
+                raise SchemaValidationError(
+                    f"Referenced template file not found: '{template}' "
+                    f"(for file '{path}', looked in {template_dir})"
+                )
+
+
+def create_structure(
+    root: Path,
+    schema: dict,
+    force: bool = False,
+    logger: logging.Logger | None = None,
+) -> dict:
+    """Create project directory structure from schema.
+
+    Args:
+        root: Root directory where structure should be created.
+        schema: The loaded project structure schema.
+        force: If True, overwrite existing files. If False, skip existing.
+        logger: Optional logger for progress output.
+
+    Returns:
+        Dict with created_dirs, created_files, skipped_files lists.
+    """
+    result = {"created_dirs": [], "created_files": [], "skipped_files": []}
+
+    # Create directories
+    for dir_path in flatten_directories(schema):
+        full = root / dir_path
+        full.mkdir(parents=True, exist_ok=True)
+        result["created_dirs"].append(dir_path)
+        if logger:
+            logger.info("Created directory: %s", dir_path)
+
+    # Create files (empty placeholders unless template specified)
+    for file_info in flatten_files(schema):
+        path = file_info["path"]
+        full = root / path
+        full.parent.mkdir(parents=True, exist_ok=True)
+
+        if full.exists() and not force:
+            result["skipped_files"].append(path)
+            if logger:
+                logger.info("Skipped (exists): %s", path)
+            continue
+
+        # Create empty file (templates handled by the main workflow,
+        # not the schema create_structure — the main() function writes
+        # actual content for CLAUDE.md, README.md, etc.)
+        full.touch()
+        result["created_files"].append(path)
+        if logger:
+            logger.info("Created file: %s", path)
+
+    return result
+
+
+def audit_project_structure(
+    project_root: Path, schema: dict
+) -> dict:
+    """Validate project structure against schema.
+
+    Args:
+        project_root: Root directory of project to audit.
+        schema: The loaded project structure schema.
+
+    Returns:
+        Dict with missing_required_dirs, missing_required_files,
+        missing_optional_dirs, missing_optional_files, and valid flag.
+    """
+    result = {
+        "missing_required_dirs": [],
+        "missing_required_files": [],
+        "missing_optional_dirs": [],
+        "missing_optional_files": [],
+        "valid": True,
+    }
+
+    # Check all directories
+    all_dirs = flatten_directories(schema)
+    required_dirs = set(flatten_directories(schema, required_only=True))
+
+    for d in all_dirs:
+        if not (project_root / d).exists():
+            if d in required_dirs:
+                result["missing_required_dirs"].append(d)
+                result["valid"] = False
+            else:
+                result["missing_optional_dirs"].append(d)
+
+    # Check all files
+    all_files = flatten_files(schema)
+    required_file_paths = {
+        f["path"] for f in flatten_files(schema, required_only=True)
+    }
+
+    for f in all_files:
+        path = f["path"]
+        if not (project_root / path).exists():
+            if path in required_file_paths:
+                result["missing_required_files"].append(path)
+                result["valid"] = False
+            else:
+                result["missing_optional_files"].append(path)
+
+    return result
 
 
 def validate_name(name: str) -> tuple[bool, str]:
@@ -132,7 +336,7 @@ def run_command(cmd: list[str], cwd: Path | None = None, check: bool = True) -> 
 
 def create_directory_structure(project_path: Path) -> list[str]:
     """
-    Create the canonical directory structure.
+    Create the canonical directory structure from schema.
 
     Args:
         project_path: Path to the project root
@@ -140,8 +344,9 @@ def create_directory_structure(project_path: Path) -> list[str]:
     Returns:
         List of created directories
     """
+    schema = load_structure_schema()
+    all_dirs = flatten_directories(schema)
     created = []
-    all_dirs = DOCS_STRUCTURE + TESTS_STRUCTURE + OTHER_STRUCTURE
 
     for dir_path in all_dirs:
         full_path = project_path / dir_path
@@ -770,7 +975,10 @@ def create_settings_json(project_path: Path) -> None:
 
 def audit_structure(project_path: Path, name: str) -> int:
     """
-    Audit an existing project structure against the canonical standard.
+    Audit an existing project structure against the canonical schema.
+
+    Uses the schema as primary source of truth, supplemented by 0011
+    audit decisions for allowed-missing exemptions.
 
     Args:
         project_path: Path to the project root
@@ -782,26 +990,16 @@ def audit_structure(project_path: Path, name: str) -> int:
     print(f"\nAuditing structure for: {project_path}")
     print("=" * 60)
 
-    missing = []
-    extra = []
+    # Load schema
+    schema = load_structure_schema()
 
-    # Load audit decisions (allowed exceptions)
+    # Load audit decisions (allowed exceptions) from 0011
     assemblyzero_root = Path(config.assemblyzero_root())
     decisions_file = assemblyzero_root / "docs" / "standards" / "0011-audit-decisions.md"
-    allowed_empty = set()
     allowed_missing = set()
 
     if decisions_file.exists():
         content = decisions_file.read_text(encoding='utf-8')
-        # Parse allowed empty directories
-        if "## Allowed Empty Directories" in content:
-            section = content.split("## Allowed Empty Directories")[1].split("##")[0]
-            for line in section.splitlines():
-                if line.strip().startswith("- `"):
-                    pattern = line.split("`")[1].rstrip("/")
-                    allowed_empty.add(pattern)
-
-        # Parse allowed missing directories
         if "## Allowed Missing Directories" in content:
             section = content.split("## Allowed Missing Directories")[1].split("##")[0]
             for line in section.splitlines():
@@ -809,46 +1007,25 @@ def audit_structure(project_path: Path, name: str) -> int:
                     pattern = line.split("`")[1].rstrip("/")
                     allowed_missing.add(pattern)
 
-    # Check required directories
-    all_required = DOCS_STRUCTURE + TESTS_STRUCTURE + OTHER_STRUCTURE
-    for dir_path in all_required:
-        full_path = project_path / dir_path
-        if not full_path.exists():
-            # Check if it's allowed to be missing
-            # Handle both exact matches and wildcard patterns (tests/*)
-            is_allowed = dir_path in allowed_missing
-            if not is_allowed:
-                for pattern in allowed_missing:
-                    if pattern.endswith("/*"):
-                        # Wildcard: tests/* matches tests/unit, tests/e2e, etc.
-                        prefix = pattern[:-2]  # Remove /*
-                        if dir_path.startswith(prefix + "/") or dir_path == prefix:
-                            is_allowed = True
-                            break
-            if not is_allowed:
-                missing.append(dir_path)
+    # Run schema-based audit
+    audit_result = audit_project_structure(project_path, schema)
 
-    # Check required files
-    required_files = ["CLAUDE.md", "GEMINI.md", "README.md", ".gitignore"]
-    for file_name in required_files:
-        file_path = project_path / file_name
-        if not file_path.exists():
-            missing.append(file_name)
+    # Filter out allowed-missing dirs from the required list
+    missing = []
+    for dir_path in audit_result["missing_required_dirs"]:
+        is_allowed = dir_path in allowed_missing
+        if not is_allowed:
+            for pattern in allowed_missing:
+                if pattern.endswith("/*"):
+                    prefix = pattern[:-2]
+                    if dir_path.startswith(prefix + "/") or dir_path == prefix:
+                        is_allowed = True
+                        break
+        if not is_allowed:
+            missing.append(dir_path)
 
-    # Check .claude/project.json
-    project_json = project_path / ".claude" / "project.json"
-    if not project_json.exists():
-        missing.append(".claude/project.json")
-
-    # Check .claude/settings.json
-    settings_json = project_path / ".claude" / "settings.json"
-    if not settings_json.exists():
-        missing.append(".claude/settings.json")
-
-    # Check docs/00003-file-inventory.md (required per 0009 standard)
-    file_inventory = project_path / "docs" / "00003-file-inventory.md"
-    if not file_inventory.exists():
-        missing.append("docs/00003-file-inventory.md")
+    # Add missing required files
+    missing.extend(audit_result["missing_required_files"])
 
     # Report results
     if missing:
@@ -901,6 +1078,11 @@ Examples:
         "--no-github",
         action="store_true",
         help="Skip GitHub repository creation (local only)"
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing files when creating structure (default: skip)"
     )
 
     args = parser.parse_args()

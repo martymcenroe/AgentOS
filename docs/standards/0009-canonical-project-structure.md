@@ -15,6 +15,16 @@ This standard defines the required directory structure, file naming conventions,
 
 ---
 
+## Authoritative Schema
+
+The canonical project structure is defined in machine-readable form:
+- **Schema file:** [`0009-structure-schema.json`](0009-structure-schema.json)
+- **Tool:** `tools/new-repo-setup.py` reads this schema to create and audit projects
+
+When this markdown document and the schema disagree, **the schema is authoritative**.
+
+---
+
 ## Documentation Numbering Scheme (5-Digit)
 
 All documentation uses a 5-digit numbering scheme:
