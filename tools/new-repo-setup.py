@@ -53,6 +53,8 @@ DOCS_STRUCTURE = [
     "docs/media",   # 4xxxx range: artwork, videos, tutorials
     "docs/legal",   # ToS, privacy policy, regulatory compliance
     "docs/design",  # UI mockups, icon prompts, style guides
+    "docs/lineage/active",  # Design review artifacts (active)
+    "docs/lineage/done",    # Design review artifacts (archived)
 ]
 
 TESTS_STRUCTURE = [

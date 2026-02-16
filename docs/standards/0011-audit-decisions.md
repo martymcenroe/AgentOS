@@ -32,6 +32,8 @@ These directories may be empty (with `.gitkeep`) without triggering audit warnin
 - `docs/media/` - Media files added as needed (4xxxx range)
 - `docs/legal/` - Legal docs added for consumer-facing apps
 - `docs/design/` - Design artifacts added for UI/visual projects
+- `docs/lineage/active/` - Populated during design review workflow
+- `docs/lineage/done/` - Populated when design review artifacts are archived
 - `data/` - App data added as needed (examples, templates, seeds)
 
 ---
