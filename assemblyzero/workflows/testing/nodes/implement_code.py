@@ -2,6 +2,7 @@
 
 Issue #272: File-by-file prompting with mechanical validation.
 Issue #309: Add retry logic on validation failure (up to 3 attempts).
+Issue #188: LLD path enforcement in prompts and write validation.
 
 Key changes from original:
 - Iterate through files_to_modify one at a time (not batch)
@@ -9,6 +10,7 @@ Key changes from original:
 - Mechanical validation: code block exists, not empty, parses
 - RETRY on validation failure: up to 3 attempts with error feedback
 - WE control the file path, not Claude
+- Issue #188: Prompt includes allowed paths; writes validated against LLD
 """
 
 import ast
@@ -21,6 +23,12 @@ import time
 from pathlib import Path
 from typing import Any
 
+from assemblyzero.hooks.file_write_validator import validate_file_write
+from assemblyzero.utils.lld_path_enforcer import (
+    build_implementation_prompt_section,
+    detect_scaffolded_test_files,
+    extract_paths_from_lld,
+)
 from assemblyzero.workflows.testing.audit import (
     get_repo_root,
     log_workflow_execution,
@@ -610,8 +618,12 @@ def build_single_file_prompt(
     repo_root: Path,
     test_content: str = "",
     previous_error: str = "",
+    path_enforcement_section: str = "",
 ) -> str:
-    """Build prompt for a single file with accumulated context."""
+    """Build prompt for a single file with accumulated context.
+
+    Issue #188: Added path_enforcement_section parameter to inject allowed paths.
+    """
 
     change_type = file_spec.get("change_type", "Add")
     description = file_spec.get("description", "")
@@ -630,6 +642,10 @@ Description: {description}
 {lld_content}
 
 """
+
+    # Issue #188: Add path enforcement section
+    if path_enforcement_section:
+        prompt += path_enforcement_section + "\n"
 
     # Include existing file content if modifying
     if change_type.lower() == "modify":
@@ -1045,6 +1061,18 @@ def implement_code(state: TestingWorkflowState) -> dict[str, Any]:
     for f in files_to_modify:
         print(f"      - {f['path']} ({f.get('change_type', 'Add')})")
 
+    # Issue #188: Extract allowed paths from LLD and build prompt section
+    path_spec = extract_paths_from_lld(lld_content)
+    path_spec["scaffolded_test_files"] = detect_scaffolded_test_files(
+        path_spec["test_files"], repo_root,
+    )
+    # Also add files_to_modify paths (from state) to allowed set
+    for f in files_to_modify:
+        path_spec["all_allowed_paths"].add(f["path"])
+    path_enforcement_section = build_implementation_prompt_section(path_spec)
+    if path_enforcement_section:
+        print(f"    Path enforcement: {len(path_spec['all_allowed_paths'])} allowed paths")
+
     # Accumulated context
     completed_files: list[tuple[str, str]] = []
     written_paths: list[str] = []
@@ -1086,6 +1114,17 @@ def implement_code(state: TestingWorkflowState) -> dict[str, Any]:
         if token_estimate > 150000:
             print(f"        [WARN] Context approaching limit ({token_estimate} tokens)")
 
+        # Issue #188: Validate file path against LLD
+        if path_spec["all_allowed_paths"]:
+            validation = validate_file_write(filepath, path_spec["all_allowed_paths"])
+            if not validation["allowed"]:
+                print(f"        [PATH] REJECTED: {validation['reason']}")
+                raise ImplementationError(
+                    filepath=filepath,
+                    reason=f"Path not in LLD: {validation['reason']}",
+                    response_preview=None,
+                )
+
         # Build prompt for this single file
         prompt = build_single_file_prompt(
             filepath=filepath,
@@ -1095,6 +1134,7 @@ def implement_code(state: TestingWorkflowState) -> dict[str, Any]:
             repo_root=repo_root,
             test_content=test_content,
             previous_error=green_phase_output if iteration_count > 0 else "",
+            path_enforcement_section=path_enforcement_section,
         )
 
         # Call Claude with retry logic (Issue #309)
