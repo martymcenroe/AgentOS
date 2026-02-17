@@ -271,6 +271,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
         type=str,
         help="Path to checkpoint database (overrides default per-issue partitioning)",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview execution plan without API calls or file modifications",
+    )
 
     return parser
 
@@ -452,7 +457,26 @@ def main():
         print(f"[implement] E2E: skipped")
     if args.scaffold_only:
         print(f"[implement] Mode: scaffold-only")
+    if args.dry_run:
+        print(f"[implement] Mode: DRY RUN")
     print()
+
+    # Issue #290: Dry-run — preview execution plan and exit
+    if args.dry_run:
+        lld_path = repo_root / "docs" / "lld" / "active" / f"LLD-{args.issue:03d}.md"
+        lld_exists = lld_path.exists()
+        print("[DRY RUN] Would execute:")
+        print("  N0_load_lld -> N1_review_test_plan -> N2_scaffold_tests -> N3_verify_red")
+        print("  -> N4_implement_code -> N5_verify_green -> N6_e2e_validation -> N7_finalize")
+        print()
+        print(f"  LLD: {lld_path} ({'found' if lld_exists else 'NOT FOUND'})")
+        print(f"  Database: {db_path}")
+        print(f"  Mock mode: {args.mock}")
+        print(f"  Skip E2E: {args.skip_e2e}")
+        print(f"  Max iterations: {args.max_iterations}")
+        print()
+        print("[DRY RUN] No API calls made, no files modified.")
+        return 0
 
     # Build initial state
     initial_state: TestingWorkflowState = {

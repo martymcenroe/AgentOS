@@ -417,6 +417,26 @@ class TestCheckpointDbPath:
         assert "testing_99" not in str(path)
 
 
+class TestDryRunFlag:
+    """Tests for --dry-run CLI argument — Issue #290."""
+
+    def test_dry_run_argument_accepted(self):
+        """Parser accepts --dry-run argument."""
+        from tools.run_implement_from_lld import create_argument_parser
+
+        parser = create_argument_parser()
+        args = parser.parse_args(["--issue", "42", "--dry-run"])
+        assert args.dry_run is True
+
+    def test_dry_run_defaults_to_false(self):
+        """--dry-run defaults to False when not provided."""
+        from tools.run_implement_from_lld import create_argument_parser
+
+        parser = create_argument_parser()
+        args = parser.parse_args(["--issue", "42"])
+        assert args.dry_run is False
+
+
 class TestDbPathCliArgument:
     """Tests for --db-path CLI argument — Issue #379."""
 
