@@ -1,7 +1,11 @@
-"""N0: Load LLD node for TDD Testing Workflow.
+"""N0: Load Implementation Spec node for TDD Testing Workflow.
 
-Reads the approved LLD from docs/lld/active/LLD-{N}.md and extracts:
-- Full LLD content
+Issue #384: The TDD workflow now requires an Implementation Spec (produced
+by the #304 spec workflow), not a raw LLD. If no spec exists, the workflow
+exits with a specific command to generate one.
+
+Reads the spec from docs/lld/drafts/spec-{N}.md and extracts:
+- Full spec content (used as LLD content downstream)
 - Section 10 (Test Plan)
 - Test scenarios with metadata
 - Requirements for coverage tracking
@@ -23,8 +27,11 @@ from assemblyzero.workflows.testing.knowledge.patterns import detect_test_types
 from assemblyzero.workflows.testing.state import TestingWorkflowState, TestScenario
 
 
-# LLD directory relative to repo root
+# LLD directory relative to repo root (kept for backward-compatible helpers)
 LLD_ACTIVE_DIR = Path("docs/lld/active")
+
+# Implementation Spec directory (Issue #384)
+SPEC_DRAFTS_DIR = Path("docs/lld/drafts")
 
 
 def find_lld_path(issue_number: int, repo_root: Path) -> Path | None:
@@ -59,6 +66,59 @@ def find_lld_path(issue_number: int, repo_root: Path) -> Path | None:
             return matches[0]
 
     return None
+
+
+def find_spec_path(issue_number: int, repo_root: Path) -> Path | None:
+    """Find the Implementation Spec file for an issue number.
+
+    Issue #384: TDD workflow requires an implementation spec, not a raw LLD.
+
+    Args:
+        issue_number: GitHub issue number.
+        repo_root: Repository root path.
+
+    Returns:
+        Path to spec file if found, None otherwise.
+    """
+    spec_dir = repo_root / SPEC_DRAFTS_DIR
+
+    if not spec_dir.exists():
+        return None
+
+    # Search patterns in priority order
+    patterns = [
+        f"spec-{issue_number:04d}.md",   # spec-0305.md (4-digit padded)
+        f"spec-{issue_number:04d}-*.md",  # spec-0305-desc.md
+        f"spec-{issue_number:03d}.md",    # spec-305.md (3-digit padded)
+        f"spec-{issue_number:03d}-*.md",  # spec-305-desc.md
+        f"spec-{issue_number}.md",        # spec-305.md (unpadded)
+        f"spec-{issue_number}-*.md",      # spec-305-desc.md
+    ]
+
+    for pattern in patterns:
+        matches = list(spec_dir.glob(pattern))
+        if matches:
+            if len(matches) > 1:
+                matches.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+            return matches[0]
+
+    return None
+
+
+def build_spec_command(issue_number: int, repo_root: Path) -> str:
+    """Build the exact command to generate a missing implementation spec.
+
+    Args:
+        issue_number: GitHub issue number.
+        repo_root: Repository root path.
+
+    Returns:
+        Full command string the user can copy-paste.
+    """
+    return (
+        f"poetry run python tools/run_implementation_spec_workflow.py "
+        f"--issue {issue_number} --repo {repo_root}"
+    )
 
 
 def extract_test_plan_section(lld_content: str) -> str:
@@ -412,7 +472,7 @@ def load_lld(state: TestingWorkflowState) -> dict[str, Any]:
     if not issue_number:
         return {"error_message": "No issue number provided"}
 
-    gate_log(f"[N0] Loading LLD for issue #{issue_number}...")
+    gate_log(f"[N0] Loading implementation spec for issue #{issue_number}...")
 
     # Check for mock mode
     if state.get("mock_mode"):
@@ -422,30 +482,41 @@ def load_lld(state: TestingWorkflowState) -> dict[str, Any]:
     repo_root_str = state.get("repo_root", "")
     repo_root = Path(repo_root_str) if repo_root_str else get_repo_root()
 
-    # Find LLD file
+    # Issue #384: Find Implementation Spec (NOT raw LLD)
     lld_path = state.get("lld_path", "")
     if lld_path:
         lld_path_obj = Path(lld_path)
     else:
-        lld_path_obj = find_lld_path(issue_number, repo_root)
+        lld_path_obj = find_spec_path(issue_number, repo_root)
 
     # Issue #380: If not found in worktree, try original (main) repo
     if (not lld_path_obj or not lld_path_obj.exists()) and state.get("original_repo_root"):
         original_root = Path(state["original_repo_root"])
         if original_root != repo_root:
-            print(f"    LLD not found in worktree, checking main repo: {original_root}")
-            lld_path_obj = find_lld_path(issue_number, original_root)
+            print(f"    Spec not found in worktree, checking main repo: {original_root}")
+            lld_path_obj = find_spec_path(issue_number, original_root)
 
+    # Issue #384: No spec found — exit with specific command to generate one
     if not lld_path_obj or not lld_path_obj.exists():
-        hint = ""
-        if state.get("original_repo_root"):
-            hint = " Also checked main repo."
+        cmd = build_spec_command(issue_number, repo_root)
+        error_msg = (
+            f"\n"
+            f"    ╔══════════════════════════════════════════════════════════════╗\n"
+            f"    ║  No Implementation Spec found for issue #{issue_number:<20}║\n"
+            f"    ║                                                              ║\n"
+            f"    ║  The TDD workflow requires an implementation spec.           ║\n"
+            f"    ║  Generate one first by running:                              ║\n"
+            f"    ╚══════════════════════════════════════════════════════════════╝\n"
+            f"\n"
+            f"    {cmd}\n"
+        )
+        print(error_msg)
         return {
-            "error_message": f"LLD not found for issue #{issue_number}. "
-            f"Expected at: {repo_root / LLD_ACTIVE_DIR / f'LLD-{issue_number:03d}.md'}{hint}"
+            "error_message": f"No implementation spec found for issue #{issue_number}. "
+            f"Run: {cmd}"
         }
 
-    print(f"    LLD path: {lld_path_obj}")
+    print(f"    Spec path: {lld_path_obj}")
 
     # Read LLD content
     try:

@@ -522,3 +522,104 @@ class TestLldWorktreeFallback:
 
         result = find_lld_path(42, tmp_path)
         assert result is None
+
+
+class TestSpecRequired:
+    """Tests for spec-only input — Issue #384."""
+
+    def test_find_spec_4digit_padded(self, tmp_path):
+        """Finds spec-0305.md with 4-digit padding."""
+        from assemblyzero.workflows.testing.nodes.load_lld import find_spec_path
+
+        spec_dir = tmp_path / "docs" / "lld" / "drafts"
+        spec_dir.mkdir(parents=True)
+        spec_file = spec_dir / "spec-0305.md"
+        spec_file.write_text("# Spec 305", encoding="utf-8")
+
+        result = find_spec_path(305, tmp_path)
+        assert result is not None
+        assert result.name == "spec-0305.md"
+
+    def test_find_spec_3digit_padded(self, tmp_path):
+        """Finds spec-305.md with 3-digit padding."""
+        from assemblyzero.workflows.testing.nodes.load_lld import find_spec_path
+
+        spec_dir = tmp_path / "docs" / "lld" / "drafts"
+        spec_dir.mkdir(parents=True)
+        spec_file = spec_dir / "spec-042.md"
+        spec_file.write_text("# Spec 42", encoding="utf-8")
+
+        result = find_spec_path(42, tmp_path)
+        assert result is not None
+        assert result.name == "spec-042.md"
+
+    def test_find_spec_returns_none_when_missing(self, tmp_path):
+        """Returns None when no spec exists."""
+        from assemblyzero.workflows.testing.nodes.load_lld import find_spec_path
+
+        result = find_spec_path(42, tmp_path)
+        assert result is None
+
+    def test_find_spec_returns_none_empty_dir(self, tmp_path):
+        """Returns None when drafts dir is empty."""
+        from assemblyzero.workflows.testing.nodes.load_lld import find_spec_path
+
+        spec_dir = tmp_path / "docs" / "lld" / "drafts"
+        spec_dir.mkdir(parents=True)
+
+        result = find_spec_path(42, tmp_path)
+        assert result is None
+
+    def test_build_spec_command_includes_issue_and_repo(self, tmp_path):
+        """Command includes correct --issue and --repo flags."""
+        from assemblyzero.workflows.testing.nodes.load_lld import build_spec_command
+
+        cmd = build_spec_command(305, tmp_path)
+        assert "--issue 305" in cmd
+        assert f"--repo {tmp_path}" in cmd
+        assert "run_implementation_spec_workflow.py" in cmd
+        assert "poetry run python" in cmd
+
+    def test_load_lld_rejects_missing_spec(self, tmp_path):
+        """load_lld returns error with command when no spec found."""
+        from assemblyzero.workflows.testing.nodes.load_lld import load_lld
+
+        # Create minimal repo structure (no spec)
+        (tmp_path / "docs" / "lld" / "drafts").mkdir(parents=True)
+
+        state = {
+            "issue_number": 305,
+            "repo_root": str(tmp_path),
+            "mock_mode": False,
+        }
+        result = load_lld(state)
+        assert result["error_message"]
+        assert "implementation spec" in result["error_message"].lower()
+        assert "run_implementation_spec_workflow.py" in result["error_message"]
+        assert "--issue 305" in result["error_message"]
+
+    def test_load_lld_accepts_spec(self, tmp_path):
+        """load_lld successfully loads a spec file."""
+        from assemblyzero.workflows.testing.nodes.load_lld import load_lld
+
+        # Create spec file with minimum content
+        spec_dir = tmp_path / "docs" / "lld" / "drafts"
+        spec_dir.mkdir(parents=True)
+        spec_content = (
+            "# Spec 042: Test Feature\n\n"
+            "## 1. Context & Goal\n* **Issue:** #42\n"
+            "* **Status:** Approved\n\n"
+            "## 3. Requirements\n1. REQ-1: Must work\n\n"
+            "## 10. Test Plan\n### test_it_works\nVerify it works.\n\n"
+            "**Final Status:** APPROVED\n"
+        )
+        (spec_dir / "spec-0042.md").write_text(spec_content, encoding="utf-8")
+
+        state = {
+            "issue_number": 42,
+            "repo_root": str(tmp_path),
+            "mock_mode": False,
+        }
+        result = load_lld(state)
+        assert result.get("error_message", "") == ""
+        assert "spec-0042.md" in result["lld_path"]
