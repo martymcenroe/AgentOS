@@ -36,6 +36,12 @@ class LLMCallResult:
         attempts: Number of API call attempts made.
         credential_used: Which credential was used (for rotation tracking).
         rotation_occurred: True if we rotated from initial credential.
+        input_tokens: Input token count (0 if unavailable).
+        output_tokens: Output token count (0 if unavailable).
+        cache_read_tokens: Prompt cache read tokens (claude -p only).
+        cache_creation_tokens: Prompt cache creation tokens (claude -p only).
+        cost_usd: Cost in USD (0.0 if unavailable).
+        rate_limited: True if a 429 was encountered during this call.
     """
 
     success: bool
@@ -48,6 +54,41 @@ class LLMCallResult:
     attempts: int
     credential_used: str = ""
     rotation_occurred: bool = False
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_creation_tokens: int = 0
+    cost_usd: float = 0.0
+    rate_limited: bool = False
+
+
+def log_llm_call(result: LLMCallResult) -> None:
+    """Log token usage and cost for an LLM call.
+
+    Issue #398: Prints a structured line after every LLM call.
+    Issue #399: Includes rate limit warning if 429 was hit.
+    """
+    duration_s = result.duration_ms / 1000.0
+    parts = [
+        f"[LLM] provider={result.provider}",
+        f"model={result.model_used}",
+    ]
+    if result.input_tokens or result.output_tokens:
+        parts.append(f"input={result.input_tokens}")
+        parts.append(f"output={result.output_tokens}")
+    if result.cache_read_tokens:
+        parts.append(f"cache_read={result.cache_read_tokens}")
+    if result.cache_creation_tokens:
+        parts.append(f"cache_create={result.cache_creation_tokens}")
+    if result.cost_usd > 0:
+        parts.append(f"cost=${result.cost_usd:.4f}")
+    parts.append(f"duration={duration_s:.1f}s")
+    if not result.success:
+        parts.append(f"ERROR={result.error_message or 'unknown'}")
+    if result.rate_limited:
+        parts.append("RATE_LIMITED=true")
+
+    print("    " + " ".join(parts))
 
 
 class LLMProvider(ABC):
@@ -233,7 +274,7 @@ class ClaudeCLIProvider(LLMProvider):
 
             if result.returncode != 0:
                 error_msg = result.stderr or result.stdout or "Unknown error"
-                return LLMCallResult(
+                call_result = LLMCallResult(
                     success=False,
                     response=None,
                     raw_response=result.stdout,
@@ -243,16 +284,33 @@ class ClaudeCLIProvider(LLMProvider):
                     duration_ms=duration_ms,
                     attempts=1,
                 )
+                log_llm_call(call_result)
+                return call_result
 
-            # Parse JSON response
+            # Parse JSON response — extract usage stats (Issue #398)
+            input_tokens = 0
+            output_tokens = 0
+            cache_read_tokens = 0
+            cache_creation_tokens = 0
+            cost_usd = 0.0
+
             try:
                 response_data = json.loads(result.stdout)
                 response_text = response_data.get("result", "")
+
+                # Extract usage from claude -p JSON
+                usage = response_data.get("usage", {})
+                input_tokens = usage.get("input_tokens", 0)
+                output_tokens = usage.get("output_tokens", 0)
+                cache_read_tokens = usage.get("cache_read_input_tokens", 0)
+                cache_creation_tokens = usage.get("cache_creation_input_tokens", 0)
+                cost_usd = response_data.get("total_cost_usd", 0.0)
+
             except json.JSONDecodeError:
                 # Fall back to raw stdout if not valid JSON
                 response_text = result.stdout.strip()
 
-            return LLMCallResult(
+            call_result = LLMCallResult(
                 success=True,
                 response=response_text,
                 raw_response=result.stdout,
@@ -261,11 +319,18 @@ class ClaudeCLIProvider(LLMProvider):
                 model_used=self._model,
                 duration_ms=duration_ms,
                 attempts=1,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cache_read_tokens=cache_read_tokens,
+                cache_creation_tokens=cache_creation_tokens,
+                cost_usd=cost_usd,
             )
+            log_llm_call(call_result)
+            return call_result
 
         except subprocess.TimeoutExpired:
             duration_ms = int((time.time() - start_time) * 1000)
-            return LLMCallResult(
+            call_result = LLMCallResult(
                 success=False,
                 response=None,
                 raw_response=None,
@@ -275,9 +340,11 @@ class ClaudeCLIProvider(LLMProvider):
                 duration_ms=duration_ms,
                 attempts=1,
             )
+            log_llm_call(call_result)
+            return call_result
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
-            return LLMCallResult(
+            call_result = LLMCallResult(
                 success=False,
                 response=None,
                 raw_response=None,
@@ -287,6 +354,8 @@ class ClaudeCLIProvider(LLMProvider):
                 duration_ms=duration_ms,
                 attempts=1,
             )
+            log_llm_call(call_result)
+            return call_result
 
 
 class GeminiProvider(LLMProvider):
@@ -372,7 +441,13 @@ class GeminiProvider(LLMProvider):
                 content=content,
             )
 
-            return LLMCallResult(
+            # Issue #399: detect 429 from error type
+            was_rate_limited = (
+                result.error_type is not None
+                and str(result.error_type) == "GeminiErrorType.QUOTA_EXHAUSTED"
+            ) if hasattr(result, "error_type") else False
+
+            call_result = LLMCallResult(
                 success=result.success,
                 response=result.response,
                 raw_response=result.raw_response,
@@ -383,10 +458,18 @@ class GeminiProvider(LLMProvider):
                 attempts=result.attempts,
                 credential_used=result.credential_used,
                 rotation_occurred=result.rotation_occurred,
+                rate_limited=was_rate_limited,
             )
+            log_llm_call(call_result)
+            return call_result
 
         except Exception as e:
-            return LLMCallResult(
+            # Issue #399: detect 429 in credential pool exhaustion
+            is_rate_limit = "quota" in str(e).lower() or "429" in str(e)
+            if is_rate_limit:
+                print(f"    [LLM] RATE LIMITED: provider=gemini model={self._model} error={str(e)[:100]}")
+
+            call_result = LLMCallResult(
                 success=False,
                 response=None,
                 raw_response=None,
@@ -395,7 +478,10 @@ class GeminiProvider(LLMProvider):
                 model_used=self._model,
                 duration_ms=0,
                 attempts=0,
+                rate_limited=is_rate_limit,
             )
+            log_llm_call(call_result)
+            return call_result
 
 
 class MockProvider(LLMProvider):

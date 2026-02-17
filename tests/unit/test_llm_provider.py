@@ -24,6 +24,7 @@ from assemblyzero.core.llm_provider import (
     GeminiProvider,
     MockProvider,
     get_provider,
+    log_llm_call,
     parse_provider_spec,
 )
 
@@ -428,3 +429,184 @@ class TestLLMProviderABC:
 
         with pytest.raises(TypeError):
             IncompleteProvider()
+
+
+class TestTokenLogging:
+    """Tests for Issue #398: token usage and cost logging."""
+
+    def test_result_has_token_fields(self):
+        """LLMCallResult includes token and cost fields."""
+        result = LLMCallResult(
+            success=True,
+            response="ok",
+            raw_response="ok",
+            error_message=None,
+            provider="claude",
+            model_used="opus-4.5",
+            duration_ms=1000,
+            attempts=1,
+            input_tokens=1500,
+            output_tokens=800,
+            cache_read_tokens=5000,
+            cache_creation_tokens=3000,
+            cost_usd=0.089,
+        )
+        assert result.input_tokens == 1500
+        assert result.output_tokens == 800
+        assert result.cache_read_tokens == 5000
+        assert result.cache_creation_tokens == 3000
+        assert result.cost_usd == 0.089
+
+    def test_token_fields_default_to_zero(self):
+        """Token fields default to zero when not provided."""
+        result = LLMCallResult(
+            success=True,
+            response="ok",
+            raw_response="ok",
+            error_message=None,
+            provider="mock",
+            model_used="test",
+            duration_ms=100,
+            attempts=1,
+        )
+        assert result.input_tokens == 0
+        assert result.output_tokens == 0
+        assert result.cost_usd == 0.0
+
+    @patch("subprocess.run")
+    @patch.object(ClaudeCLIProvider, "_find_cli")
+    def test_claude_parses_usage_from_json(self, mock_find_cli, mock_run):
+        """Claude provider extracts token counts from JSON response."""
+        mock_find_cli.return_value = "/usr/local/bin/claude"
+        mock_run.return_value = Mock(
+            returncode=0,
+            stdout=json.dumps({
+                "result": "Generated content",
+                "total_cost_usd": 0.089,
+                "usage": {
+                    "input_tokens": 1500,
+                    "output_tokens": 800,
+                    "cache_read_input_tokens": 5000,
+                    "cache_creation_input_tokens": 3000,
+                },
+            }),
+            stderr="",
+        )
+
+        provider = ClaudeCLIProvider()
+        result = provider.invoke("system", "content")
+
+        assert result.success is True
+        assert result.input_tokens == 1500
+        assert result.output_tokens == 800
+        assert result.cache_read_tokens == 5000
+        assert result.cache_creation_tokens == 3000
+        assert result.cost_usd == 0.089
+
+    @patch("subprocess.run")
+    @patch.object(ClaudeCLIProvider, "_find_cli")
+    def test_claude_handles_missing_usage(self, mock_find_cli, mock_run):
+        """Claude provider handles JSON without usage field."""
+        mock_find_cli.return_value = "/usr/local/bin/claude"
+        mock_run.return_value = Mock(
+            returncode=0,
+            stdout='{"result": "content"}',
+            stderr="",
+        )
+
+        provider = ClaudeCLIProvider()
+        result = provider.invoke("system", "content")
+
+        assert result.success is True
+        assert result.input_tokens == 0
+        assert result.output_tokens == 0
+        assert result.cost_usd == 0.0
+
+    def test_log_llm_call_prints(self, capsys):
+        """log_llm_call prints structured line to stdout."""
+        result = LLMCallResult(
+            success=True,
+            response="ok",
+            raw_response="ok",
+            error_message=None,
+            provider="claude",
+            model_used="opus-4.5",
+            duration_ms=1500,
+            attempts=1,
+            input_tokens=1500,
+            output_tokens=800,
+            cost_usd=0.089,
+        )
+        log_llm_call(result)
+        output = capsys.readouterr().out
+        assert "[LLM]" in output
+        assert "provider=claude" in output
+        assert "input=1500" in output
+        assert "output=800" in output
+        assert "cost=$0.0890" in output
+
+    def test_log_llm_call_error(self, capsys):
+        """log_llm_call includes error for failed calls."""
+        result = LLMCallResult(
+            success=False,
+            response=None,
+            raw_response=None,
+            error_message="timed out",
+            provider="claude",
+            model_used="opus-4.5",
+            duration_ms=300000,
+            attempts=1,
+        )
+        log_llm_call(result)
+        output = capsys.readouterr().out
+        assert "ERROR=timed out" in output
+
+
+class TestRateLimitLogging:
+    """Tests for Issue #399: 429 rate limit logging."""
+
+    def test_result_has_rate_limited_field(self):
+        """LLMCallResult includes rate_limited field."""
+        result = LLMCallResult(
+            success=False,
+            response=None,
+            raw_response=None,
+            error_message="429 quota exhausted",
+            provider="gemini",
+            model_used="3-pro-preview",
+            duration_ms=500,
+            attempts=1,
+            rate_limited=True,
+        )
+        assert result.rate_limited is True
+
+    def test_rate_limited_defaults_to_false(self):
+        """rate_limited defaults to False."""
+        result = LLMCallResult(
+            success=True,
+            response="ok",
+            raw_response="ok",
+            error_message=None,
+            provider="claude",
+            model_used="opus-4.5",
+            duration_ms=100,
+            attempts=1,
+        )
+        assert result.rate_limited is False
+
+    def test_log_llm_call_shows_rate_limit(self, capsys):
+        """log_llm_call includes RATE_LIMITED flag."""
+        result = LLMCallResult(
+            success=False,
+            response=None,
+            raw_response=None,
+            error_message="429",
+            provider="gemini",
+            model_used="3-pro-preview",
+            duration_ms=500,
+            attempts=1,
+            rate_limited=True,
+        )
+        log_llm_call(result)
+        output = capsys.readouterr().out
+        assert "RATE_LIMITED=true" in output
