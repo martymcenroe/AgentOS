@@ -428,10 +428,20 @@ def load_lld(state: TestingWorkflowState) -> dict[str, Any]:
     else:
         lld_path_obj = find_lld_path(issue_number, repo_root)
 
+    # Issue #380: If not found in worktree, try original (main) repo
+    if (not lld_path_obj or not lld_path_obj.exists()) and state.get("original_repo_root"):
+        original_root = Path(state["original_repo_root"])
+        if original_root != repo_root:
+            print(f"    LLD not found in worktree, checking main repo: {original_root}")
+            lld_path_obj = find_lld_path(issue_number, original_root)
+
     if not lld_path_obj or not lld_path_obj.exists():
+        hint = ""
+        if state.get("original_repo_root"):
+            hint = " Also checked main repo."
         return {
             "error_message": f"LLD not found for issue #{issue_number}. "
-            f"Expected at: {repo_root / LLD_ACTIVE_DIR / f'LLD-{issue_number:03d}.md'}"
+            f"Expected at: {repo_root / LLD_ACTIVE_DIR / f'LLD-{issue_number:03d}.md'}{hint}"
         }
 
     print(f"    LLD path: {lld_path_obj}")

@@ -1,11 +1,14 @@
 """Unit tests for Implement From LLD CLI Runner.
 
 Issue #156: Fix unused CLI arguments
+Issue #379: SQLite concurrent deadlock — per-issue database partitioning
+Issue #380: Cross-repo workflow execution failures
 
 Tests verify that every argparse argument affects behavior.
 TDD: These tests are written FIRST to expose unused arguments.
 """
 
+import json
 import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
@@ -343,3 +346,159 @@ class TestWorktreeHandling:
             result = get_current_branch(tmp_path)
 
             assert result == "main"
+
+
+class TestCheckpointDbPath:
+    """Tests for get_checkpoint_db_path() — Issue #379.
+
+    Verifies per-issue database partitioning to prevent concurrent deadlocks.
+    """
+
+    def test_default_per_issue_partitioning(self):
+        """Default db_path includes issue number."""
+        from tools.run_implement_from_lld import get_checkpoint_db_path
+
+        with patch.dict("os.environ", {}, clear=False):
+            # Remove env var if present
+            import os
+            os.environ.pop("ASSEMBLYZERO_WORKFLOW_DB", None)
+
+            path = get_checkpoint_db_path(42)
+
+        assert "testing_42.db" in str(path)
+        assert ".assemblyzero" in str(path)
+
+    def test_different_issues_get_different_dbs(self):
+        """Two different issues get different database files."""
+        from tools.run_implement_from_lld import get_checkpoint_db_path
+
+        with patch.dict("os.environ", {}, clear=False):
+            import os
+            os.environ.pop("ASSEMBLYZERO_WORKFLOW_DB", None)
+
+            path_42 = get_checkpoint_db_path(42)
+            path_99 = get_checkpoint_db_path(99)
+
+        assert path_42 != path_99
+        assert "testing_42.db" in str(path_42)
+        assert "testing_99.db" in str(path_99)
+
+    def test_zero_issue_falls_back(self):
+        """Issue number 0 falls back to generic testing_workflow.db."""
+        from tools.run_implement_from_lld import get_checkpoint_db_path
+
+        with patch.dict("os.environ", {}, clear=False):
+            import os
+            os.environ.pop("ASSEMBLYZERO_WORKFLOW_DB", None)
+
+            path = get_checkpoint_db_path(0)
+
+        assert "testing_workflow.db" in str(path)
+
+    def test_env_var_overrides(self, tmp_path):
+        """ASSEMBLYZERO_WORKFLOW_DB env var overrides default."""
+        from tools.run_implement_from_lld import get_checkpoint_db_path
+
+        custom_db = str(tmp_path / "custom.db")
+        with patch.dict("os.environ", {"ASSEMBLYZERO_WORKFLOW_DB": custom_db}):
+            path = get_checkpoint_db_path(42)
+
+        assert str(path) == custom_db
+
+    def test_env_var_takes_priority_over_issue(self, tmp_path):
+        """Env var takes priority regardless of issue number."""
+        from tools.run_implement_from_lld import get_checkpoint_db_path
+
+        override_db = str(tmp_path / "override.db")
+        with patch.dict("os.environ", {"ASSEMBLYZERO_WORKFLOW_DB": override_db}):
+            path = get_checkpoint_db_path(99)
+
+        assert str(path) == override_db
+        assert "testing_99" not in str(path)
+
+
+class TestDbPathCliArgument:
+    """Tests for --db-path CLI argument — Issue #379."""
+
+    def test_db_path_argument_accepted(self):
+        """Parser accepts --db-path argument."""
+        from tools.run_implement_from_lld import create_argument_parser
+
+        parser = create_argument_parser()
+        args = parser.parse_args(["--issue", "42", "--db-path", "/tmp/test.db"])
+        assert args.db_path == "/tmp/test.db"
+
+    def test_db_path_defaults_to_none(self):
+        """--db-path defaults to None when not provided."""
+        from tools.run_implement_from_lld import create_argument_parser
+
+        parser = create_argument_parser()
+        args = parser.parse_args(["--issue", "42"])
+        assert args.db_path is None
+
+
+class TestStatusFile:
+    """Tests for _write_status_file() — Issue #380."""
+
+    def test_writes_success_status(self, tmp_path):
+        """Writes JSON status file on success."""
+        from tools.run_implement_from_lld import _write_status_file
+
+        _write_status_file(tmp_path, 42, "SUCCESS")
+
+        status_file = tmp_path / ".implement-status-42.json"
+        assert status_file.exists()
+
+        data = json.loads(status_file.read_text(encoding="utf-8"))
+        assert data["issue"] == 42
+        assert data["status"] == "SUCCESS"
+        assert "timestamp" in data
+        assert "error" not in data
+
+    def test_writes_failed_status_with_error(self, tmp_path):
+        """Writes JSON status file with error message on failure."""
+        from tools.run_implement_from_lld import _write_status_file
+
+        _write_status_file(tmp_path, 42, "FAILED", "SQLite lock timeout")
+
+        status_file = tmp_path / ".implement-status-42.json"
+        assert status_file.exists()
+
+        data = json.loads(status_file.read_text(encoding="utf-8"))
+        assert data["status"] == "FAILED"
+        assert data["error"] == "SQLite lock timeout"
+
+    def test_different_issues_different_files(self, tmp_path):
+        """Different issues write to different status files."""
+        from tools.run_implement_from_lld import _write_status_file
+
+        _write_status_file(tmp_path, 42, "SUCCESS")
+        _write_status_file(tmp_path, 99, "FAILED", "error")
+
+        assert (tmp_path / ".implement-status-42.json").exists()
+        assert (tmp_path / ".implement-status-99.json").exists()
+
+
+class TestLldWorktreeFallback:
+    """Tests for LLD auto-detection from main repo — Issue #380."""
+
+    def test_find_lld_in_worktree_first(self, tmp_path):
+        """LLD found in worktree takes priority."""
+        from assemblyzero.workflows.testing.nodes.load_lld import find_lld_path
+
+        # Create LLD in worktree
+        lld_dir = tmp_path / "docs" / "lld" / "active"
+        lld_dir.mkdir(parents=True)
+        lld_file = lld_dir / "LLD-042.md"
+        lld_file.write_text("# LLD 042", encoding="utf-8")
+
+        result = find_lld_path(42, tmp_path)
+        assert result is not None
+        assert result.name == "LLD-042.md"
+
+    def test_find_lld_returns_none_when_missing(self, tmp_path):
+        """Returns None when LLD not found."""
+        from assemblyzero.workflows.testing.nodes.load_lld import find_lld_path
+
+        result = find_lld_path(42, tmp_path)
+        assert result is None

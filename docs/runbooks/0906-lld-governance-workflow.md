@@ -1,8 +1,8 @@
 # 0906 - LLD Governance Workflow
 
 **Category:** Runbook / Operational Procedure
-**Version:** 1.2
-**Last Updated:** 2026-01-31
+**Version:** 1.3
+**Last Updated:** 2026-02-16
 
 ---
 
@@ -69,7 +69,7 @@ stateDiagram-v2
 Browse open issues and filter by LLD status:
 
 ```bash
-poetry run python tools/run_lld_workflow.py --select
+poetry run python tools/run_requirements_workflow.py --type lld --select
 ```
 
 You'll see a list with status indicators:
@@ -98,7 +98,7 @@ Select issue [1-3, q]: _
 **Option B: Direct issue number**
 
 ```bash
-poetry run python tools/run_lld_workflow.py --issue 42
+poetry run python tools/run_requirements_workflow.py --type lld --issue 42
 ```
 
 **Option C: Cross-repo usage**
@@ -107,7 +107,7 @@ Run the workflow from AssemblyZero against a different repository:
 
 ```bash
 poetry run --directory /c/Users/mcwiz/Projects/AssemblyZero python \
-  /c/Users/mcwiz/Projects/AssemblyZero/tools/run_lld_workflow.py \
+  /c/Users/mcwiz/Projects/AssemblyZero/tools/run_requirements_workflow.py --type lld \
   --repo /c/Users/mcwiz/Projects/YourProject --select
 ```
 
@@ -118,7 +118,7 @@ The `--repo` flag specifies the target repository. This is required when running
 Include additional files for Claude to reference:
 
 ```bash
-poetry run python tools/run_lld_workflow.py --issue 42 --context src/main.py --context docs/architecture.md
+poetry run python tools/run_requirements_workflow.py --type lld --issue 42 --context src/main.py --context docs/architecture.md
 ```
 
 ### Step 3: N0-N1 (Automatic)
@@ -172,25 +172,31 @@ On approval, the workflow:
 Run full workflow without API calls:
 
 ```bash
-poetry run python tools/run_lld_workflow.py --issue 42 --mock
+poetry run python tools/run_requirements_workflow.py --type lld --issue 42 --mock
 ```
 
 Uses fixtures: first review returns BLOCKED, second returns APPROVED.
 
-### Auto Mode (Unattended)
+### No Human Review (Default)
 
-Skip VS Code editing, auto-send to review:
+The default mode (`--review none`) skips VS Code editing and sends directly to Gemini review:
 
 ```bash
-poetry run python tools/run_lld_workflow.py --issue 42 --auto
+poetry run python tools/run_requirements_workflow.py --type lld --issue 42
 ```
 
-### Resume Mode
-
-Continue interrupted workflow:
+For human review at draft stage (opens VS Code):
 
 ```bash
-poetry run python tools/run_lld_workflow.py --issue 42 --resume
+poetry run python tools/run_requirements_workflow.py --type lld --issue 42 --review draft
+```
+
+### Auto-Confirm Existing LLD (Regeneration)
+
+When an LLD already exists, the workflow prompts for confirmation before shifting the old version to lineage. Use `--yes` to auto-confirm:
+
+```bash
+poetry run python tools/run_requirements_workflow.py --type lld --issue 42 --yes
 ```
 
 ### Custom Iteration Limit
@@ -198,7 +204,7 @@ poetry run python tools/run_lld_workflow.py --issue 42 --resume
 Override the default 20-iteration limit:
 
 ```bash
-poetry run python tools/run_lld_workflow.py --issue 42 --max-iterations 50
+poetry run python tools/run_requirements_workflow.py --type lld --issue 42 --max-iterations 50
 ```
 
 ### Audit Mode
@@ -206,14 +212,14 @@ poetry run python tools/run_lld_workflow.py --issue 42 --max-iterations 50
 Rebuild LLD status cache from all LLD files:
 
 ```bash
-poetry run python tools/run_lld_workflow.py --audit
+poetry run python tools/run_requirements_workflow.py --type lld --audit
 ```
 
 For cross-repo audit:
 
 ```bash
 poetry run --directory /c/Users/mcwiz/Projects/AssemblyZero python \
-  /c/Users/mcwiz/Projects/AssemblyZero/tools/run_lld_workflow.py \
+  /c/Users/mcwiz/Projects/AssemblyZero/tools/run_requirements_workflow.py --type lld \
   --repo /c/Users/mcwiz/Projects/YourProject --audit
 ```
 
@@ -344,3 +350,4 @@ All `--context` paths must be within the repository root. Use relative paths:
 | 1.0 | 2026-01-29 | Initial version with --select, --audit, and status tracking |
 | 1.1 | 2026-01-29 | Add `--repo` flag for cross-repo workflow usage |
 | 1.2 | 2026-01-31 | Update max iterations to 20, fix audit path to docs/lineage/ |
+| 1.3 | 2026-02-16 | Fix script name: `run_lld_workflow.py` → `run_requirements_workflow.py --type lld`. Add `--yes` and `--review` docs. Remove defunct `--auto`/`--resume` flags. |

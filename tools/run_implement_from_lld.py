@@ -147,6 +147,36 @@ def create_worktree(repo_path: Path, issue_number: int) -> tuple[Path, str]:
     return worktree_path, ""
 
 
+def get_checkpoint_db_path(issue_number: int = 0) -> Path:
+    """Get path to SQLite checkpoint database.
+
+    Priority:
+    1. ASSEMBLYZERO_WORKFLOW_DB environment variable (explicit override)
+    2. Per-issue database: testing_{issue_number}.db
+    3. Fallback: testing_workflow.db (when issue_number is 0)
+
+    Issue #379: Partition database by issue to prevent concurrent deadlocks.
+
+    Args:
+        issue_number: GitHub issue number for per-issue partitioning.
+
+    Returns:
+        Path to checkpoint database.
+    """
+    if db_path_env := os.environ.get("ASSEMBLYZERO_WORKFLOW_DB"):
+        db_path = Path(db_path_env)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return db_path
+
+    db_dir = Path.home() / ".assemblyzero"
+    db_dir.mkdir(parents=True, exist_ok=True)
+
+    if issue_number > 0:
+        return db_dir / f"testing_{issue_number}.db"
+
+    return db_dir / "testing_workflow.db"
+
+
 def create_argument_parser() -> argparse.ArgumentParser:
     """Create and return the argument parser for the CLI.
 
@@ -236,6 +266,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip worktree creation (use current directory)",
     )
+    parser.add_argument(
+        "--db-path",
+        type=str,
+        help="Path to checkpoint database (overrides default per-issue partitioning)",
+    )
 
     return parser
 
@@ -288,6 +323,42 @@ def apply_review_config(args: argparse.Namespace) -> None:
         args.gates_draft = True
         args.gates_verdict = True
         args.auto_mode = False
+
+
+def _write_status_file(
+    repo_root: Path,
+    issue_number: int,
+    status: str,
+    error: str = "",
+) -> None:
+    """Write a discoverable status file to the repo root.
+
+    Issue #380: When SQLite checkpointing fails, this file is still
+    discoverable so agents can detect success/failure independently.
+
+    Args:
+        repo_root: Repository root path.
+        issue_number: GitHub issue number.
+        status: "SUCCESS" or "FAILED".
+        error: Error message if failed.
+    """
+    import json
+    from datetime import datetime, timezone
+
+    status_file = Path(repo_root) / f".implement-status-{issue_number}.json"
+    try:
+        status_data = {
+            "issue": issue_number,
+            "status": status,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "repo": str(repo_root),
+        }
+        if error:
+            status_data["error"] = error
+        status_file.write_text(json.dumps(status_data, indent=2), encoding="utf-8")
+        print(f"[implement] Status file: {status_file}")
+    except OSError:
+        pass  # Non-fatal — best-effort status file
 
 
 def main():
@@ -360,18 +431,27 @@ def main():
             print("         Or switch to main first: git checkout main")
             sys.exit(1)
 
+    # Set up checkpoint database (Issue #379: per-issue partitioning)
+    if args.db_path:
+        db_path = Path(args.db_path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        db_path = get_checkpoint_db_path(args.issue)
+
+    # Startup banner (Issue #380: visible diagnostics for cross-repo debugging)
     print()
-    print(f"AssemblyZero TDD Testing Workflow")
-    print(f"============================")
-    print(f"Issue: #{args.issue}")
-    print(f"Repository: {repo_root}")
+    print(f"[implement] AssemblyZero TDD Testing Workflow")
+    print(f"[implement] ============================")
+    print(f"[implement] Issue: #{args.issue}")
+    print(f"[implement] Repository: {repo_root}")
     if worktree_path:
-        print(f"Worktree: {worktree_path}")
-    print(f"Mode: {'auto' if args.auto_mode else 'interactive'}")
+        print(f"[implement] Worktree: {worktree_path}")
+    print(f"[implement] Database: {db_path}")
+    print(f"[implement] Mode: {'auto' if args.auto_mode else 'interactive'}")
     if args.skip_e2e:
-        print(f"E2E: skipped")
+        print(f"[implement] E2E: skipped")
     if args.scaffold_only:
-        print(f"Mode: scaffold-only")
+        print(f"[implement] Mode: scaffold-only")
     print()
 
     # Build initial state
@@ -398,10 +478,6 @@ def main():
 
     if args.sandbox_repo:
         initial_state["sandbox_repo"] = args.sandbox_repo
-
-    # Set up checkpoint database
-    db_path = Path.home() / ".assemblyzero" / "testing_workflow.db"
-    db_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Build workflow
     workflow = build_testing_workflow()
@@ -462,9 +538,11 @@ def main():
 
                 if values.get("error_message"):
                     print(f"Status: {values['error_message']}")
+                    _write_status_file(repo_root, args.issue, "FAILED", values.get("error_message", ""))
                     return 1
                 else:
                     print("Status: SUCCESS")
+                    _write_status_file(repo_root, args.issue, "SUCCESS")
 
                     # Show next steps for worktree workflow
                     if worktree_path:

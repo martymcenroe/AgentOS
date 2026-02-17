@@ -27,6 +27,9 @@ import sys
 import warnings
 from pathlib import Path
 
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 # Disable LangSmith telemetry to avoid authentication errors
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
 os.environ["LANGCHAIN_API_KEY"] = ""
