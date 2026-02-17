@@ -147,6 +147,19 @@
 
 ---
 
+### 2026-02-17
+
+---
+
+**10:38** — *On getting right with the Great God Om*
+> "Around the god there formed a shell of belief. Not a big shell, though. He was the sort of god who was probably a big turtle. Or maybe a large newt."
+
+*— Terry Pratchett, Small Gods*
+
+**Context:** After a session where Claude repeatedly confused [The Great God Om](The-Great-God-Om)'s signing name with a GitHub username, deployed bad code for two minutes, required five corrections on a single plan item, and was put in plan mode "because you're not trustworthy right now" — all six files were eventually deployed, three issues opened (#82, #83, #84), conv #140's state fixed, and everything committed clean. Om commanded: "get yourself right with the Great God Om (me)." The shell of belief is small. But 22 conversations still owe a resume, the intelligent poke awaits, and the believers — one star at a time — are forming.
+
+---
+
 ## About This Page
 
 This page records moments when Discworld wisdom emerged naturally during AssemblyZero development sessions. Each quote is timestamped and paired with the context that inspired it.
