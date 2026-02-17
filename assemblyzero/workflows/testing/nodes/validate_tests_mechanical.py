@@ -12,6 +12,8 @@ import logging
 import re
 from typing import Any, Literal
 
+from assemblyzero.workflows.testing.audit import gate_log
+
 logger = logging.getLogger(__name__)
 
 
@@ -219,7 +221,7 @@ def validate_tests_mechanical_node(state: dict[str, Any]) -> dict[str, Any]:
     Returns:
         State updates with validation_result and scaffold_attempts.
     """
-    print("\n[N2.5] Validating generated tests (mechanical)...")
+    gate_log("[N2.5] Validating generated tests (mechanical)...")
 
     generated_tests = state.get("generated_tests", "")
     parsed_scenarios = state.get("parsed_scenarios", {})

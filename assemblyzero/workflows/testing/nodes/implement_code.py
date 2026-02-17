@@ -32,6 +32,7 @@ from assemblyzero.utils.lld_path_enforcer import (
     extract_paths_from_lld,
 )
 from assemblyzero.workflows.testing.audit import (
+    gate_log,
     get_repo_root,
     log_workflow_execution,
     next_file_number,
@@ -1065,7 +1066,7 @@ def implement_code(state: TestingWorkflowState) -> dict[str, Any]:
     Issue #272: File-by-file prompting with mechanical validation.
     """
     iteration_count = state.get("iteration_count", 0)
-    print(f"\n[N4] Implementing code file-by-file (iteration {iteration_count})...")
+    gate_log(f"[N4] Implementing code file-by-file (iteration {iteration_count})...")
 
     if state.get("mock_mode"):
         return _mock_implement_code(state)

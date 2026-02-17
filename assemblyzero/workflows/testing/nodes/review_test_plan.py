@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from assemblyzero.workflows.testing.audit import (
+    gate_log,
     get_repo_root,
     log_workflow_execution,
     next_file_number,
@@ -270,7 +271,7 @@ def review_test_plan(state: TestingWorkflowState) -> dict[str, Any]:
     Returns:
         State updates with review verdict.
     """
-    print("\n[N1] Reviewing test plan...")
+    gate_log("[N1] Reviewing test plan...")
 
     # Check for mock mode
     if state.get("mock_mode"):

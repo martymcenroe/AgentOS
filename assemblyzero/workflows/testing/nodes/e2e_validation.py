@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from assemblyzero.workflows.testing.audit import (
+    gate_log,
     get_repo_root,
     log_workflow_execution,
     next_file_number,
@@ -139,7 +140,7 @@ def e2e_validation(state: TestingWorkflowState) -> dict[str, Any]:
     Returns:
         State updates with E2E results.
     """
-    print("\n[N6] Running E2E validation...")
+    gate_log("[N6] Running E2E validation...")
 
     # Check for skip_e2e mode
     if state.get("skip_e2e"):

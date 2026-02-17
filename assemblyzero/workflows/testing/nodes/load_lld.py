@@ -13,6 +13,7 @@ from typing import Any
 
 from assemblyzero.workflows.testing.audit import (
     create_testing_audit_dir,
+    gate_log,
     get_repo_root,
     log_workflow_execution,
     next_file_number,
@@ -411,7 +412,7 @@ def load_lld(state: TestingWorkflowState) -> dict[str, Any]:
     if not issue_number:
         return {"error_message": "No issue number provided"}
 
-    print(f"\n[N0] Loading LLD for issue #{issue_number}...")
+    gate_log(f"[N0] Loading LLD for issue #{issue_number}...")
 
     # Check for mock mode
     if state.get("mock_mode"):

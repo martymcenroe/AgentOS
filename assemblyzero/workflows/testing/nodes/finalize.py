@@ -14,6 +14,7 @@ from typing import Any
 
 from assemblyzero.workflows.testing.audit import (
     TestReportMetadata,
+    gate_log,
     generate_test_report,
     get_repo_root,
     log_workflow_execution,
@@ -130,7 +131,7 @@ def finalize(state: TestingWorkflowState) -> dict[str, Any]:
     Returns:
         State updates with report paths.
     """
-    print("\n[N7] Finalizing workflow...")
+    gate_log("[N7] Finalizing workflow...")
 
     issue_number = state.get("issue_number", 0)
     repo_root_str = state.get("repo_root", "")

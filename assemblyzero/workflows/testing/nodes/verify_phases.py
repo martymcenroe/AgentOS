@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from assemblyzero.workflows.testing.audit import (
+    gate_log,
     get_repo_root,
     log_workflow_execution,
     next_file_number,
@@ -110,7 +111,7 @@ def verify_red_phase(state: TestingWorkflowState) -> dict[str, Any]:
     Returns:
         State updates with red phase results.
     """
-    print("\n[N3] Verifying red phase (all tests should fail)...")
+    gate_log("[N3] Verifying red phase (all tests should fail)...")
 
     # Check for mock mode
     if state.get("mock_mode"):
@@ -269,7 +270,7 @@ def verify_green_phase(state: TestingWorkflowState) -> dict[str, Any]:
     Returns:
         State updates with green phase results.
     """
-    print("\n[N5] Verifying green phase (all tests should pass)...")
+    gate_log("[N5] Verifying green phase (all tests should pass)...")
 
     # Check for mock mode
     if state.get("mock_mode"):

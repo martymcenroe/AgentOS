@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from assemblyzero.workflows.testing.audit import (
+    gate_log,
     get_repo_root,
     log_workflow_execution,
     next_file_number,
@@ -669,7 +670,7 @@ def scaffold_tests(state: TestingWorkflowState) -> dict[str, Any]:
     Returns:
         State updates with test file paths.
     """
-    print("\n[N2] Scaffolding tests...")
+    gate_log("[N2] Scaffolding tests...")
 
     # Check for mock mode
     if state.get("mock_mode"):

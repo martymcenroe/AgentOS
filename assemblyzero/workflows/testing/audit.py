@@ -22,6 +22,19 @@ from typing import TypedDict
 logger = logging.getLogger(__name__)
 
 
+def gate_log(message: str) -> None:
+    """Print a gate-level log message with wall-clock timestamp.
+
+    Issue #372: Prefixes every gate transition with [HH:MM:SS] for timing.
+
+    Args:
+        message: The message to print (e.g., "[N4] Implementing code...").
+    """
+    now = datetime.now()
+    timestamp = now.strftime("%H:%M:%S")
+    print(f"[{timestamp}] {message}", flush=True)
+
+
 class TestReportMetadata(TypedDict):
     __test__ = False
     """Schema for test-report.json metadata file."""

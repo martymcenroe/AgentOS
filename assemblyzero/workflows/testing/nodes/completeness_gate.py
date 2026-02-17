@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from assemblyzero.workflows.testing.audit import (
+    gate_log,
     get_repo_root,
     log_workflow_execution,
     next_file_number,
@@ -77,7 +78,7 @@ def completeness_gate(state: TestingWorkflowState) -> dict[str, Any]:
         implementation_report_path, and review_materials.
     """
     iteration_count = state.get("iteration_count", 0)
-    print(f"\n[N4b] Completeness gate (iteration {iteration_count})...")
+    gate_log(f"[N4b] Completeness gate (iteration {iteration_count})...")
 
     # Extract required state
     repo_root_str = state.get("repo_root", "")
@@ -298,7 +299,7 @@ def route_after_completeness_gate(
         return "N4_implement_code"
 
     # PASS or WARN — proceed to N5
-    print(f"    [N4b] {verdict} — routing to N5_verify_green")
+    gate_log(f"    [N4b] {verdict} — routing to N5_verify_green")
     return "N5_verify_green"
 
 

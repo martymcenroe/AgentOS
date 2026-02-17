@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from assemblyzero.workflows.testing.audit import (
+    gate_log,
     get_repo_root,
     log_workflow_execution,
 )
@@ -223,7 +224,7 @@ def document(state: TestingWorkflowState) -> dict[str, Any]:
     Returns:
         State updates with documentation paths.
     """
-    print("\n[N8] Generating documentation...")
+    gate_log("[N8] Generating documentation...")
 
     issue_number = state.get("issue_number", 0)
     repo_root_str = state.get("repo_root", "")
