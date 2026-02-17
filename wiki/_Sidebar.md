@@ -31,7 +31,9 @@
 
 ### Core Workflows
 
+- [The Pipeline](The-Pipeline) (Issue → Code)
 - [Requirements Workflow](Requirements-Workflow)
+- [Implementation Spec](The-Pipeline#stage-2-implementation-spec-workflow-new---304)
 - [Implementation Workflow](Implementation-Workflow)
 - [The Scout](The-Scout-External-Intelligence-Gathering-Workflow)
 
