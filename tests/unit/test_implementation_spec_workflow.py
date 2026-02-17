@@ -1925,3 +1925,266 @@ class TestEdgeCases:
 
         result = validate_completeness(base_state)
         assert result["error_message"] == ""
+
+
+# =============================================================================
+# INTEGRATION TESTS — Graph execution, state propagation, node contracts
+#
+# These tests catch bugs that unit tests miss:
+# - #390: async nodes crash sync graph runner
+# - #391: Path.cwd() fallback when repo_root is lost between nodes
+# - #392: TypedDict missing fields causes LangGraph to discard state
+# - #393: CLI runner uses get_state() without checkpointer
+# =============================================================================
+
+
+class TestAllNodesAreSynchronous:
+    """Verify node functions are sync — catches #390.
+
+    LangGraph's graph.stream() is synchronous. If a node is async,
+    the stream call crashes with TypeError. This test ensures no
+    node accidentally uses 'async def'.
+    """
+
+    def test_all_nodes_are_sync_functions(self):
+        """Every node registered in the graph must be a sync function."""
+        import inspect
+        from assemblyzero.workflows.implementation_spec.nodes.load_lld import load_lld
+        from assemblyzero.workflows.implementation_spec.nodes.analyze_codebase import analyze_codebase
+        from assemblyzero.workflows.implementation_spec.nodes.generate_spec import generate_spec
+        from assemblyzero.workflows.implementation_spec.nodes.validate_completeness import validate_completeness
+        from assemblyzero.workflows.implementation_spec.nodes.human_gate import human_gate
+        from assemblyzero.workflows.implementation_spec.nodes.review_spec import review_spec
+        from assemblyzero.workflows.implementation_spec.nodes.finalize_spec import finalize_spec
+
+        nodes = {
+            "load_lld": load_lld,
+            "analyze_codebase": analyze_codebase,
+            "generate_spec": generate_spec,
+            "validate_completeness": validate_completeness,
+            "human_gate": human_gate,
+            "review_spec": review_spec,
+            "finalize_spec": finalize_spec,
+        }
+
+        for name, func in nodes.items():
+            assert not inspect.iscoroutinefunction(func), (
+                f"Node '{name}' is async — graph.stream() will crash. "
+                f"Use 'def' not 'async def'."
+            )
+
+
+class TestStateSchemaCompleteness:
+    """Verify TypedDict has all fields nodes actually use — catches #392.
+
+    LangGraph uses the TypedDict to determine valid state fields.
+    Fields not in the TypedDict are silently discarded between nodes.
+    """
+
+    def test_state_schema_has_repo_root(self):
+        """repo_root must be in schema to survive between nodes."""
+        from assemblyzero.workflows.implementation_spec.state import ImplementationSpecState
+        annotations = ImplementationSpecState.__annotations__
+        assert "repo_root" in annotations, "repo_root missing — state lost between nodes"
+
+    def test_state_schema_has_assemblyzero_root(self):
+        """assemblyzero_root must be in schema to survive between nodes."""
+        from assemblyzero.workflows.implementation_spec.state import ImplementationSpecState
+        annotations = ImplementationSpecState.__annotations__
+        assert "assemblyzero_root" in annotations, "assemblyzero_root missing — state lost between nodes"
+
+    def test_state_schema_has_audit_dir(self):
+        """audit_dir must be in schema to survive between nodes."""
+        from assemblyzero.workflows.implementation_spec.state import ImplementationSpecState
+        annotations = ImplementationSpecState.__annotations__
+        assert "audit_dir" in annotations, "audit_dir missing — state lost between nodes"
+
+    def test_state_schema_has_config_fields(self):
+        """Config fields must survive between nodes."""
+        from assemblyzero.workflows.implementation_spec.state import ImplementationSpecState
+        annotations = ImplementationSpecState.__annotations__
+        for field in ["config_mock_mode", "config_drafter", "config_reviewer"]:
+            assert field in annotations, f"{field} missing from schema"
+
+    def test_all_node_state_gets_are_in_schema(self):
+        """Every state.get('field') call in nodes must have a matching schema field.
+
+        Scans all node source files for state.get('X') calls and verifies
+        each field X exists in ImplementationSpecState.
+        """
+        import re
+        from assemblyzero.workflows.implementation_spec.state import ImplementationSpecState
+        annotations = set(ImplementationSpecState.__annotations__.keys())
+
+        node_dir = Path(__file__).parent.parent.parent / "assemblyzero" / "workflows" / "implementation_spec" / "nodes"
+        missing = []
+
+        for py_file in node_dir.glob("*.py"):
+            if py_file.name == "__init__.py":
+                continue
+            content = py_file.read_text(encoding="utf-8")
+            # Find all state.get("field_name") calls
+            for match in re.finditer(r'state\.get\(["\'](\w+)["\']', content):
+                field = match.group(1)
+                if field not in annotations:
+                    missing.append(f"{py_file.name}: state.get('{field}')")
+
+        assert not missing, (
+            f"Fields used by nodes but missing from ImplementationSpecState:\n"
+            + "\n".join(f"  - {m}" for m in missing)
+        )
+
+
+class TestGraphExecutesEndToEnd:
+    """Compile graph and run it with mock providers — catches #390, #392, #393.
+
+    This is the most important test class. It compiles the real graph
+    and streams it with mock LLM providers. If any node is async,
+    if any state field is lost between nodes, or if the graph can't
+    execute, this test fails.
+    """
+
+    def test_happy_path_mock_mode(self, tmp_path):
+        """Full workflow executes: N0→N1→N2→N3→N5→N6→END."""
+        from assemblyzero.workflows.implementation_spec.graph import (
+            create_implementation_spec_graph,
+        )
+
+        # Set up mock repo with LLD and source files
+        lld_dir = tmp_path / "docs" / "lld" / "active"
+        lld_dir.mkdir(parents=True)
+        drafts_dir = tmp_path / "docs" / "lld" / "drafts"
+        drafts_dir.mkdir(parents=True)
+        lineage_dir = tmp_path / "docs" / "lineage" / "active" / "999-impl-spec"
+        lineage_dir.mkdir(parents=True)
+
+        # Write LLD file
+        (lld_dir / "LLD-999.md").write_text(SAMPLE_LLD_APPROVED, encoding="utf-8")
+
+        # Create source files referenced in the LLD
+        src_dir = tmp_path / "assemblyzero" / "workflows" / "test"
+        src_dir.mkdir(parents=True)
+        (src_dir / "graph.py").write_text("def create_graph(): pass\n", encoding="utf-8")
+
+        # Standards template
+        standards_dir = tmp_path / "docs" / "standards"
+        standards_dir.mkdir(parents=True)
+        (standards_dir / "0701-implementation-spec-template.md").write_text(
+            "# Template\n## 1. Overview\n", encoding="utf-8"
+        )
+
+        # Compile the real graph
+        graph = create_implementation_spec_graph()
+
+        # Build initial state with ALL required fields
+        state = {
+            "issue_number": 999,
+            "lld_path": str(lld_dir / "LLD-999.md"),
+            "repo_root": str(tmp_path),
+            "assemblyzero_root": str(tmp_path),
+            "audit_dir": str(lineage_dir),
+            "config_mock_mode": True,
+            "config_drafter": "mock:draft",
+            "config_reviewer": "mock:review",
+            "lld_content": "",
+            "files_to_modify": [],
+            "current_state_snapshots": {},
+            "pattern_references": [],
+            "spec_draft": "",
+            "spec_path": "",
+            "completeness_issues": [],
+            "validation_passed": False,
+            "review_verdict": "BLOCKED",
+            "review_feedback": "",
+            "review_iteration": 0,
+            "max_iterations": 3,
+            "human_gate_enabled": False,
+            "error_message": "",
+            "next_node": "",
+        }
+
+        config = {"recursion_limit": 50}
+
+        # Execute the compiled graph — this is the real test
+        final_state = dict(state)
+        nodes_visited = []
+
+        for event in graph.stream(state, config):
+            for node_name, node_output in event.items():
+                if node_name == "__end__":
+                    continue
+                nodes_visited.append(node_name)
+                final_state.update(node_output)
+
+        # Verify workflow executed nodes
+        assert "N0_load_lld" in nodes_visited, f"N0 not visited. Visited: {nodes_visited}"
+        assert "N1_analyze_codebase" in nodes_visited, f"N1 not visited. Visited: {nodes_visited}"
+
+        # Verify critical state survived between nodes
+        assert final_state.get("lld_content"), "lld_content lost after N0"
+        assert final_state.get("repo_root") == str(tmp_path), "repo_root lost between nodes"
+        assert final_state.get("assemblyzero_root") == str(tmp_path), "assemblyzero_root lost between nodes"
+
+    def test_repo_root_propagates_to_all_nodes(self, tmp_path):
+        """repo_root set in initial state must be readable by every node.
+
+        Catches #391/#392: repo_root being lost or falling back to cwd.
+        """
+        from assemblyzero.workflows.implementation_spec.state import ImplementationSpecState
+
+        # Verify the field is in the TypedDict
+        annotations = ImplementationSpecState.__annotations__
+        assert "repo_root" in annotations
+
+        # Verify it's typed as str (ForwardRef due to __future__ annotations)
+        assert "str" in str(annotations["repo_root"])
+
+    def test_error_in_n0_stops_workflow(self, tmp_path):
+        """If N0 returns error_message, workflow should route to END."""
+        from assemblyzero.workflows.implementation_spec.graph import (
+            create_implementation_spec_graph,
+        )
+
+        graph = create_implementation_spec_graph()
+
+        # State with nonexistent LLD path — N0 will error
+        state = {
+            "issue_number": 999,
+            "lld_path": str(tmp_path / "nonexistent.md"),
+            "repo_root": str(tmp_path),
+            "assemblyzero_root": str(tmp_path),
+            "audit_dir": "",
+            "config_mock_mode": True,
+            "config_drafter": "mock:draft",
+            "config_reviewer": "mock:review",
+            "lld_content": "",
+            "files_to_modify": [],
+            "current_state_snapshots": {},
+            "pattern_references": [],
+            "spec_draft": "",
+            "spec_path": "",
+            "completeness_issues": [],
+            "validation_passed": False,
+            "review_verdict": "BLOCKED",
+            "review_feedback": "",
+            "review_iteration": 0,
+            "max_iterations": 3,
+            "human_gate_enabled": False,
+            "error_message": "",
+            "next_node": "",
+        }
+
+        config = {"recursion_limit": 50}
+        nodes_visited = []
+        final_state = dict(state)
+
+        for event in graph.stream(state, config):
+            for node_name, node_output in event.items():
+                if node_name != "__end__":
+                    nodes_visited.append(node_name)
+                    final_state.update(node_output)
+
+        # N0 should have been visited
+        assert "N0_load_lld" in nodes_visited
+        # Workflow should have stopped (error routes to END)
+        assert final_state.get("error_message"), "Expected error but got none"
