@@ -168,6 +168,10 @@ def finalize_spec(state: ImplementationSpecState) -> dict[str, Any]:
             dir=str(output_dir),
         )
         tmp_path = Path(tmp_path_str)
+        # Close the fd from mkstemp BEFORE writing — Windows locks
+        # the file while the original fd is open (WinError 32).
+        import os
+        os.close(fd)
         try:
             tmp_path.write_text(finalized_content, encoding="utf-8")
             # Atomic rename (replace if exists)
@@ -177,13 +181,6 @@ def finalize_spec(state: ImplementationSpecState) -> dict[str, Any]:
             if tmp_path.exists():
                 tmp_path.unlink()
             raise
-        finally:
-            # Close the file descriptor (mkstemp opens it)
-            import os
-            try:
-                os.close(fd)
-            except OSError:
-                pass  # Already closed by write_text or replace
     except OSError as e:
         print(f"    ERROR: Failed to write spec file: {e}")
         return {

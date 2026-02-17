@@ -193,6 +193,7 @@ def generate_spec(state: ImplementationSpecState) -> dict[str, Any]:
     result = drafter.invoke(
         system_prompt=DRAFTER_SYSTEM_PROMPT,
         content=prompt,
+        timeout_seconds=600,  # 10 min — impl specs are large
     )
 
     if not result.success:
