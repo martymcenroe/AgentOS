@@ -109,10 +109,12 @@ def validate_test_structure(
 
             for child in ast.walk(node):
                 if isinstance(child, ast.Assert):
-                    # Check if it's a real assertion (not assert False)
+                    # Issue #386: Accept `assert False, 'TDD RED: ...'` as valid
+                    # TDD scaffold intentionally generates failing assertions.
+                    # Only reject bare `assert False` without a message.
                     if isinstance(child.test, ast.Constant):
-                        if child.test.value is False:
-                            continue  # Skip assert False
+                        if child.test.value is False and child.msg is None:
+                            continue  # Skip bare assert False (no message)
                     has_real_assertion = True
                     break
 
@@ -231,14 +233,14 @@ def validate_tests_mechanical_node(state: dict[str, Any]) -> dict[str, Any]:
     all_errors = []
     stub_count = 0
 
-    # Step 1: Detect stub patterns
-    stub_errors = detect_stub_patterns(generated_tests)
-    if stub_errors:
-        stub_count = len(stub_errors)
-        all_errors.extend(stub_errors)
-        print(f"    Found {stub_count} stub patterns")
+    # Issue #386: Skip stub pattern detection for TDD scaffold validation.
+    # The TDD workflow intentionally generates `assert False, 'TDD RED: ...'`
+    # as failing test placeholders. Flagging these as "stubs" creates a
+    # circular rejection loop (scaffold → validate → reject → scaffold).
+    # Stub detection is only useful for non-TDD generated tests.
+    # The red/green phases (N3/N5) validate test behavior instead.
 
-    # Step 2: Validate structure with AST
+    # Step 2: Validate structure with AST (imports, test functions exist)
     structure_errors = validate_test_structure(generated_tests, scenarios)
     all_errors.extend(structure_errors)
 

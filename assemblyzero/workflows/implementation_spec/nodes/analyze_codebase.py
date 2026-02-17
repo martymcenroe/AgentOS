@@ -92,9 +92,16 @@ def analyze_codebase(state: ImplementationSpecState) -> dict[str, Any]:
     files_to_modify = state.get("files_to_modify", [])
     lld_content = state.get("lld_content", "")
 
-    # Resolve repo root
+    # Resolve repo root — never fall back to cwd (Issue #391)
     repo_root_str = state.get("repo_root", "")
-    repo_root = Path(repo_root_str) if repo_root_str else Path.cwd()
+    if not repo_root_str:
+        print("    [GUARD] ERROR: repo_root not set in state — cannot analyze codebase")
+        return {
+            "current_state_snapshots": {},
+            "pattern_references": [],
+            "error_message": "repo_root not set in state. Pass --repo to the CLI.",
+        }
+    repo_root = Path(repo_root_str)
 
     # --------------------------------------------------------------------------
     # GUARD: Must have files to analyze

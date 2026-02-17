@@ -251,12 +251,31 @@ START YOUR RESPONSE WITH THE # HEADING. NO PREAMBLE."""
 
     else:
         # Initial draft mode
+        # Issue #389: Include repo structure so drafter uses real paths
+        repo_context = ""
+        target_repo = state.get("target_repo", "")
+        if target_repo:
+            repo_structure = get_repo_structure(target_repo)
+            repo_context = f"""## TARGET REPOSITORY STRUCTURE
+
+**Use ONLY these existing directories** (or explicitly Add new ones in Section 2.1):
+
+```
+{repo_structure}
+```
+
+**To add files in a NEW directory:**
+1. First add the directory itself with Change Type: `Add (Directory)`
+2. Then add files inside it with Change Type: `Add`
+
+"""
+
         prompt = f"""IMPORTANT: Output ONLY the markdown content. Start with # title. No preamble.
 
 ## {input_label}
 {input_content}
 
-## Template (follow this structure)
+{repo_context}## Template (follow this structure)
 {template}
 
 Create a complete document following the template structure.

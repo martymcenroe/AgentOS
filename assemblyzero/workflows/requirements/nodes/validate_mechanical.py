@@ -770,8 +770,13 @@ def validate_file_paths(
     directories_to_create: set[str] = set()
     
     # First pass: collect all directories that will be created
+    # Issue #388: Also collect parent directories implied by Add file entries
     for file_info in files:
-        if file_info.get("is_directory", False) and file_info.get("change_type") == "Add":
+        if file_info.get("change_type") != "Add":
+            continue
+
+        if file_info.get("is_directory", False):
+            # Explicit directory creation
             dir_path = file_info["path"].replace("\\", "/").rstrip("/")
             directories_to_create.add(dir_path)
             # Also add all parent paths that this directory implies
@@ -780,6 +785,18 @@ def validate_file_paths(
                 parent = "/".join(parts[:i])
                 if parent:
                     directories_to_create.add(parent)
+        else:
+            # Issue #388: Add file entries imply their parent directories
+            # e.g., "new_package/module.py" implies "new_package/" exists
+            parent_path = str(Path(file_info["path"]).parent).replace("\\", "/")
+            if parent_path and parent_path != ".":
+                directories_to_create.add(parent_path)
+                # Also add ancestor directories
+                parts = parent_path.split("/")
+                for i in range(1, len(parts)):
+                    ancestor = "/".join(parts[:i])
+                    if ancestor:
+                        directories_to_create.add(ancestor)
 
     for file_info in files:
         path = file_info["path"]

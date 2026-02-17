@@ -77,7 +77,7 @@ You ARE reviewing:
 # =============================================================================
 
 
-async def review_spec(state: ImplementationSpecState) -> dict[str, Any]:
+def review_spec(state: ImplementationSpecState) -> dict[str, Any]:
     """N5: Send spec to Gemini for implementation readiness review.
 
     Issue #304: Implementation Readiness Review Workflow

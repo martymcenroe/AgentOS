@@ -31,7 +31,6 @@ Test IDs map to LLD Section 10.0/10.1:
 - T100: CLI runs full workflow
 """
 
-import asyncio
 import os
 import pytest
 import textwrap
@@ -1207,7 +1206,7 @@ class TestGenerateSpec:
 
         from assemblyzero.workflows.implementation_spec.nodes.generate_spec import generate_spec
 
-        result = asyncio.run(generate_spec(base_state))
+        result = generate_spec(base_state)
         assert result["error_message"] == ""
         assert "Implementation Spec" in result["spec_draft"]
         drafter.invoke.assert_called_once()
@@ -1225,7 +1224,7 @@ class TestGenerateSpec:
 
         from assemblyzero.workflows.implementation_spec.nodes.generate_spec import generate_spec
 
-        result = asyncio.run(generate_spec(base_state))
+        result = generate_spec(base_state)
         assert result["error_message"] != ""
 
     @patch("assemblyzero.workflows.implementation_spec.nodes.generate_spec.get_provider")
@@ -1246,7 +1245,7 @@ class TestGenerateSpec:
 
         from assemblyzero.workflows.implementation_spec.nodes.generate_spec import generate_spec
 
-        result = asyncio.run(generate_spec(base_state))
+        result = generate_spec(base_state)
         assert result["error_message"] == ""
         assert result["review_iteration"] == 1
 
@@ -1350,7 +1349,7 @@ class TestReviewSpec:
 
         from assemblyzero.workflows.implementation_spec.nodes.review_spec import review_spec
 
-        result = asyncio.run(review_spec(base_state))
+        result = review_spec(base_state)
         assert result["error_message"] == ""
         assert result["review_verdict"] == "APPROVED"
 
@@ -1373,7 +1372,7 @@ class TestReviewSpec:
 
         from assemblyzero.workflows.implementation_spec.nodes.review_spec import review_spec
 
-        result = asyncio.run(review_spec(base_state))
+        result = review_spec(base_state)
         assert result["review_verdict"] == "REVISE"
         assert result["review_feedback"] != ""
 
@@ -1386,7 +1385,7 @@ class TestReviewSpec:
 
         from assemblyzero.workflows.implementation_spec.nodes.review_spec import review_spec
 
-        result = asyncio.run(review_spec(base_state))
+        result = review_spec(base_state)
         assert result["review_verdict"] == "BLOCKED"
         mock_provider.assert_not_called()
 
@@ -1397,7 +1396,7 @@ class TestReviewSpec:
 
         from assemblyzero.workflows.implementation_spec.nodes.review_spec import review_spec
 
-        result = asyncio.run(review_spec(base_state))
+        result = review_spec(base_state)
         assert result["review_verdict"] == "BLOCKED"
         mock_provider.assert_not_called()
 

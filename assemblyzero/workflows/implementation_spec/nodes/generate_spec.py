@@ -91,7 +91,7 @@ Do not skip or abbreviate any section."""
 # =============================================================================
 
 
-async def generate_spec(state: ImplementationSpecState) -> dict[str, Any]:
+def generate_spec(state: ImplementationSpecState) -> dict[str, Any]:
     """N2: Generate Implementation Spec draft using Claude.
 
     Issue #304: Implementation Readiness Review Workflow

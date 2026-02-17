@@ -315,6 +315,10 @@ def verify_green_phase(state: TestingWorkflowState) -> dict[str, Any]:
             if rel_path_str.endswith(".py"):
                 rel_path_str = rel_path_str[:-3]  # Remove .py extension
             coverage_module = rel_path_str.replace("/", ".").replace("\\", ".")
+            # Issue #387: Strip src. prefix for src-layout projects
+            # src/ is a namespace directory, not a Python package
+            if coverage_module.startswith("src."):
+                coverage_module = coverage_module[4:]
             print(f"    DEBUG: coverage_module (after conversion) = {coverage_module}")
             break
 

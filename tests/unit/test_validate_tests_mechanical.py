@@ -43,8 +43,8 @@ def test_add():
 
         assert result.get("validation_result", {}).get("is_valid", False) is True
 
-    def test_node_returns_invalid_for_stubs(self):
-        """Validation node fails for stub tests."""
+    def test_node_accepts_tdd_red_scaffolds(self):
+        """Issue #386: TDD RED scaffold with assert False + message is valid."""
         from assemblyzero.workflows.testing.nodes.validate_tests_mechanical import (
             validate_tests_mechanical_node,
         )
@@ -67,8 +67,33 @@ def test_example():
         result = validate_tests_mechanical_node(state)
 
         validation = result.get("validation_result", {})
+        assert validation.get("is_valid") is True
+
+    def test_node_rejects_pass_only_tests(self):
+        """Tests with only pass (no assertions) are invalid."""
+        from assemblyzero.workflows.testing.nodes.validate_tests_mechanical import (
+            validate_tests_mechanical_node,
+        )
+
+        state = {
+            "generated_tests": '''
+import pytest
+
+def test_example():
+    pass
+''',
+            "parsed_scenarios": {
+                "scenarios": [
+                    {"test_id": "T010", "test_name": "test_example"}
+                ]
+            },
+            "scaffold_attempts": 0,
+        }
+
+        result = validate_tests_mechanical_node(state)
+
+        validation = result.get("validation_result", {})
         assert validation.get("is_valid") is False
-        assert validation.get("stub_count", 0) > 0
 
     def test_node_increments_attempts(self):
         """Validation node increments scaffold_attempts on failure."""

@@ -191,9 +191,10 @@ Provide your verdict in this exact format:
 - [list any tests that aren't real executable tests]
 
 ## Verdict
-[x] **APPROVED** - Test plan is ready for implementation
-OR
-[x] **BLOCKED** - Test plan needs revision
+[ ] **APPROVED** - Test plan is ready for implementation
+[ ] **BLOCKED** - Test plan needs revision
+
+Mark EXACTLY ONE option with [X].
 
 ## Required Changes (if BLOCKED)
 1. [specific change needed]
@@ -397,6 +398,10 @@ def review_test_plan(state: TestingWorkflowState) -> dict[str, Any]:
 def _parse_verdict(verdict_content: str) -> str:
     """Parse verdict from Gemini response.
 
+    Issue #385: More robust parsing to avoid false BLOCKED results.
+    Checks checked checkboxes first, then verdict keyword patterns,
+    then falls back to keyword presence with priority to APPROVED.
+
     Args:
         verdict_content: Gemini response text.
 
@@ -405,17 +410,44 @@ def _parse_verdict(verdict_content: str) -> str:
     """
     content_upper = verdict_content.upper()
 
-    # Look for explicit verdict markers
-    if "[X] **APPROVED**" in content_upper or "[X] APPROVED" in content_upper:
-        return "APPROVED"
+    # Primary: Look for checked checkboxes [X] or [x]
+    has_approved_checked = bool(
+        re.search(r"\[X\]\s*\**APPROVED\**", content_upper)
+    )
+    has_blocked_checked = bool(
+        re.search(r"\[X\]\s*\**BLOCKED\**", content_upper)
+    )
 
-    if "[X] **BLOCKED**" in content_upper or "[X] BLOCKED" in content_upper:
+    # If only one is checked, use it
+    if has_approved_checked and not has_blocked_checked:
+        return "APPROVED"
+    if has_blocked_checked and not has_approved_checked:
         return "BLOCKED"
 
-    if "APPROVED" in content_upper and "BLOCKED" not in content_upper:
+    # Secondary: Look for "Verdict: X" pattern
+    verdict_match = re.search(
+        r"VERDICT[:\s]+\**\s*(APPROVED|BLOCKED)\b", content_upper
+    )
+    if verdict_match:
+        return verdict_match.group(1)
+
+    # Tertiary: If both or neither checkbox found, check verdict section
+    # Look for the ## Verdict section and see what's checked there
+    verdict_section = re.search(
+        r"##\s*VERDICT\s*\n(.*?)(?=\n##|\Z)", content_upper, re.DOTALL
+    )
+    if verdict_section:
+        section_text = verdict_section.group(1)
+        if "APPROVED" in section_text and "BLOCKED" not in section_text:
+            return "APPROVED"
+        if "BLOCKED" in section_text and "APPROVED" not in section_text:
+            return "BLOCKED"
+
+    # Fallback: presence of keywords (APPROVED gets priority)
+    if "APPROVED" in content_upper:
         return "APPROVED"
 
-    # Default to BLOCKED if unclear
+    # Default to BLOCKED if truly unclear
     return "BLOCKED"
 
 

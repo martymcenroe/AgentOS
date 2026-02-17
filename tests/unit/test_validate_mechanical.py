@@ -392,13 +392,27 @@ class TestValidateFilePaths:
         assert len(errors) == 0
 
     def test_add_file_with_invalid_parent_returns_error(self, mock_repo):
-        """T060: Validate Add file with invalid parent returns ERROR."""
-        files = [{"path": "assemblyzero/nonexistent_dir/new_file.py", "change_type": "Add"}]
+        """T060: Validate Modify file with nonexistent path returns ERROR.
+
+        Issue #388: Single Add files now imply their parent directory,
+        so Add file alone no longer triggers this error. Modify files
+        in nonexistent directories still do.
+        """
+        files = [{"path": "assemblyzero/nonexistent_dir/old_file.py", "change_type": "Modify"}]
         errors = validate_file_paths(files, mock_repo)
 
         assert len(errors) == 1
-        assert "parent" in errors[0].message.lower() or "directory" in errors[0].message.lower()
         assert errors[0].severity == ValidationSeverity.ERROR
+
+    def test_add_file_implies_parent_directory(self, mock_repo):
+        """Issue #388: Add file entries imply parent directories exist."""
+        files = [
+            {"path": "assemblyzero/new_package/module.py", "change_type": "Add"},
+            {"path": "assemblyzero/new_package/__init__.py", "change_type": "Add"},
+        ]
+        errors = validate_file_paths(files, mock_repo)
+
+        assert len(errors) == 0
 
     def test_delete_nonexistent_file_returns_error(self, mock_repo):
         """Delete file that doesn't exist returns ERROR."""
