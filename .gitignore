@@ -22,6 +22,9 @@ logs/batch/
 logs/active/
 !logs/active/.gitkeep
 
+# Environment secrets
+.env
+
 # Python cache
 __pycache__/
 *.pyc

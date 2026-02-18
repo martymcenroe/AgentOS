@@ -153,8 +153,8 @@ Examples:
     # LLM configuration
     parser.add_argument(
         "--drafter",
-        default="claude:opus-4.5",
-        help="Drafter LLM spec (default: claude:opus-4.5)",
+        default="claude:opus",
+        help="Drafter LLM spec (default: claude:opus)",
     )
     parser.add_argument(
         "--reviewer",

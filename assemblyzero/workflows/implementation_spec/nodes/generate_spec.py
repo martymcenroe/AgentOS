@@ -42,7 +42,7 @@ from assemblyzero.workflows.implementation_spec.state import (
 SPEC_TEMPLATE_PATH = Path("docs/standards/0701-implementation-spec-template.md")
 
 # Default drafter model spec
-DEFAULT_DRAFTER = "claude:opus-4.5"
+DEFAULT_DRAFTER = "claude:opus"
 
 # Maximum characters for pattern reference excerpts in the prompt
 MAX_PATTERN_EXCERPT_CHARS = 3_000

@@ -147,7 +147,7 @@ class TestArgumentParsing:
             "--issue", "42",
         ])
 
-        assert args.drafter == "claude:opus-4.5"
+        assert args.drafter == "claude:opus"
         assert args.reviewer == "gemini:3-pro-preview"
         assert args.review == "none"
         assert args.mock is False
@@ -200,7 +200,7 @@ class TestBuildInitialState:
         args = Mock()
         args.type = "issue"
         args.brief = "ideas/active/feature.md"
-        args.drafter = "claude:opus-4.5"
+        args.drafter = "claude:opus"
         args.reviewer = "gemini:3-pro-preview"
         args.review = "all"
         args.mock = False
@@ -215,7 +215,7 @@ class TestBuildInitialState:
 
         assert state["workflow_type"] == "issue"
         assert state["brief_file"] == "ideas/active/feature.md"
-        assert state["config_drafter"] == "claude:opus-4.5"
+        assert state["config_drafter"] == "claude:opus"
         assert state["config_gates_draft"] is True
         assert state["config_gates_verdict"] is True
 

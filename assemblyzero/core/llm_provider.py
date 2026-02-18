@@ -1,14 +1,19 @@
 """LLM Provider abstraction for pluggable model support.
 
 Issue #101: Unified Governance Workflow
+Issue #395: Anthropic API provider with CLI→API fallback
 
 Provides a unified interface for calling different LLM providers:
-- Claude (via claude -p CLI, uses Max subscription)
+- Claude CLI (via claude -p CLI, uses Max subscription)
+- Anthropic API (direct API calls, requires ANTHROPIC_API_KEY in .env)
 - Gemini (via GeminiClient with credential rotation)
 - OpenAI (future)
 - Ollama (future)
 
-Spec format: provider:model (e.g. "claude:opus-4.5", "gemini:2.5-pro")
+Spec format: provider:model (e.g. "claude:opus", "anthropic:haiku", "gemini:2.5-pro")
+
+The "claude:" prefix uses CLI first (free via Max subscription), and automatically
+falls back to the Anthropic API if an API key is configured in .env.
 """
 
 import json
@@ -91,6 +96,42 @@ def log_llm_call(result: LLMCallResult) -> None:
     print("    " + " ".join(parts))
 
 
+def _load_anthropic_api_key() -> Optional[str]:
+    """Load ANTHROPIC_API_KEY from the .env file at the repo root.
+
+    Does NOT check os.environ — setting ANTHROPIC_API_KEY as an OS env var
+    conflicts with Claude Code's auth. The .env file is the only source.
+
+    Returns:
+        The API key string, or None if .env is missing or key not found.
+    """
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    if not env_path.exists():
+        return None
+
+    try:
+        text = env_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if key == "ANTHROPIC_API_KEY":
+            # Strip surrounding quotes
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+                value = value[1:-1]
+            return value if value else None
+
+    return None
+
+
 class LLMProvider(ABC):
     """Abstract base class for LLM providers.
 
@@ -136,36 +177,40 @@ class ClaudeCLIProvider(LLMProvider):
     Max subscription without requiring API credits.
 
     Supported models:
-    - opus-4.5 (default for governance)
+    - opus (default for governance)
     - sonnet (faster, lower quality)
     - haiku (fastest, lowest quality)
     """
 
     # Model mapping from friendly names to actual model specs
     MODEL_MAP = {
-        "opus-4.5": "claude-opus-4-5-20251101",
-        "opus": "claude-opus-4-5-20251101",
-        "sonnet": "claude-sonnet-4-20250514",
-        "haiku": "claude-haiku-4-20250514",
+        "opus": "claude-opus-4-6",
+        "sonnet": "claude-sonnet-4-6",
+        "haiku": "claude-haiku-4-5",
     }
 
-    def __init__(self, model: str = "opus-4.5"):
+    def __init__(self, model: str = "opus"):
         """Initialize Claude CLI provider.
 
         Args:
-            model: Model identifier (opus-4.5, sonnet, haiku).
+            model: Model identifier (opus, sonnet, haiku) or full model ID.
 
         Raises:
             ValueError: If model is not recognized.
         """
         # Normalize model name
         model_lower = model.lower()
-        if model_lower not in self.MODEL_MAP:
+        if model_lower in self.MODEL_MAP:
+            self._model = model_lower
+            self._model_id = self.MODEL_MAP[model_lower]
+        elif model_lower.startswith("claude-"):
+            # Passthrough: accept full model IDs like claude-opus-4-7-20260415
+            self._model = model_lower
+            self._model_id = model_lower
+        else:
             valid = ", ".join(self.MODEL_MAP.keys())
             raise ValueError(f"Unknown Claude model '{model}'. Valid: {valid}")
 
-        self._model = model_lower
-        self._model_id = self.MODEL_MAP[model_lower]
         self._cli_path: Optional[str] = None
 
     @property
@@ -356,6 +401,279 @@ class ClaudeCLIProvider(LLMProvider):
             )
             log_llm_call(call_result)
             return call_result
+
+
+class AnthropicProvider(LLMProvider):
+    """Anthropic API provider for direct Claude API calls.
+
+    Issue #395: Provides direct API access with proper token tracking,
+    cost calculation, and error handling. Requires ANTHROPIC_API_KEY in .env.
+
+    Supported models:
+    - opus (claude-opus-4-6)
+    - sonnet (claude-sonnet-4-6)
+    - haiku (claude-haiku-4-5)
+    - Any full model ID as passthrough (e.g. claude-opus-4-7-20260415)
+    """
+
+    MODEL_MAP = {
+        "opus": "claude-opus-4-6",
+        "sonnet": "claude-sonnet-4-6",
+        "haiku": "claude-haiku-4-5",
+    }
+
+    MAX_TOKENS = 65536
+
+    # Pricing per million tokens (input, output)
+    _PRICING: dict[str, tuple[float, float]] = {
+        "claude-opus-4-6": (5.0, 25.0),
+        "claude-sonnet-4-6": (3.0, 15.0),
+        "claude-haiku-4-5": (1.0, 5.0),
+    }
+
+    def __init__(self, model: str = "opus"):
+        """Initialize Anthropic API provider.
+
+        Args:
+            model: Model alias (opus, sonnet, haiku) or full model ID.
+        """
+        model_lower = model.lower()
+        if model_lower in self.MODEL_MAP:
+            self._model = model_lower
+            self._model_id = self.MODEL_MAP[model_lower]
+        else:
+            # Passthrough for full model IDs
+            self._model = model_lower
+            self._model_id = model_lower
+
+        self._client = None
+
+    @property
+    def provider_name(self) -> str:
+        return "anthropic"
+
+    @property
+    def model(self) -> str:
+        return self._model
+
+    def _get_client(self):
+        """Get or create Anthropic client.
+
+        Raises:
+            RuntimeError: If API key not found in .env.
+        """
+        if self._client is None:
+            import anthropic
+
+            api_key = _load_anthropic_api_key()
+            if not api_key:
+                raise RuntimeError(
+                    "ANTHROPIC_API_KEY not found in .env file. "
+                    "Add it to the .env file at the repo root."
+                )
+            self._client = anthropic.Anthropic(api_key=api_key)
+        return self._client
+
+    def _calculate_cost(
+        self,
+        input_tokens: int,
+        output_tokens: int,
+        cache_read_tokens: int = 0,
+        cache_creation_tokens: int = 0,
+    ) -> float:
+        """Calculate cost in USD for a call.
+
+        Cache read tokens are charged at 10% of input price.
+        Cache creation tokens are charged at 125% of input price.
+        """
+        pricing = self._PRICING.get(self._model_id)
+        if not pricing:
+            return 0.0
+        input_price, output_price = pricing
+        cost = (input_tokens * input_price / 1_000_000) + (
+            output_tokens * output_price / 1_000_000
+        )
+        if cache_read_tokens:
+            cost += cache_read_tokens * (input_price * 0.1) / 1_000_000
+        if cache_creation_tokens:
+            cost += cache_creation_tokens * (input_price * 1.25) / 1_000_000
+        return cost
+
+    def invoke(
+        self,
+        system_prompt: str,
+        content: str,
+        timeout_seconds: int = 300,
+    ) -> LLMCallResult:
+        """Invoke Claude via the Anthropic API.
+
+        Args:
+            system_prompt: System instructions for the model.
+            content: User content to process.
+            timeout_seconds: Maximum time to wait (default 5 minutes).
+
+        Returns:
+            LLMCallResult with response or error.
+        """
+        start_time = time.time()
+
+        try:
+            import httpx
+
+            client = self._get_client()
+
+            response = client.messages.create(
+                model=self._model_id,
+                max_tokens=self.MAX_TOKENS,
+                system=system_prompt,
+                messages=[{"role": "user", "content": content}],
+                timeout=httpx.Timeout(timeout_seconds, connect=30.0),
+            )
+
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            # Extract text from content blocks
+            response_text = ""
+            for block in response.content:
+                if hasattr(block, "text"):
+                    response_text += block.text
+
+            # Extract usage
+            input_tokens = response.usage.input_tokens
+            output_tokens = response.usage.output_tokens
+            cache_read = getattr(response.usage, "cache_read_input_tokens", 0) or 0
+            cache_create = (
+                getattr(response.usage, "cache_creation_input_tokens", 0) or 0
+            )
+
+            cost = self._calculate_cost(
+                input_tokens, output_tokens, cache_read, cache_create
+            )
+
+            call_result = LLMCallResult(
+                success=True,
+                response=response_text,
+                raw_response=str(response),
+                error_message=None,
+                provider=self.provider_name,
+                model_used=self._model,
+                duration_ms=duration_ms,
+                attempts=1,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cache_read_tokens=cache_read,
+                cache_creation_tokens=cache_create,
+                cost_usd=cost,
+            )
+            log_llm_call(call_result)
+            return call_result
+
+        except RuntimeError as e:
+            # No API key
+            duration_ms = int((time.time() - start_time) * 1000)
+            call_result = LLMCallResult(
+                success=False,
+                response=None,
+                raw_response=None,
+                error_message=str(e),
+                provider=self.provider_name,
+                model_used=self._model,
+                duration_ms=duration_ms,
+                attempts=0,
+            )
+            log_llm_call(call_result)
+            return call_result
+        except Exception as e:
+            import anthropic
+
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            rate_limited = isinstance(e, anthropic.RateLimitError)
+            if isinstance(e, anthropic.APITimeoutError):
+                error_msg = f"Anthropic API timed out after {timeout_seconds}s"
+            elif isinstance(e, anthropic.AuthenticationError):
+                error_msg = "Anthropic API authentication failed. Check your API key."
+            elif rate_limited:
+                error_msg = f"Anthropic API rate limited: {e}"
+            else:
+                error_msg = f"Anthropic API error: {e}"
+
+            call_result = LLMCallResult(
+                success=False,
+                response=None,
+                raw_response=None,
+                error_message=error_msg,
+                provider=self.provider_name,
+                model_used=self._model,
+                duration_ms=duration_ms,
+                attempts=1,
+                rate_limited=rate_limited,
+            )
+            log_llm_call(call_result)
+            return call_result
+
+
+class FallbackProvider(LLMProvider):
+    """Tries primary provider first, falls back to secondary on failure.
+
+    Issue #395: Wraps two providers — typically CLI (free) primary with
+    API (paid) fallback for reliability.
+    """
+
+    def __init__(
+        self,
+        primary: LLMProvider,
+        fallback: LLMProvider,
+        primary_timeout: int = 180,
+    ):
+        """Initialize fallback provider.
+
+        Args:
+            primary: First provider to try.
+            fallback: Provider to use if primary fails.
+            primary_timeout: Max timeout for primary (default 180s).
+        """
+        self._primary = primary
+        self._fallback = fallback
+        self._primary_timeout = primary_timeout
+
+    @property
+    def provider_name(self) -> str:
+        return self._primary.provider_name
+
+    @property
+    def model(self) -> str:
+        return self._primary.model
+
+    def invoke(
+        self,
+        system_prompt: str,
+        content: str,
+        timeout_seconds: int = 300,
+    ) -> LLMCallResult:
+        """Invoke primary, fall back to secondary on failure.
+
+        Args:
+            system_prompt: System instructions for the model.
+            content: User content to process.
+            timeout_seconds: Maximum time for fallback provider.
+
+        Returns:
+            LLMCallResult from whichever provider succeeded (or last failure).
+        """
+        # Try primary with shorter timeout
+        effective_timeout = min(timeout_seconds, self._primary_timeout)
+        result = self._primary.invoke(system_prompt, content, effective_timeout)
+        if result.success:
+            return result
+
+        # Primary failed — try fallback with full timeout
+        print(
+            f"    [LLM] {self._primary.provider_name} failed "
+            f"({result.error_message[:80] if result.error_message else 'unknown'}), "
+            f"falling back to {self._fallback.provider_name}..."
+        )
+        return self._fallback.invoke(system_prompt, content, timeout_seconds)
 
 
 class GeminiProvider(LLMProvider):
@@ -580,7 +898,7 @@ def parse_provider_spec(spec: str) -> tuple[str, str]:
     """Parse provider:model specification.
 
     Args:
-        spec: Provider spec like "claude:opus-4.5" or "gemini:2.5-pro".
+        spec: Provider spec like "claude:opus" or "gemini:2.5-pro".
 
     Returns:
         Tuple of (provider_name, model_name).
@@ -591,7 +909,7 @@ def parse_provider_spec(spec: str) -> tuple[str, str]:
     if ":" not in spec:
         raise ValueError(
             f"Invalid provider spec '{spec}'. Expected format: provider:model "
-            f"(e.g., 'claude:opus-4.5', 'gemini:2.5-pro')"
+            f"(e.g., 'claude:opus', 'gemini:2.5-pro')"
         )
 
     parts = spec.split(":", 1)
@@ -605,7 +923,8 @@ def get_provider(spec: str) -> LLMProvider:
     """Factory function to create LLM provider from spec.
 
     Args:
-        spec: Provider specification like "claude:opus-4.5" or "gemini:2.5-pro".
+        spec: Provider specification like "claude:opus", "anthropic:haiku",
+              or "gemini:2.5-pro".
 
     Returns:
         Configured LLMProvider instance.
@@ -614,19 +933,28 @@ def get_provider(spec: str) -> LLMProvider:
         ValueError: If provider or model is not recognized.
 
     Examples:
-        >>> drafter = get_provider("claude:opus-4.5")
+        >>> drafter = get_provider("claude:opus")
+        >>> direct = get_provider("anthropic:haiku")
         >>> reviewer = get_provider("gemini:2.5-pro")
         >>> mock = get_provider("mock:test")
     """
     provider, model = parse_provider_spec(spec)
 
     if provider == "claude":
-        return ClaudeCLIProvider(model=model)
+        cli = ClaudeCLIProvider(model=model)
+        # If API key available, wrap with automatic fallback
+        if _load_anthropic_api_key():
+            api = AnthropicProvider(model=model)
+            return FallbackProvider(primary=cli, fallback=api, primary_timeout=180)
+        return cli
+    elif provider == "anthropic":
+        return AnthropicProvider(model=model)
     elif provider == "gemini":
         return GeminiProvider(model=model)
     elif provider == "mock":
         return MockProvider(model=model)
     else:
         raise ValueError(
-            f"Unknown provider '{provider}'. Supported: claude, gemini, mock"
+            f"Unknown provider '{provider}'. "
+            f"Supported: claude, anthropic, gemini, mock"
         )

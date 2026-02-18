@@ -234,7 +234,7 @@ def create_initial_state(
     workflow_type: Literal["issue", "lld"],
     assemblyzero_root: str,
     target_repo: str,
-    drafter: str = "claude:opus-4.5",
+    drafter: str = "claude:opus",
     reviewer: str = "gemini:3-pro-preview",
     gates_draft: bool = True,
     gates_verdict: bool = True,
