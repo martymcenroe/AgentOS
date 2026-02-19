@@ -127,6 +127,8 @@ class ImplementationSpecState(TypedDict, total=False):
     # Codebase analysis (N1)
     current_state_snapshots: dict[str, str]
     pattern_references: list[PatternRef]
+    project_context: str        # Issue #409: CLAUDE.md conventions + README + metadata
+    import_dependencies: str    # Issue #409: Cross-file import map for files_to_modify
 
     # Generated spec (N2)
     spec_draft: str

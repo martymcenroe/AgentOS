@@ -854,6 +854,86 @@ class TestAnalyzeCodebase:
         assert result["error_message"] == ""
 
 
+class TestBuildProjectContext:
+    """Tests for Issue #409 Gap 1: _build_project_context in N1."""
+
+    def test_analyze_reads_claude_md(self, tmp_path):
+        """N1 extracts conventions from CLAUDE.md when present."""
+        from assemblyzero.workflows.implementation_spec.nodes.analyze_codebase import (
+            _build_project_context,
+        )
+
+        (tmp_path / "CLAUDE.md").write_text(
+            "# CLAUDE.md\n\n## Rules\n\n- Use poetry run python\n",
+            encoding="utf-8",
+        )
+        result = _build_project_context(tmp_path)
+        assert "CLAUDE.md" in result
+        assert "poetry run python" in result
+
+    def test_analyze_skips_missing_claude_md(self, tmp_path):
+        """N1 handles missing CLAUDE.md gracefully."""
+        from assemblyzero.workflows.implementation_spec.nodes.analyze_codebase import (
+            _build_project_context,
+        )
+
+        # No CLAUDE.md, no README.md, no pyproject.toml
+        result = _build_project_context(tmp_path)
+        assert result == ""
+
+    def test_includes_readme(self, tmp_path):
+        """Project context includes README summary."""
+        from assemblyzero.workflows.implementation_spec.nodes.analyze_codebase import (
+            _build_project_context,
+        )
+
+        (tmp_path / "README.md").write_text(
+            "# MyProject\n\nA cool project.\n", encoding="utf-8",
+        )
+        result = _build_project_context(tmp_path)
+        assert "MyProject" in result
+        assert "README" in result
+
+
+class TestExtractImportDependencies:
+    """Tests for Issue #409 Gap 3: _extract_import_dependencies in N1."""
+
+    def test_analyze_extracts_imports(self, tmp_path):
+        """Import extraction returns intra-project imports."""
+        from assemblyzero.workflows.implementation_spec.nodes.analyze_codebase import (
+            _extract_import_dependencies,
+        )
+
+        pkg = tmp_path / "assemblyzero" / "workflows"
+        pkg.mkdir(parents=True)
+        (pkg / "graph.py").write_text(
+            "from assemblyzero.workflows.state import MyState\nimport os\n",
+            encoding="utf-8",
+        )
+
+        files = [{"path": "assemblyzero/workflows/graph.py",
+                  "change_type": "Modify", "description": "Update",
+                  "current_content": None}]
+
+        result = _extract_import_dependencies(files, tmp_path)
+        assert "graph.py" in result
+        assert "assemblyzero.workflows.state" in result
+        # stdlib 'os' should appear too (we capture all ImportFrom, not just intra-project)
+        # But 'import os' is ast.Import, not ImportFrom, so it won't be captured
+
+    def test_empty_for_nonexistent_files(self, tmp_path):
+        """Missing files produce empty result."""
+        from assemblyzero.workflows.implementation_spec.nodes.analyze_codebase import (
+            _extract_import_dependencies,
+        )
+
+        files = [{"path": "nonexistent.py", "change_type": "Add",
+                  "description": "New", "current_content": None}]
+
+        result = _extract_import_dependencies(files, tmp_path)
+        assert result == ""
+
+
 class TestExtractRelevantExcerpt:
     """Tests for extract_relevant_excerpt helper."""
 
@@ -1298,6 +1378,143 @@ class TestBuildDrafterPrompt:
         prompt = build_drafter_prompt(lld_content="# LLD", current_state={}, patterns=patterns)
         assert "node implementation" in prompt
         assert "Similar node" in prompt
+
+
+class TestPromptProjectContext:
+    """Tests for Issue #409: project context and import deps in prompt."""
+
+    def test_prompt_includes_project_context(self):
+        """N2 prompt contains project context section when provided."""
+        from assemblyzero.workflows.implementation_spec.nodes.generate_spec import (
+            build_drafter_prompt,
+        )
+
+        prompt = build_drafter_prompt(
+            lld_content="# LLD\n\nSome feature.",
+            current_state={},
+            patterns=[],
+            template="# Template",
+            issue_number=409,
+            project_context="## Project Context\n\n### CLAUDE.md\n\nUse poetry run python.",
+        )
+        assert "Project Context" in prompt
+        assert "poetry run python" in prompt
+
+    def test_prompt_includes_import_deps(self):
+        """N2 prompt contains import dependencies section when provided."""
+        from assemblyzero.workflows.implementation_spec.nodes.generate_spec import (
+            build_drafter_prompt,
+        )
+
+        prompt = build_drafter_prompt(
+            lld_content="# LLD\n\nSome feature.",
+            current_state={},
+            patterns=[],
+            template="# Template",
+            issue_number=409,
+            import_dependencies="## Import Dependencies\n\n- state.py imports: (none)",
+        )
+        assert "Import Dependencies" in prompt
+        assert "state.py imports" in prompt
+
+    def test_prompt_omits_empty_context(self):
+        """Empty project_context and import_dependencies are not injected."""
+        from assemblyzero.workflows.implementation_spec.nodes.generate_spec import (
+            build_drafter_prompt,
+        )
+
+        prompt = build_drafter_prompt(
+            lld_content="# LLD",
+            current_state={},
+            patterns=[],
+            template="# Template",
+            issue_number=1,
+        )
+        assert "Project Context" not in prompt
+        assert "Import Dependencies" not in prompt
+
+
+class TestTruncatePrompt:
+    """Tests for Issue #409 Gap 4: section-aware prompt truncation."""
+
+    def test_truncation_drops_sections_not_midstring(self):
+        """Truncation drops whole sections by priority, not mid-string."""
+        from assemblyzero.workflows.implementation_spec.nodes.generate_spec import (
+            _truncate_prompt,
+            MAX_TOTAL_PROMPT_CHARS,
+        )
+
+        # Build a prompt that exceeds the limit (120K chars)
+        lld = "## LLD Content (Issue #99)\n\n" + "LLD line.\n" * 100
+        context = "## Project Context\n\n" + "Context line padding.\n" * 5000
+        excerpts = "## Current State of Files to Modify\n\n" + "Code excerpt.\n" * 5000
+        template = "## Implementation Spec Template\n\n" + "Template.\n" * 100
+
+        prompt = "\n\n".join([lld, context, excerpts, template])
+        assert len(prompt) > MAX_TOTAL_PROMPT_CHARS
+
+        result = _truncate_prompt(prompt)
+        assert len(result) <= MAX_TOTAL_PROMPT_CHARS
+        # LLD should survive (highest priority)
+        assert "LLD Content" in result
+        # Template should survive (high priority)
+        assert "Implementation Spec Template" in result
+
+    def test_truncation_preserves_lld_and_template(self):
+        """LLD and template survive truncation even at extreme sizes."""
+        from assemblyzero.workflows.implementation_spec.nodes.generate_spec import (
+            _truncate_prompt,
+            MAX_TOTAL_PROMPT_CHARS,
+        )
+
+        lld = "## LLD Content (Issue #99)\n\nCritical design info."
+        patterns = "## Similar Implementation Patterns\n\n" + "Pattern data.\n" * 6000
+        context = "## Project Context\n\n" + "Context data.\n" * 6000
+        template = "## Implementation Spec Template\n\nFollow this structure."
+
+        prompt = "\n\n".join([lld, patterns, context, template])
+        assert len(prompt) > MAX_TOTAL_PROMPT_CHARS
+
+        result = _truncate_prompt(prompt)
+        assert "Critical design info" in result
+        assert "Follow this structure" in result
+
+    def test_no_truncation_under_limit(self):
+        """Prompts under the limit are returned unchanged."""
+        from assemblyzero.workflows.implementation_spec.nodes.generate_spec import (
+            _truncate_prompt,
+        )
+
+        prompt = "## LLD\n\nShort prompt."
+        assert _truncate_prompt(prompt) == prompt
+
+
+class TestSplitIntoSections:
+    """Tests for _split_into_sections helper."""
+
+    def test_splits_by_headers(self):
+        """Sections are split on ## headers."""
+        from assemblyzero.workflows.implementation_spec.nodes.generate_spec import (
+            _split_into_sections,
+        )
+
+        prompt = "Preamble.\n\n## Section A\n\nContent A.\n\n## Section B\n\nContent B."
+        sections = _split_into_sections(prompt)
+        assert len(sections) == 3
+        assert sections[0]["header"] == ""
+        assert sections[1]["header"] == "Section A"
+        assert sections[2]["header"] == "Section B"
+
+    def test_preserves_order(self):
+        """Sections have incrementing order indices."""
+        from assemblyzero.workflows.implementation_spec.nodes.generate_spec import (
+            _split_into_sections,
+        )
+
+        prompt = "## A\nContent.\n## B\nContent.\n## C\nContent."
+        sections = _split_into_sections(prompt)
+        orders = [s["order"] for s in sections]
+        assert orders == sorted(orders)
 
 
 class TestStripPreamble:

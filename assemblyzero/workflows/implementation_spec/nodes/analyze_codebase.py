@@ -235,9 +235,23 @@ def analyze_codebase(state: ImplementationSpecState) -> dict[str, Any]:
     if len(pattern_references) > 3:
         print(f"      ... and {len(pattern_references) - 3} more")
 
+    # Step 3: Build project context (Issue #409 Gap 1)
+    project_context = _build_project_context(repo_root)
+    if project_context:
+        print(f"    Project context: {len(project_context):,} chars")
+
+    # Step 4: Extract import dependencies (Issue #409 Gap 3)
+    import_dependencies = _extract_import_dependencies(
+        files_to_modify, repo_root
+    )
+    if import_dependencies:
+        print(f"    Import dependencies: {len(import_dependencies):,} chars")
+
     return {
         "current_state_snapshots": current_state_snapshots,
         "pattern_references": pattern_references,
+        "project_context": project_context,
+        "import_dependencies": import_dependencies,
         "files_to_modify": updated_files,
         "error_message": "",
     }
@@ -805,6 +819,132 @@ def _find_tool_patterns(
 # =============================================================================
 # Utility
 # =============================================================================
+
+
+def _build_project_context(repo_root: Path) -> str:
+    """Build project context from CLAUDE.md, README, and metadata.
+
+    Issue #409 Gap 1: Inject project-level conventions and rules
+    into the spec generation prompt.
+
+    Args:
+        repo_root: Repository root path.
+
+    Returns:
+        Formatted project context string, or empty if nothing found.
+    """
+    parts: list[str] = []
+
+    # CLAUDE.md conventions
+    claude_md_path = repo_root / "CLAUDE.md"
+    if claude_md_path.exists():
+        try:
+            content = claude_md_path.read_text(encoding="utf-8", errors="replace")
+            # Keep first 2000 chars — enough for key rules
+            if len(content) > 2000:
+                content = content[:2000] + "\n... (truncated)"
+            parts.append(f"### CLAUDE.md (Project Rules)\n\n{content}")
+        except OSError:
+            pass
+
+    # README summary
+    readme_path = repo_root / "README.md"
+    if readme_path.exists():
+        try:
+            content = readme_path.read_text(encoding="utf-8", errors="replace")
+            # Just first 1500 chars for project overview
+            if len(content) > 1500:
+                content = content[:1500] + "\n... (truncated)"
+            parts.append(f"### README (Project Overview)\n\n{content}")
+        except OSError:
+            pass
+
+    # Project metadata from pyproject.toml
+    pyproject_path = repo_root / "pyproject.toml"
+    if pyproject_path.exists():
+        try:
+            content = pyproject_path.read_text(encoding="utf-8", errors="replace")
+            # Extract just [tool.poetry] or [project] section (first 500 chars)
+            # Don't include full dependency list
+            lines = content.splitlines()
+            meta_lines = []
+            in_section = False
+            for line in lines:
+                if line.strip().startswith("[tool.poetry]") or line.strip().startswith("[project]"):
+                    in_section = True
+                elif line.strip().startswith("[") and in_section:
+                    break
+                if in_section:
+                    meta_lines.append(line)
+                if len(meta_lines) > 15:
+                    break
+            if meta_lines:
+                parts.append(
+                    f"### Project Metadata\n\n```toml\n"
+                    + "\n".join(meta_lines)
+                    + "\n```"
+                )
+        except OSError:
+            pass
+
+    if not parts:
+        return ""
+
+    return "## Project Context\n\n" + "\n\n".join(parts)
+
+
+def _extract_import_dependencies(
+    files_to_modify: list[FileToModify],
+    repo_root: Path,
+) -> str:
+    """Extract intra-project import dependencies for files_to_modify.
+
+    Issue #409 Gap 3: Map which files import from which, so the spec
+    drafter understands file ordering and coupling.
+
+    Args:
+        files_to_modify: List of files from the LLD.
+        repo_root: Repository root path.
+
+    Returns:
+        Formatted import dependency map, or empty if nothing found.
+    """
+    dep_map: dict[str, list[str]] = {}
+
+    for file_spec in files_to_modify:
+        file_path = file_spec["path"]
+        full_path = repo_root / file_path
+
+        if not full_path.exists() or not file_path.endswith(".py"):
+            continue
+
+        try:
+            content = full_path.read_text(encoding="utf-8")
+            tree = ast.parse(content)
+        except (OSError, SyntaxError):
+            continue
+
+        imports: list[str] = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                imports.append(node.module)
+
+        if imports:
+            dep_map[file_path] = imports
+
+    if not dep_map:
+        return ""
+
+    # Format as readable text
+    lines = ["## Import Dependencies (files_to_modify)\n"]
+    for file_path, imports in sorted(dep_map.items()):
+        filename = Path(file_path).name
+        import_list = ", ".join(imports[:10])
+        if len(imports) > 10:
+            import_list += f" (+{len(imports) - 10} more)"
+        lines.append(f"- **{filename}** imports: {import_list}")
+
+    return "\n".join(lines)
 
 
 def _names_similar(name_a: str, name_b: str) -> bool:

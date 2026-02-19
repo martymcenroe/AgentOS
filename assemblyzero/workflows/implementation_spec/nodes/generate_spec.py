@@ -169,6 +169,8 @@ def generate_spec(state: ImplementationSpecState) -> dict[str, Any]:
         completeness_issues=completeness_issues if is_revision else [],
         repo_root=repo_root,
         files_to_modify=state.get("files_to_modify", []),
+        project_context=state.get("project_context", ""),
+        import_dependencies=state.get("import_dependencies", ""),
     )
 
     # -------------------------------------------------------------------------
@@ -254,6 +256,8 @@ def build_drafter_prompt(
     completeness_issues: list[str] | None = None,
     repo_root: str = "",
     files_to_modify: list | None = None,
+    project_context: str = "",
+    import_dependencies: str = "",
 ) -> str:
     """Build the prompt for Claude spec generation.
 
@@ -262,7 +266,9 @@ def build_drafter_prompt(
 
     The prompt includes:
     - Full LLD content
+    - Project context (CLAUDE.md, README, metadata) — Issue #409
     - Current state snapshots for each file to be modified
+    - Import dependencies between files — Issue #409
     - Pattern references with code excerpts
     - Implementation Spec template (if available)
     - Revision feedback (if revising)
@@ -278,6 +284,8 @@ def build_drafter_prompt(
         completeness_issues: List of completeness check failures (for revision).
         repo_root: Target repository root path (for repo structure display).
         files_to_modify: List of FileToModify dicts from the LLD.
+        project_context: CLAUDE.md/README/metadata context (Issue #409).
+        import_dependencies: Cross-file import map (Issue #409).
 
     Returns:
         Complete prompt string for the drafter LLM.
@@ -310,6 +318,8 @@ def build_drafter_prompt(
             template=template,
             issue_number=issue_number,
             files_to_modify=files_to_modify,
+            project_context=project_context,
+            import_dependencies=import_dependencies,
         )
 
 
@@ -325,6 +335,8 @@ def _build_initial_prompt(
     template: str,
     issue_number: int,
     files_to_modify: list,
+    project_context: str = "",
+    import_dependencies: str = "",
 ) -> str:
     """Build prompt for initial spec generation.
 
@@ -335,6 +347,8 @@ def _build_initial_prompt(
         template: Implementation Spec template.
         issue_number: GitHub issue number.
         files_to_modify: List of FileToModify dicts.
+        project_context: CLAUDE.md/README/metadata context (Issue #409).
+        import_dependencies: Cross-file import map (Issue #409).
 
     Returns:
         Initial draft prompt string.
@@ -349,10 +363,18 @@ def _build_initial_prompt(
     # LLD content
     sections.append(f"## LLD Content (Issue #{issue_number})\n\n{lld_content}")
 
+    # Project context (Issue #409 Gap 1)
+    if project_context:
+        sections.append(project_context)
+
     # Current state snapshots
     snapshot_section = _format_current_state_section(current_state, files_to_modify)
     if snapshot_section:
         sections.append(snapshot_section)
+
+    # Import dependencies (Issue #409 Gap 3)
+    if import_dependencies:
+        sections.append(import_dependencies)
 
     # Pattern references
     pattern_section = _format_patterns_section(patterns)
@@ -608,35 +630,135 @@ def _strip_preamble(content: str) -> str:
 
 
 def _truncate_prompt(prompt: str) -> str:
-    """Truncate prompt to stay within token limits.
+    """Truncate prompt by dropping lowest-priority sections first.
 
-    Preserves the beginning (instructions, feedback) and end (template,
-    final instructions) while trimming the middle (file excerpts).
+    Issue #409 Gap 4: Instead of blunt 40%/30% string splitting that
+    loses file excerpts mid-content, parse the prompt into ## sections
+    and drop whole sections in priority order.
+
+    Priority (highest = kept longest):
+      Instructions/preamble, LLD, Template, Current Draft,
+      Completeness Errors, File Excerpts, Import Dependencies,
+      Patterns, Project Context
 
     Args:
         prompt: Full prompt content.
 
     Returns:
-        Truncated prompt.
+        Truncated prompt fitting within MAX_TOTAL_PROMPT_CHARS.
     """
     if len(prompt) <= MAX_TOTAL_PROMPT_CHARS:
         return prompt
 
-    # Keep first 40% and last 30%, truncate middle
-    keep_start = int(MAX_TOTAL_PROMPT_CHARS * 0.4)
-    keep_end = int(MAX_TOTAL_PROMPT_CHARS * 0.3)
+    original_len = len(prompt)
 
-    start = prompt[:keep_start]
-    end = prompt[-keep_end:]
+    # Split into sections by ## headers
+    sections = _split_into_sections(prompt)
 
-    truncation_notice = (
-        "\n\n<!-- CONTEXT TRUNCATED: Prompt exceeded size limit. "
-        "Some file excerpts were removed. -->\n\n"
+    # Priority keywords: lower index = higher priority (kept longer).
+    # Matching is case-insensitive substring on the ## header text.
+    _priority_keywords = [
+        "lld content",
+        "implementation spec template",
+        "current draft",
+        "mechanical completeness",
+        "current state",
+        "gemini",
+        "import dependencies",
+        "similar implementation patterns",
+        "project context",
+    ]
+
+    def _section_priority(section: dict) -> int:
+        header = section["header"].lower()
+        if not header:
+            # Preamble / final instructions — highest priority
+            return -1
+        for i, keyword in enumerate(_priority_keywords):
+            if keyword in header:
+                return i
+        # Unknown sections — drop before known ones
+        return len(_priority_keywords)
+
+    # Build a droppable list sorted by priority (lowest priority first)
+    droppable = sorted(
+        [s for s in sections if _section_priority(s) > 0],
+        key=_section_priority,
+        reverse=True,
     )
+
+    total = sum(len(s["content"]) for s in sections)
+    dropped: list[str] = []
+
+    while total > MAX_TOTAL_PROMPT_CHARS and droppable:
+        victim = droppable.pop(0)
+        sections.remove(victim)
+        total -= len(victim["content"])
+        dropped.append(victim["header"] or "(unnamed)")
+
+    if dropped:
+        # Insert a notice where content was removed
+        notice = (
+            "\n\n<!-- CONTEXT TRIMMED: Dropped sections to fit budget: "
+            + ", ".join(dropped)
+            + " -->\n"
+        )
+        sections.append({"header": "", "content": notice, "order": 999})
+
+    # Reassemble in original order
+    sections.sort(key=lambda s: s["order"])
+    result = "\n\n".join(s["content"] for s in sections)
+
+    # Last resort: if still over budget, hard-truncate at limit
+    if len(result) > MAX_TOTAL_PROMPT_CHARS:
+        result = result[:MAX_TOTAL_PROMPT_CHARS]
 
     print(
-        f"    [WARN] Prompt truncated from {len(prompt):,} to "
-        f"~{MAX_TOTAL_PROMPT_CHARS:,} chars"
+        f"    [WARN] Prompt truncated from {original_len:,} to "
+        f"{len(result):,} chars (dropped: {', '.join(dropped) if dropped else 'none'})"
     )
 
-    return start + truncation_notice + end
+    return result
+
+
+def _split_into_sections(prompt: str) -> list[dict]:
+    """Split a prompt string into sections demarcated by ## headers.
+
+    Each section is a dict with:
+      - header: The ## header text (empty string for preamble/tail).
+      - content: The full text including the header line.
+      - order: Original position index for reassembly.
+
+    Args:
+        prompt: The full prompt string.
+
+    Returns:
+        List of section dicts in original order.
+    """
+    sections: list[dict] = []
+    current_header = ""
+    current_lines: list[str] = []
+
+    for line in prompt.split("\n"):
+        if line.startswith("## "):
+            # Flush previous section
+            if current_lines:
+                sections.append({
+                    "header": current_header,
+                    "content": "\n".join(current_lines),
+                    "order": len(sections),
+                })
+            current_header = line[3:].strip()
+            current_lines = [line]
+        else:
+            current_lines.append(line)
+
+    # Flush last section
+    if current_lines:
+        sections.append({
+            "header": current_header,
+            "content": "\n".join(current_lines),
+            "order": len(sections),
+        })
+
+    return sections
