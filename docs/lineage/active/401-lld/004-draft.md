@@ -10,7 +10,7 @@ Previous: Added sections based on 80 blocking issues from 164 governance verdict
 ## 1. Context & Goal
 * **Issue:** #401
 * **Objective:** Add a codebase analysis node to the requirements workflow so the LLD drafter has real context about the target repository's architecture, patterns, and conventions — eliminating hallucinated designs.
-* **Status:** Approved (gemini-3-pro-preview, 2026-02-18)
+* **Status:** Draft
 * **Related Issues:** #389 (added directory listing — insufficient context)
 
 ### Open Questions
@@ -693,13 +693,6 @@ Mechanical validation automatically checks:
 
 ---
 
-## Reviewer Suggestions
-
-*Non-blocking recommendations from the reviewer.*
-
-- **Constraint Handling:** In `extract_conventions_from_claude_md`, ensure that if the file is extremely large, we prioritized the rules section over general chatter to save tokens.
-- **Stop Words:** For `_find_related_files`, ensure standard English stop words (the, a, is, on, at) are filtered out to improve keyword matching quality.
-
 ## Appendix: Review Log
 
 *Track all review feedback with timestamps and implementation status.*
@@ -708,10 +701,9 @@ Mechanical validation automatically checks:
 
 | Review | Date | Verdict | Key Issue |
 |--------|------|---------|-----------|
-| 1 | 2026-02-18 | APPROVED | `gemini-3-pro-preview` |
 | Mechanical Validation | — | BLOCKED | `draft_lld.py` and `requirements_graph.py` paths do not exist |
 | LLD Revision #1 | — | REVISED | Removed non-existent Modify targets; deferred integration; added missing tests |
 | Mechanical Test Plan Validation | — | FAILED (66.7%) | REQ-4, REQ-8, REQ-9 had no test coverage |
 | LLD Revision #2 | — | REVISED | Added test scenarios 145, 190, 200, 205, 225, 240 for full REQ coverage; added traceability matrix |
 
-**Final Status:** APPROVED
+**Final Status:** PENDING

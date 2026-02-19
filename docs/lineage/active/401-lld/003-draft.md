@@ -10,7 +10,7 @@ Previous: Added sections based on 80 blocking issues from 164 governance verdict
 ## 1. Context & Goal
 * **Issue:** #401
 * **Objective:** Add a codebase analysis node to the requirements workflow so the LLD drafter has real context about the target repository's architecture, patterns, and conventions — eliminating hallucinated designs.
-* **Status:** Approved (gemini-3-pro-preview, 2026-02-18)
+* **Status:** Draft
 * **Related Issues:** #389 (added directory listing — insufficient context)
 
 ### Open Questions
@@ -540,15 +540,11 @@ graph TD
 | T120 | `test_extract_conventions_from_claude_md` | Extracts bullet-point conventions from CLAUDE.md | RED |
 | T130 | `test_extract_conventions_empty` | Returns empty list for CLAUDE.md without conventions | RED |
 | T140 | `test_analyze_codebase_happy_path` | Produces full CodebaseContext from mock repo | RED |
-| T145 | `test_analyze_codebase_context_has_real_paths` | Generated context references real file paths and patterns from target codebase | RED |
 | T150 | `test_analyze_codebase_no_repo_path` | Returns empty context, logs warning | RED |
 | T160 | `test_analyze_codebase_missing_repo` | Returns empty context when repo_path doesn't exist | RED |
 | T170 | `test_find_related_files_keyword_match` | Finds auth.py when issue mentions "authentication" | RED |
 | T180 | `test_find_related_files_no_match` | Returns empty list for unrelated issue text | RED |
 | T185 | `test_find_related_files_max_five` | Returns at most 5 results even with many matches | RED |
-| T190 | `test_analyze_codebase_produces_state_key` | Node returns dict with `codebase_context` key matching CodebaseContext shape | RED |
-| T200 | `test_sensitive_file_not_read_env` | `.env` file content never appears in any read result | RED |
-| T205 | `test_sensitive_file_not_read_pem` | `.pem` file content never appears in any read result | RED |
 | T210 | `test_select_key_files_priority_order` | CLAUDE.md before README.md before pyproject.toml | RED |
 | T220 | `test_sensitive_file_exclusion` | .env, .secrets files are not read | RED |
 | T225 | `test_is_sensitive_file` | Correctly identifies sensitive file patterns | RED |
@@ -566,37 +562,32 @@ graph TD
 
 | ID | Scenario | Type | Input | Expected Output | Pass Criteria |
 |----|----------|------|-------|-----------------|---------------|
-| 010 | Read file within budget (REQ-1) | Auto | Small text file, budget=2000 | Full content, truncated=False | Content matches file, token_estimate < 2000 |
-| 020 | Read file exceeding budget (REQ-6) | Auto | 10KB file, budget=500 | Partial content, truncated=True | Content length ≈ 500×4 chars, truncated=True |
-| 030 | Read binary file gracefully (REQ-7) | Auto | PNG file path | Empty content, no exception | Returns FileReadResult with empty content |
-| 040 | Read missing file gracefully (REQ-7) | Auto | Non-existent path | Empty content, no exception | Returns FileReadResult with empty content |
-| 050 | Total budget enforcement (REQ-6) | Auto | 10 files, total_budget=5000 | First N files read, rest skipped | Sum of token_estimates ≤ 5000 |
-| 055 | Per-file budget enforcement (REQ-6) | Auto | 1 large file, per_file_budget=500 | Single file truncated | token_estimate ≤ 500 |
-| 060 | Parse pyproject.toml (REQ-1) | Auto | Valid pyproject.toml | Dict with name, dependencies | Keys present, deps list non-empty |
-| 070 | Parse package.json (REQ-1) | Auto | Valid package.json | Dict with name, dependencies | Keys present, deps list non-empty |
-| 080 | Parse missing config (REQ-7) | Auto | Repo with no config file | Empty dict | Returns {} |
-| 090 | Detect naming conventions (REQ-2) | Auto | Python files with snake_case | PatternAnalysis.naming_convention set | Contains "snake_case" |
-| 100 | Detect TypedDict pattern (REQ-2) | Auto | File with TypedDict import | PatternAnalysis.state_pattern set | Contains "TypedDict" |
-| 105 | Unknown pattern defaults (REQ-7) | Auto | Empty file_contents dict | All fields "unknown" | All PatternAnalysis values == "unknown" |
-| 110 | Detect frameworks from deps (REQ-2) | Auto | deps=["langgraph", "pytest"] | ["LangGraph", "pytest"] | Both detected |
-| 115 | Detect frameworks from imports (REQ-2) | Auto | File with `from fastapi import` | ["FastAPI"] in result | FastAPI detected |
-| 120 | Extract CLAUDE.md conventions (REQ-1) | Auto | CLAUDE.md with rule bullets | List of convention strings | Non-empty list, strings match rules |
-| 130 | Extract empty conventions (REQ-7) | Auto | CLAUDE.md with no rules section | Empty list | Returns [] |
-| 140 | Full analysis happy path (REQ-4) | Auto | Mock repo with all key files, issue text referencing existing modules | Complete CodebaseContext with real file paths and patterns | All fields populated; file paths in key_file_excerpts and related_code exist in mock repo |
-| 145 | Context references real paths and patterns (REQ-4) | Auto | Mock repo with known structure + specific issue text | CodebaseContext.key_file_excerpts keys are real file paths; conventions match CLAUDE.md content | Every path in context exists in mock_repo; every convention string traceable to CLAUDE.md |
-| 150 | Analysis with no repo_path (REQ-7) | Auto | State with repo_path=None | Empty CodebaseContext | All fields empty/default |
-| 160 | Analysis with bad repo_path (REQ-7) | Auto | State with non-existent path | Empty CodebaseContext | All fields empty/default |
-| 170 | Find related files - match (REQ-3) | Auto | Issue "fix auth", repo has auth.py | [auth.py] | auth.py in results |
-| 180 | Find related files - no match (REQ-3) | Auto | Issue "fix auth", repo has no auth | [] | Empty list |
-| 185 | Find related files - max results (REQ-3) | Auto | Issue matching 10+ files | At most 5 paths | len(result) <= 5 |
-| 190 | Node produces codebase_context state key (REQ-8) | Auto | Mock repo with CLAUDE.md and source files | Dict with `codebase_context` key; value is dict matching CodebaseContext shape | Return dict has key `codebase_context`; nested dict has all CodebaseContext keys; no unexpected keys |
-| 200 | Sensitive .env file never read (REQ-9) | Auto | Repo with `.env` file containing `SECRET=abc123` | `.env` not in any read results; `abc123` not in any content | No FileReadResult.path ends with `.env`; `abc123` absent from all content strings |
-| 205 | Sensitive .pem file never read (REQ-9) | Auto | Repo with `server.pem` file containing certificate data | `server.pem` not in any read results | No FileReadResult.path contains `server.pem` |
-| 210 | Key file priority ordering (REQ-1) | Auto | Repo with CLAUDE.md + README | CLAUDE.md before README | Index of CLAUDE.md < index of README |
-| 220 | Sensitive file exclusion via is_sensitive_file (REQ-9) | Auto | Repo with .env file | .env not in read results | .env path not in any FileReadResult |
-| 225 | is_sensitive_file detection (REQ-9) | Auto | Various sensitive paths (.env, .pem, credentials/db.yml, main.py) | True for .env, .pem, credentials/db.yml; False for main.py | Correct bool for each input path |
-| 230 | Symlink outside repo blocked (REQ-9) | Auto | Symlink to /tmp/secret.txt in repo | Empty content returned | FileReadResult.content == "" |
-| 240 | Cross-repo analysis via repo_path (REQ-5) | Auto | State with repo_path pointing to a second mock repo in fixtures | CodebaseContext populated from second repo's files | key_file_excerpts contain content from second mock repo, not from primary project |
+| 010 | Read file within budget | Auto | Small text file, budget=2000 | Full content, truncated=False | Content matches file, token_estimate < 2000 |
+| 020 | Read file exceeding budget | Auto | 10KB file, budget=500 | Partial content, truncated=True | Content length ≈ 500×4 chars, truncated=True |
+| 030 | Read binary file gracefully | Auto | PNG file path | Empty content, no exception | Returns FileReadResult with empty content |
+| 040 | Read missing file gracefully | Auto | Non-existent path | Empty content, no exception | Returns FileReadResult with empty content |
+| 050 | Total budget enforcement | Auto | 10 files, total_budget=5000 | First N files read, rest skipped | Sum of token_estimates ≤ 5000 |
+| 055 | Per-file budget enforcement | Auto | 1 large file, per_file_budget=500 | Single file truncated | token_estimate ≤ 500 |
+| 060 | Parse pyproject.toml | Auto | Valid pyproject.toml | Dict with name, dependencies | Keys present, deps list non-empty |
+| 070 | Parse package.json | Auto | Valid package.json | Dict with name, dependencies | Keys present, deps list non-empty |
+| 080 | Parse missing config | Auto | Repo with no config file | Empty dict | Returns {} |
+| 090 | Detect naming conventions | Auto | Python files with snake_case | PatternAnalysis.naming_convention set | Contains "snake_case" |
+| 100 | Detect TypedDict pattern | Auto | File with TypedDict import | PatternAnalysis.state_pattern set | Contains "TypedDict" |
+| 105 | Unknown pattern defaults | Auto | Empty file_contents dict | All fields "unknown" | All PatternAnalysis values == "unknown" |
+| 110 | Detect frameworks from deps | Auto | deps=["langgraph", "pytest"] | ["LangGraph", "pytest"] | Both detected |
+| 115 | Detect frameworks from imports | Auto | File with `from fastapi import` | ["FastAPI"] in result | FastAPI detected |
+| 120 | Extract CLAUDE.md conventions | Auto | CLAUDE.md with rule bullets | List of convention strings | Non-empty list, strings match rules |
+| 130 | Extract empty conventions | Auto | CLAUDE.md with no rules section | Empty list | Returns [] |
+| 140 | Full analysis happy path | Auto | Mock repo with all key files | Complete CodebaseContext | All fields populated |
+| 150 | Analysis with no repo_path | Auto | State with repo_path=None | Empty CodebaseContext | All fields empty/default |
+| 160 | Analysis with bad repo_path | Auto | State with non-existent path | Empty CodebaseContext | All fields empty/default |
+| 170 | Find related files - match | Auto | Issue "fix auth", repo has auth.py | [auth.py] | auth.py in results |
+| 180 | Find related files - no match | Auto | Issue "fix auth", repo has no auth | [] | Empty list |
+| 185 | Find related files - max results | Auto | Issue matching 10+ files | At most 5 paths | len(result) <= 5 |
+| 210 | Key file priority ordering | Auto | Repo with CLAUDE.md + README | CLAUDE.md before README | Index of CLAUDE.md < index of README |
+| 220 | Sensitive file exclusion | Auto | Repo with .env file | .env not in read results | .env path not in any FileReadResult |
+| 225 | is_sensitive_file detection | Auto | Various sensitive paths | True for .env, .pem; False for main.py | Correct bool for each |
+| 230 | Symlink outside repo blocked | Auto | Symlink to /tmp/secret.txt in repo | Empty content returned | FileReadResult.content == "" |
 
 ### 10.2 Test Commands
 
@@ -646,7 +637,7 @@ N/A - All scenarios automated.
 - [ ] Code comments reference this LLD (#401)
 
 ### Tests
-- [ ] All 31 test scenarios pass
+- [ ] All 27 test scenarios pass
 - [ ] Test coverage ≥95% for new code
 - [ ] Tests run in CI without flakiness
 
@@ -675,30 +666,9 @@ Mechanical validation automatically checks:
   - Symlink escape → `read_file_with_budget` (resolve + boundary check) ✓
   - Drafter/graph paths unknown → Deferred integration (state key contract specified) ✓
 
-**Requirement-to-Test Traceability:**
-
-| Requirement | Test Scenario IDs |
-|-------------|-------------------|
-| REQ-1 | 010, 060, 070, 120, 210 |
-| REQ-2 | 090, 100, 110, 115 |
-| REQ-3 | 170, 180, 185 |
-| REQ-4 | 140, 145 |
-| REQ-5 | 240 |
-| REQ-6 | 020, 050, 055 |
-| REQ-7 | 030, 040, 080, 105, 130, 150, 160 |
-| REQ-8 | 190 |
-| REQ-9 | 200, 205, 220, 225, 230 |
-
 **If files are missing from Section 2.1, the LLD is BLOCKED.**
 
 ---
-
-## Reviewer Suggestions
-
-*Non-blocking recommendations from the reviewer.*
-
-- **Constraint Handling:** In `extract_conventions_from_claude_md`, ensure that if the file is extremely large, we prioritized the rules section over general chatter to save tokens.
-- **Stop Words:** For `_find_related_files`, ensure standard English stop words (the, a, is, on, at) are filtered out to improve keyword matching quality.
 
 ## Appendix: Review Log
 
@@ -708,10 +678,7 @@ Mechanical validation automatically checks:
 
 | Review | Date | Verdict | Key Issue |
 |--------|------|---------|-----------|
-| 1 | 2026-02-18 | APPROVED | `gemini-3-pro-preview` |
 | Mechanical Validation | — | BLOCKED | `draft_lld.py` and `requirements_graph.py` paths do not exist |
-| LLD Revision #1 | — | REVISED | Removed non-existent Modify targets; deferred integration; added missing tests |
-| Mechanical Test Plan Validation | — | FAILED (66.7%) | REQ-4, REQ-8, REQ-9 had no test coverage |
-| LLD Revision #2 | — | REVISED | Added test scenarios 145, 190, 200, 205, 225, 240 for full REQ coverage; added traceability matrix |
+| LLD Revision | — | REVISED | Removed non-existent Modify targets; deferred integration; added missing tests |
 
-**Final Status:** APPROVED
+**Final Status:** PENDING
