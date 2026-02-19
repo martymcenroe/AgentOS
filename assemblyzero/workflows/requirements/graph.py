@@ -5,9 +5,11 @@ Issue #248: Add conditional edge for question-loop after review
 Issue #277: Add mechanical validation node before human gate
 Issue #334: Print validation errors in route_after_validate function
 Issue #166: Add test plan validation node (N1b) after mechanical validation
+Issue #401: Add codebase analysis node (N0b) between load_input and generate_draft
 
 Creates a LangGraph StateGraph that connects:
 - N0: load_input (brief or issue loading)
+- N0b: analyze_codebase (codebase context analysis - Issue #401, LLD only)
 - N1: generate_draft (pluggable drafter)
 - N1.5: validate_lld_mechanical (mechanical validation - Issue #277)
 - N1b: validate_test_plan (test plan coverage validation - Issue #166)
@@ -16,11 +18,11 @@ Creates a LangGraph StateGraph that connects:
 - N4: human_gate_verdict (human checkpoint)
 - N5: finalize (issue filing or LLD saving)
 
-Graph structure:
-    START -> N0 -> N1 -> N1.5 -> N1b -> N2 -> N3 -> N4 -> N5 -> END
-                    ^                          |         |
-                    |                          v         |
-                    +----------<---------------+---------+
+Graph structure (LLD workflow):
+    START -> N0 -> N0b -> N1 -> N1.5 -> N1b -> N2 -> N3 -> N4 -> N5 -> END
+                          ^                          |         |
+                          |                          v         |
+                          +----------<---------------+---------+
 
 Issue #248 addition: After N3 (review), if open questions are UNANSWERED,
 loop back to N3 with a followup prompt. If HUMAN_REQUIRED, force N4.
@@ -47,6 +49,7 @@ from typing import Literal
 from langgraph.graph import END, START, StateGraph
 
 from assemblyzero.workflows.requirements.nodes import (
+    analyze_codebase,
     finalize,
     generate_draft,
     human_gate_draft,
@@ -67,6 +70,7 @@ from assemblyzero.workflows.requirements.state import RequirementsWorkflowState
 # =============================================================================
 
 N0_LOAD_INPUT = "N0_load_input"
+N0B_ANALYZE_CODEBASE = "N0b_analyze_codebase"  # Issue #401
 N1_GENERATE_DRAFT = "N1_generate_draft"
 N1_5_VALIDATE_MECHANICAL = "N1_5_validate_mechanical"  # Issue #277
 N1B_VALIDATE_TEST_PLAN = "N1b_validate_test_plan"  # Issue #166
@@ -83,11 +87,14 @@ N5_FINALIZE = "N5_finalize"
 
 def route_after_load_input(
     state: RequirementsWorkflowState,
-) -> Literal["N1_generate_draft", "END"]:
+) -> Literal["N0b_analyze_codebase", "N1_generate_draft", "END"]:
     """Route after load_input node.
 
+    Issue #401: LLD workflows route through N0b (codebase analysis) first.
+
     Routes to:
-    - N1_generate_draft: Success
+    - N0b_analyze_codebase: LLD workflow (Issue #401)
+    - N1_generate_draft: Issue workflow
     - END: Error loading input
 
     Args:
@@ -98,6 +105,9 @@ def route_after_load_input(
     """
     if state.get("error_message"):
         return "END"
+    # Issue #401: LLD workflows analyze codebase before drafting
+    if state.get("workflow_type") == "lld":
+        return "N0b_analyze_codebase"
     return "N1_generate_draft"
 
 
@@ -354,16 +364,18 @@ def route_after_finalize(
 def create_requirements_graph() -> StateGraph:
     """Create the requirements workflow graph.
 
-    Graph structure:
-        START -> N0 -> N1 -> N1.5 -> N1b -> N2 -> N3 -> N4 -> N5 -> END
-                        ^                          |         |
-                        |                          v         |
-                        +----------<---------------+---------+
+    Graph structure (LLD workflow):
+        START -> N0 -> N0b -> N1 -> N1.5 -> N1b -> N2 -> N3 -> N4 -> N5 -> END
+                              ^                          |         |
+                              |                          v         |
+                              +----------<---------------+---------+
 
     Issue #248: N3 can now loop back to N1 when open questions are
     unanswered, or force N4 when questions require human decision.
 
     Issue #166: N1b validates test plan coverage after structural validation.
+
+    Issue #401: N0b analyzes target codebase for context (LLD workflows only).
 
     Returns:
         Uncompiled StateGraph.
@@ -373,6 +385,7 @@ def create_requirements_graph() -> StateGraph:
 
     # Add nodes
     graph.add_node(N0_LOAD_INPUT, load_input)
+    graph.add_node(N0B_ANALYZE_CODEBASE, analyze_codebase)  # Issue #401
     graph.add_node(N1_GENERATE_DRAFT, generate_draft)
     graph.add_node(N1_5_VALIDATE_MECHANICAL, validate_lld_mechanical)  # Issue #277
     graph.add_node(N1B_VALIDATE_TEST_PLAN, validate_test_plan_node)  # Issue #166
@@ -385,15 +398,20 @@ def create_requirements_graph() -> StateGraph:
     # START -> N0
     graph.add_edge(START, N0_LOAD_INPUT)
 
-    # N0 -> N1 or END (on error)
+    # N0 -> N0b (LLD) or N1 or END (on error)
+    # Issue #401: LLD workflows go through codebase analysis
     graph.add_conditional_edges(
         N0_LOAD_INPUT,
         route_after_load_input,
         {
+            "N0b_analyze_codebase": N0B_ANALYZE_CODEBASE,
             "N1_generate_draft": N1_GENERATE_DRAFT,
             "END": END,
         },
     )
+
+    # N0b -> N1 (always proceeds to draft generation)
+    graph.add_edge(N0B_ANALYZE_CODEBASE, N1_GENERATE_DRAFT)
 
     # N1 -> N1.5 (LLD) or N2 or N3 or END (based on workflow type, gates, error)
     # Issue #277: LLD workflows go through mechanical validation

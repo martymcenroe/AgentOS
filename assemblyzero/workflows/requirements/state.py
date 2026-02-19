@@ -229,6 +229,9 @@ class RequirementsWorkflowState(TypedDict, total=False):
     lineage_path: str
     draft_number: int
 
+    # Codebase context (Issue #401)
+    codebase_context: dict
+
 
 def create_initial_state(
     workflow_type: Literal["issue", "lld"],

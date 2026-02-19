@@ -183,6 +183,14 @@ def _build_prompt(
         input_content = f"# Issue #{issue_number}: {issue_title}\n\n{issue_body}"
         if context_content:
             input_content += f"\n\n## Context\n\n{context_content}"
+
+        # Issue #401: Inject codebase context from N0b analyze_codebase node
+        codebase_ctx = state.get("codebase_context")
+        if codebase_ctx and isinstance(codebase_ctx, dict):
+            codebase_section = _format_codebase_context(codebase_ctx)
+            if codebase_section:
+                input_content += f"\n\n{codebase_section}"
+
         input_content += f"\n\n**CRITICAL: This LLD is for GitHub Issue #{issue_number}. Use this exact issue number in all references.**"
         input_label = f"GitHub Issue #{issue_number}"
 
@@ -282,6 +290,62 @@ Create a complete document following the template structure.
 START YOUR RESPONSE WITH THE # HEADING. NO PREAMBLE."""
 
     return prompt
+
+
+def _format_codebase_context(ctx: dict) -> str:
+    """Format CodebaseContext dict into a markdown section for the drafter prompt.
+
+    Issue #401: Converts the structured codebase analysis into a human-readable
+    section that helps the drafter produce grounded LLDs.
+
+    Args:
+        ctx: CodebaseContext dict from analyze_codebase node.
+
+    Returns:
+        Formatted markdown string, or empty string if context is empty.
+    """
+    parts: list[str] = []
+
+    project_desc = ctx.get("project_description", "")
+    if project_desc:
+        parts.append(f"## Codebase Analysis\n\n{project_desc}")
+
+    conventions = ctx.get("conventions", [])
+    if conventions:
+        conv_lines = "\n".join(f"- {c}" for c in conventions)
+        parts.append(f"### Coding Conventions\n\n{conv_lines}")
+
+    frameworks = ctx.get("frameworks", [])
+    if frameworks:
+        fw_lines = "\n".join(f"- {f}" for f in frameworks)
+        parts.append(f"### Frameworks & Libraries\n\n{fw_lines}")
+
+    module_structure = ctx.get("module_structure", "")
+    if module_structure:
+        parts.append(f"### Module Structure\n\n```\n{module_structure}\n```")
+
+    key_excerpts = ctx.get("key_file_excerpts", {})
+    if key_excerpts:
+        excerpt_parts = []
+        for path, content in key_excerpts.items():
+            excerpt_parts.append(f"**{path}**:\n```\n{content}\n```")
+        parts.append("### Key File Excerpts\n\n" + "\n\n".join(excerpt_parts))
+
+    related_code = ctx.get("related_code", {})
+    if related_code:
+        related_parts = []
+        for path, content in related_code.items():
+            related_parts.append(f"**{path}**:\n```\n{content}\n```")
+        parts.append("### Related Code\n\n" + "\n\n".join(related_parts))
+
+    dep_summary = ctx.get("dependency_summary", "")
+    if dep_summary:
+        parts.append(f"### Dependencies\n\n{dep_summary}")
+
+    if not parts:
+        return ""
+
+    return "\n\n".join(parts)
 
 
 def validate_draft_structure(content: str) -> str | None:
