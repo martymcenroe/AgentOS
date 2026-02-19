@@ -77,7 +77,7 @@ class WorkflowConfig:
 
     Attributes:
         workflow_type: Either "issue" or "lld".
-        drafter: LLM provider spec for drafting (e.g., "claude:opus-4.5").
+        drafter: LLM provider spec for drafting (e.g., "claude:opus").
         reviewer: LLM provider spec for reviewing (e.g., "gemini:2.5-pro").
         draft_template_path: Path to template file (relative to assemblyzero_root).
         review_prompt_path: Path to review prompt (relative to assemblyzero_root).
@@ -90,7 +90,7 @@ class WorkflowConfig:
     """
 
     workflow_type: Literal["issue", "lld"]
-    drafter: str = "claude:opus-4.5"
+    drafter: str = "claude:opus"
     reviewer: str = "gemini:3-pro-preview"
     draft_template_path: Path = field(default_factory=lambda: Path(""))
     review_prompt_path: Path = field(default_factory=lambda: Path(""))
@@ -158,7 +158,7 @@ class WorkflowConfig:
 
 
 def create_issue_config(
-    drafter: str = "claude:opus-4.5",
+    drafter: str = "claude:opus",
     reviewer: str = "gemini:3-pro-preview",
     gates: str = "none",
     max_iterations: int = 20,
@@ -198,7 +198,7 @@ def create_issue_config(
 
 
 def create_lld_config(
-    drafter: str = "claude:opus-4.5",
+    drafter: str = "claude:opus",
     reviewer: str = "gemini:3-pro-preview",
     gates: str = "none",
     max_iterations: int = 20,
